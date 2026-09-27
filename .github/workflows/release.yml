@@ -155,22 +155,6 @@ jobs:
             ${{ matrix.archive }}.sha256
             js/packages/cli/${{ matrix.binding }}
 
-  publish-crates:
-    name: Publish crates.io packages
-    needs: build
-    runs-on: macos-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Publish Rust crates
-        run: cargo publish --workspace --locked
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
   publish:
     name: Publish release artifacts
     needs:
@@ -263,6 +247,8 @@ jobs:
             ${{ matrix.archive }}
             ${{ matrix.archive }}.sha256
 
+  # NOTICE: NAPI and CLI npm packages need the binaries built for a GitHub
+  # Release, so they remain on this event instead of the registry tag workflow.
   publish-npm-cli:
     name: Publish NAPI and CLI npm packages
     needs: publish
