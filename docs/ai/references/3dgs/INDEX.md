@@ -28,6 +28,7 @@
 
 ## 相关文档
 
+- [`2026-09-27-autolabel-spike.md`](2026-09-27-autolabel-spike.md) - Step 6a 自动标注 Spike 验证报告（闭集 YOLO 数据管线可行性与吞吐硬实测）
 - [`2026-09-27-yolo-domain-drift-measurement.md`](2026-09-27-yolo-domain-drift-measurement.md) - YOLO-World 零样本在 Minecraft 实机截图上的域漂移实测与必须微调裁决
 - [`2026-09-27-step5-agent-integration.md`](2026-09-27-step5-agent-integration.md) - Step 5 Agent 集成与有界实战测试（1Hz 循环、记忆动作 wiring、实测指标）
 - [`2026-09-26-spatial-memory-boundaries.md`](2026-09-26-spatial-memory-boundaries.md) - 结构化空间记忆架构边界 ADR（6 条系统级已知局限）

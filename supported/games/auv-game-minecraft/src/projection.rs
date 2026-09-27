@@ -89,6 +89,58 @@ impl MinecraftProjector {
     Ok(radius)
   }
 
+  /// Projects a block's 3D AABB (8 corners) to 2D screen bounding box [min_x, min_y, max_x, max_y] in pixels.
+  /// Returns None if the block has no visible corners in front of the camera or is entirely off-screen.
+  pub fn project_block_2d_bbox(&self, block_pos: BlockPosition) -> Result<Option<[f64; 4]>, String> {
+    let mut min_x = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    let mut visible_corner_count = 0usize;
+
+    for corner in block_pos.aabb_corners() {
+      if let Some(screen_projection) = self.project_unclipped_screen_point(corner, 2.0)? {
+        min_x = min_x.min(screen_projection.x);
+        max_x = max_x.max(screen_projection.x);
+        min_y = min_y.min(screen_projection.y);
+        max_y = max_y.max(screen_projection.y);
+        visible_corner_count += 1;
+      }
+    }
+
+    if visible_corner_count == 0 {
+      return Ok(None);
+    }
+
+    let width = f64::from(self.frame.viewport.width);
+    let height = f64::from(self.frame.viewport.height);
+
+    let clamped_min_x = min_x.clamp(0.0, width);
+    let clamped_max_x = max_x.clamp(0.0, width);
+    let clamped_min_y = min_y.clamp(0.0, height);
+    let clamped_max_y = max_y.clamp(0.0, height);
+
+    if clamped_max_x <= clamped_min_x || clamped_max_y <= clamped_min_y {
+      return Ok(None);
+    }
+
+    Ok(Some([clamped_min_x, clamped_min_y, clamped_max_x, clamped_max_y]))
+  }
+
+  /// Projects a block's 3D AABB to normalized YOLO format: [cx, cy, w, h] in [0.0, 1.0].
+  pub fn project_block_yolo_bbox(&self, block_pos: BlockPosition) -> Result<Option<[f64; 4]>, String> {
+    let Some([min_x, min_y, max_x, max_y]) = self.project_block_2d_bbox(block_pos)? else {
+      return Ok(None);
+    };
+    let width = f64::from(self.frame.viewport.width);
+    let height = f64::from(self.frame.viewport.height);
+    let w = (max_x - min_x) / width;
+    let h = (max_y - min_y) / height;
+    let cx = (min_x + max_x) * 0.5 / width;
+    let cy = (min_y + max_y) * 0.5 / height;
+    Ok(Some([cx, cy, w, h]))
+  }
+
   pub fn build_projection_artifact(
     &self,
     projected_point: Option<MinecraftProjectedPoint>,
@@ -105,6 +157,34 @@ impl MinecraftProjector {
       basis_frame_id: self.frame.spatial_frame_id.clone(),
       confidence: 1.0,
     }
+  }
+
+  fn project_unclipped_screen_point(&self, world: Vec3, ndc_limit: f64) -> Result<Option<ScreenProjection>, String> {
+    let clip = self.project_vec4(world);
+    if !clip.iter().all(|value| value.is_finite()) {
+      return Err("projection produced non-finite clip coordinates".to_string());
+    }
+    if clip[3] <= 0.0 {
+      return Ok(None);
+    }
+
+    let ndc_x = clip[0] / clip[3];
+    let ndc_y = clip[1] / clip[3];
+    let ndc_z = clip[2] / clip[3];
+    if [ndc_x, ndc_y, ndc_z].iter().any(|value| !value.is_finite()) {
+      return Err("projection produced non-finite normalized device coordinates".to_string());
+    }
+    if !(-ndc_limit..=ndc_limit).contains(&ndc_x) || !(-ndc_limit..=ndc_limit).contains(&ndc_y) || !(-ndc_limit..=ndc_limit).contains(&ndc_z)
+    {
+      return Ok(None);
+    }
+
+    let width = f64::from(self.frame.viewport.width);
+    let height = f64::from(self.frame.viewport.height);
+    let x = (ndc_x * 0.5 + 0.5) * width;
+    let y = (1.0 - (ndc_y * 0.5 + 0.5)) * height;
+
+    Ok(Some(ScreenProjection { x, y }))
   }
 
   fn project_screen_point(&self, world: Vec3, ndc_limit: f64) -> Result<Option<ScreenProjection>, String> {
@@ -224,4 +304,73 @@ fn multiply_mat4_vec4(matrix: &[f64; 16], vector: [f64; 4]) -> [f64; 4] {
     matrix[2] * vector[0] + matrix[6] * vector[1] + matrix[10] * vector[2] + matrix[14] * vector[3],
     matrix[3] * vector[0] + matrix[7] * vector[1] + matrix[11] * vector[2] + matrix[15] * vector[3],
   ]
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::types::{BlockFace, BlockPosition, PlayerPose, RaycastHit, Vec3, Viewport};
+
+  fn test_v01_frame() -> MinecraftSpatialFrame {
+    MinecraftSpatialFrame {
+      spatial_frame_id: "test-v01".to_string(),
+      world_tick: 144173,
+      monotonic_timestamp_ms: 9194254,
+      telemetry_session_id: Some("aa651e23-bb4d-4df0-8d65-0ca6be11791f".to_string()),
+      viewport: Viewport::new(854, 480),
+      view_matrix: [
+        -0.98643, 0.034136, -0.160596, 0.0, 0.0, 0.978148, 0.207912, 0.0, 0.164184, 0.20509, -0.964874, 0.0, 0.0, 0.0, 0.0, 1.0,
+      ],
+      projection_matrix: [
+        0.802706, 0.0, -0.0, -0.0, 0.0, 1.428148, -0.0, -0.0, 0.0, 0.0, -1.00013, -1.0, 0.0, -0.0, -0.100007, -0.0,
+      ],
+      player_pose: PlayerPose {
+        eye_position: Vec3::new(-22.662026, 82.62, 39.552317),
+        yaw: -9.449891,
+        pitch: 12.000004,
+      },
+      raycast_hit: Some(RaycastHit {
+        block_pos: BlockPosition::new(-22, 81, 43),
+        face: BlockFace::West,
+        block_id: "minecraft:grass_block".to_string(),
+      }),
+      nearby_blocks: vec![],
+      nearby_entities: vec![],
+      inventory_summary: vec![],
+      screenshot_artifact_ref: None,
+      mc_capture_skew_ms: None,
+      screen_state: None,
+      resource_pack_ids: vec![],
+    }
+  }
+
+  #[test]
+  fn test_project_block_2d_bbox_and_yolo() {
+    let frame = test_v01_frame();
+    let projector = MinecraftProjector::new(frame).expect("projector");
+    let target_pos = BlockPosition::new(-22, 81, 43);
+
+    let bbox_px = projector.project_block_2d_bbox(target_pos).expect("project 2d bbox");
+    assert!(bbox_px.is_some(), "target block in front of camera must produce a 2d bbox");
+    let [min_x, min_y, max_x, max_y] = bbox_px.unwrap();
+
+    assert!(max_x > min_x, "width must be positive");
+    assert!(max_y > min_y, "height must be positive");
+    assert!(min_x >= 0.0 && max_x <= 854.0, "x within viewport");
+    assert!(min_y >= 0.0 && max_y <= 480.0, "y within viewport");
+
+    // Check YOLO normalized bbox
+    let yolo_bbox = projector.project_block_yolo_bbox(target_pos).expect("project yolo bbox");
+    assert!(yolo_bbox.is_some());
+    let [cx, cy, w, h] = yolo_bbox.unwrap();
+    assert!(cx > 0.0 && cx < 1.0, "cx in (0, 1)");
+    assert!(cy > 0.0 && cy < 1.0, "cy in (0, 1)");
+    assert!(w > 0.0 && w <= 1.0, "w in (0, 1]");
+    assert!(h > 0.0 && h <= 1.0, "h in (0, 1]");
+
+    let px_cx = cx * 854.0;
+    let px_cy = cy * 480.0;
+    assert!((px_cx - 427.0).abs() < 50.0, "cx should be near screen center, got {}", px_cx);
+    assert!((px_cy - 240.0).abs() < 70.0, "cy should be near screen center, got {}", px_cy);
+  }
 }
