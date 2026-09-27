@@ -34,7 +34,7 @@ pub use input::{
   ScrollDeliveryStrategy, ScrollOptions, TextSubmit, TypeTextOptions, WaitOptions, WindowClickStrategy, WindowInput,
 };
 pub use keyboard::{Key, Keysym, Modifier};
-pub use keyboard_input::{KeyboardBackend, KeyboardCoordinator, KeyboardHold, KeyboardHoldId, keyboard_coordinator};
+pub use keyboard_input::{KeyboardBackend, KeyboardHold, KeyboardHoldController, KeyboardHoldId, keyboard_hold_controller};
 pub use mouse::{
   MouseCubicBezierSegment, MouseCurve, MouseCurveMapping, MouseMotionOptions, MouseMotionSample, MouseSamples, MouseStart, MoveMouseRequest,
 };

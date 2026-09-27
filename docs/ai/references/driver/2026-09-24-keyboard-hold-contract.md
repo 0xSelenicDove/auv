@@ -39,7 +39,7 @@ finally {
 
 ## Ownership and release
 
-The process-wide coordinator admits one held combination at a time. It records
+The process-wide controller admits one held combination at a time. It records
 ownership before native posting, releases keys in reverse order after a failed
 down, and retains an uncertain hold after a failed up so the caller can retry
 the same ID. A later `KeyUp` for the most recently released ID returns `Noop`.
@@ -48,12 +48,12 @@ Separate processes and physical input are outside this admission scope.
 Rust callers retain a `KeyboardHold` guard. Explicit `release()` reports errors;
 its `Drop` makes a best-effort release. A Runner RPC transfers the hold ID out
 of that guard so the key can remain down across calls. Runner teardown calls
-coordinator `shutdown()` to attempt release. The coordinator is held by a
+controller `shutdown()` to attempt release. The controller is held by a
 process-wide static and cannot use its own `Drop` for process-exit cleanup.
 Timeout cleanup runs only while the process remains alive. A failed release is
 still uncertain, rather than a guarantee that no key remains down.
 
-`HoldKeys` leaves its own release a one-second margin before the coordinator's
+`HoldKeys` leaves its own release a one-second margin before the controller's
 fallback deadline, so its normal result describes that release transition.
 Cancellation during a blocking hold attempts the same release.
 

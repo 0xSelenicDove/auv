@@ -48,13 +48,13 @@ impl Drop for LocalInputService {
     // NOTICE: key_down transfers the guard with into_id(), so returning from an
     // RPC must not release the keys. This service triggers cleanup on teardown,
     // assuming one input service owns the process-wide cross-call hold.
-    // The static coordinator is never dropped; its Drop cannot do exit cleanup.
+    // The static controller is never dropped; its Drop cannot do exit cleanup.
     // Errors cannot be returned from Drop. Timeout cleanup can still attempt
     // release if this fails, but only while the process remains alive.
     // TODO: On the next Runner shutdown lifecycle change, move this call beside
     // mouse shutdown in serve_inherited() to report errors; this comment-only
     // clarification leaves that lifecycle change for a separate slice.
-    let _ = auv_driver::keyboard_coordinator().shutdown();
+    let _ = auv_driver::keyboard_hold_controller().shutdown();
   }
 }
 

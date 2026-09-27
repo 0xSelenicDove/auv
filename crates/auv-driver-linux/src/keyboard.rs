@@ -60,12 +60,12 @@ impl InputApi<'_> {
       ..Default::default()
     })?;
     let backend = crate::input::held_keyboard_backend(&self.session.state, &symbols)?;
-    let coordinator = auv_driver_common::keyboard_coordinator().clone();
-    coordinator.down(backend, timeout)
+    let controller = auv_driver_common::keyboard_hold_controller().clone();
+    controller.down(backend, timeout)
   }
 
   pub fn key_up(&self, hold: auv_driver_common::KeyboardHoldId) -> DriverResult<InputActionResult> {
-    auv_driver_common::keyboard_coordinator().up(hold)
+    auv_driver_common::keyboard_hold_controller().up(hold)
   }
 
   pub fn hold_keys(
@@ -75,7 +75,7 @@ impl InputApi<'_> {
     policy: InputPolicy,
     duration: Duration,
   ) -> DriverResult<InputActionResult> {
-    // Give this call time to release before the coordinator's fallback deadline.
+    // Give this call time to release before the controller's fallback deadline.
     let mut hold = self.key_down(target, keys, policy, duration.saturating_add(Duration::from_secs(1)))?;
     hold.wait_and_release(duration)
   }

@@ -154,16 +154,16 @@ pub fn key_down(target: &InputTarget, keys: Vec<String>, policy: InputPolicy, ti
     }
     codes.push(code);
   }
-  let coordinator = auv_driver_common::keyboard_coordinator().clone();
-  coordinator.down(std::sync::Arc::new(HeldKeyboardBackend { keys: codes }), timeout)
+  let controller = auv_driver_common::keyboard_hold_controller().clone();
+  controller.down(std::sync::Arc::new(HeldKeyboardBackend { keys: codes }), timeout)
 }
 
 pub fn key_up(hold: KeyboardHoldId) -> DriverResult<InputActionResult> {
-  auv_driver_common::keyboard_coordinator().up(hold)
+  auv_driver_common::keyboard_hold_controller().up(hold)
 }
 
 pub fn hold_keys(target: &InputTarget, keys: Vec<String>, policy: InputPolicy, duration: Duration) -> DriverResult<InputActionResult> {
-  // Give this call time to release before the coordinator's fallback deadline.
+  // Give this call time to release before the controller's fallback deadline.
   let mut hold = key_down(target, keys, policy, duration.saturating_add(Duration::from_secs(1)))?;
   hold.wait_and_release(duration)
 }

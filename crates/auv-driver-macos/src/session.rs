@@ -585,6 +585,7 @@ impl InputApi<'_> {
       return Err(invalid_input("background keyboard input requires an application or window target"));
     }
     let recipient = match target {
+      // Foreground posts through the session event tap; it needs no PID/window pair.
       InputTarget::Foreground => None,
       _ => Some(resolve_input_target(target)?),
     };
@@ -595,13 +596,13 @@ impl InputApi<'_> {
         crate::native::window::validate_input_target(recipient.0, recipient.1, false).map_err(backend)?;
       }
     }
-    let coordinator = auv_driver_common::keyboard_coordinator().clone();
+    let controller = auv_driver_common::keyboard_hold_controller().clone();
     let backend = std::sync::Arc::new(HeldKeyboardBackend { recipient, codes });
-    coordinator.down(backend, timeout)
+    controller.down(backend, timeout)
   }
 
   pub fn key_up(&self, hold: auv_driver_common::KeyboardHoldId) -> DriverResult<InputActionResult> {
-    auv_driver_common::keyboard_coordinator().up(hold)
+    auv_driver_common::keyboard_hold_controller().up(hold)
   }
 
   /// Hold and release under one call, including timeout cleanup.
@@ -613,7 +614,7 @@ impl InputApi<'_> {
     duration: Duration,
   ) -> DriverResult<InputActionResult> {
     // Leave a cleanup margin so the bounded call normally owns its release;
-    // the coordinator deadline remains a fallback if this call stalls.
+    // the controller deadline remains a fallback if this call stalls.
     let mut hold = self.key_down(target, keys, policy, duration.saturating_add(Duration::from_secs(1)))?;
     hold.wait_and_release(duration)
   }

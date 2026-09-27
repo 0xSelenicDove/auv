@@ -1,7 +1,7 @@
 //! Bounded ownership of a held keyboard combination.
 //!
 //! A hold retains its original delivery route until every key is released.
-//! The coordinator owns one held combination per local driver process; other
+//! The controller owns one held combination per local driver process; other
 //! processes and physical keyboard input are outside this guarantee.
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -35,23 +35,23 @@ struct State {
 }
 
 #[derive(Default)]
-pub struct KeyboardCoordinator {
+pub struct KeyboardHoldController {
   state: Mutex<State>,
   changed: Condvar,
 }
 
-/// Return the process-wide keyboard coordinator.
+/// Return the process-wide keyboard hold controller.
 ///
 /// NOTICE: The static retains a strong Arc and is not dropped at process exit.
-/// Coordinator Drop therefore cannot release outstanding holds on exit; owners
+/// Controller Drop therefore cannot release outstanding holds on exit; owners
 /// that transfer holds with `KeyboardHold::into_id` must call `shutdown` while
 /// the input backend is still available.
-pub fn keyboard_coordinator() -> &'static Arc<KeyboardCoordinator> {
-  static COORDINATOR: OnceLock<Arc<KeyboardCoordinator>> = OnceLock::new();
-  COORDINATOR.get_or_init(|| Arc::new(KeyboardCoordinator::default()))
+pub fn keyboard_hold_controller() -> &'static Arc<KeyboardHoldController> {
+  static CONTROLLER: OnceLock<Arc<KeyboardHoldController>> = OnceLock::new();
+  CONTROLLER.get_or_init(|| Arc::new(KeyboardHoldController::default()))
 }
 
-impl KeyboardCoordinator {
+impl KeyboardHoldController {
   /// Post a bounded down transition. The returned ID remains valid after a
   /// failed release so callers can retry without selecting a new route.
   pub fn down(self: &Arc<Self>, backend: Arc<dyn KeyboardBackend>, timeout: Duration) -> DriverResult<KeyboardHold> {
@@ -105,9 +105,9 @@ impl KeyboardCoordinator {
       let cleanup = self.up(id);
       return Err(combine(error, cleanup.err()));
     }
-    let coordinator = self.clone();
+    let controller = self.clone();
     std::thread::spawn(move || {
-      let mut state = coordinator.state.lock().unwrap();
+      let mut state = controller.state.lock().unwrap();
       loop {
         let Some(held) = state.held.as_ref().filter(|held| held.id == id) else {
           return;
@@ -115,15 +115,15 @@ impl KeyboardCoordinator {
         let remaining = held.deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() || held.cancellation.as_ref().is_some_and(|flag| flag.is_cancelled()) {
           drop(state);
-          let _ = coordinator.up(id);
+          let _ = controller.up(id);
           return;
         }
-        state = coordinator.changed.wait_timeout(state, remaining.min(Duration::from_millis(10))).unwrap().0;
+        state = controller.changed.wait_timeout(state, remaining.min(Duration::from_millis(10))).unwrap().0;
       }
     });
     Ok(KeyboardHold {
       id: Some(id),
-      coordinator: self.clone(),
+      controller: self.clone(),
       down: backend.result(),
     })
   }
@@ -182,7 +182,7 @@ impl KeyboardCoordinator {
 /// Local Rust ownership. Explicit release reports errors; Drop attempts cleanup.
 pub struct KeyboardHold {
   id: Option<KeyboardHoldId>,
-  coordinator: Arc<KeyboardCoordinator>,
+  controller: Arc<KeyboardHoldController>,
   down: InputActionResult,
 }
 
@@ -193,7 +193,7 @@ impl KeyboardHold {
 
   pub fn release(&mut self) -> DriverResult<InputActionResult> {
     let id = self.id.ok_or_else(|| invalid("keyboard hold already released"))?;
-    let result = self.coordinator.up(id)?;
+    let result = self.controller.up(id)?;
     self.id = None;
     Ok(result)
   }
@@ -201,7 +201,7 @@ impl KeyboardHold {
   /// Wait for a bounded dwell; cancellation triggers prompt release.
   pub fn wait_and_release(&mut self, duration: Duration) -> DriverResult<InputActionResult> {
     let deadline = Instant::now().checked_add(duration).ok_or_else(|| invalid("keyboard hold duration exceeds the platform clock range"))?;
-    let mut state = self.coordinator.state.lock().unwrap();
+    let mut state = self.controller.state.lock().unwrap();
     let mut cancelled = false;
     loop {
       if state.held.as_ref().is_none_or(|held| Some(held.id) != self.id) {
@@ -212,7 +212,7 @@ impl KeyboardHold {
       if cancelled || remaining.is_zero() {
         break;
       }
-      state = self.coordinator.changed.wait_timeout(state, remaining.min(Duration::from_millis(10))).unwrap().0;
+      state = self.controller.changed.wait_timeout(state, remaining.min(Duration::from_millis(10))).unwrap().0;
     }
     drop(state);
     cancelled |= crate::mouse_input::current_input_cancellation().as_ref().is_some_and(|flag| flag.is_cancelled());
@@ -227,7 +227,7 @@ impl KeyboardHold {
   ///
   /// This disables this guard's Drop cleanup so the keys stay down after the
   /// current RPC returns. The Runner must release the ID with `key_up` or call
-  /// coordinator `shutdown` when its service ends. Timeout cleanup can only
+  /// controller `shutdown` when its service ends. Timeout cleanup can only
   /// run while the process is alive.
   pub fn into_id(mut self) -> KeyboardHoldId {
     self.id.take().expect("held keyboard ID")
@@ -237,7 +237,7 @@ impl KeyboardHold {
 impl Drop for KeyboardHold {
   fn drop(&mut self) {
     if let Some(id) = self.id.take() {
-      let _ = self.coordinator.up(id);
+      let _ = self.controller.up(id);
     }
   }
 }
@@ -298,10 +298,10 @@ mod tests {
 
   #[test]
   fn combination_releases_in_reverse_order() {
-    let coordinator = Arc::new(KeyboardCoordinator::default());
+    let controller = Arc::new(KeyboardHoldController::default());
     let backend = FakeBackend::new(3);
-    let id = coordinator.down(backend.clone(), Duration::from_secs(1)).unwrap().into_id();
-    coordinator.up(id).unwrap();
+    let id = controller.down(backend.clone(), Duration::from_secs(1)).unwrap().into_id();
+    controller.up(id).unwrap();
     assert_eq!(
       *backend.events.lock().unwrap(),
       vec![
@@ -313,54 +313,54 @@ mod tests {
         (0, false)
       ]
     );
-    assert_eq!(coordinator.up(id).unwrap().selected_path, InputDeliveryPath::Noop);
+    assert_eq!(controller.up(id).unwrap().selected_path, InputDeliveryPath::Noop);
   }
 
   #[test]
   fn failed_release_retains_hold_for_explicit_retry() {
-    let coordinator = Arc::new(KeyboardCoordinator::default());
+    let controller = Arc::new(KeyboardHoldController::default());
     let backend = FakeBackend::new(1);
-    let id = coordinator.down(backend.clone(), Duration::from_secs(1)).unwrap().into_id();
+    let id = controller.down(backend.clone(), Duration::from_secs(1)).unwrap().into_id();
     backend.fail_release_once.store(true, Ordering::SeqCst);
-    assert!(coordinator.up(id).is_err());
-    assert!(coordinator.down(FakeBackend::new(1), Duration::from_secs(1)).is_err());
-    coordinator.up(id).unwrap();
+    assert!(controller.up(id).is_err());
+    assert!(controller.down(FakeBackend::new(1), Duration::from_secs(1)).is_err());
+    controller.up(id).unwrap();
     assert_eq!(*backend.events.lock().unwrap(), vec![(0, true), (0, false), (0, false)]);
   }
 
   #[test]
   fn cancellation_releases_without_waiting_for_timeout() {
-    let coordinator = Arc::new(KeyboardCoordinator::default());
+    let controller = Arc::new(KeyboardHoldController::default());
     let backend = FakeBackend::new(1);
     let flag = Arc::new(crate::mouse_input::InputCancellation::default());
-    let id = crate::mouse_input::with_input_cancellation(flag.clone(), || coordinator.down(backend.clone(), Duration::from_secs(5)))
+    let id = crate::mouse_input::with_input_cancellation(flag.clone(), || controller.down(backend.clone(), Duration::from_secs(5)))
       .unwrap()
       .into_id();
     flag.cancel();
     let deadline = Instant::now() + Duration::from_secs(1);
-    let mut state = coordinator.state.lock().unwrap();
+    let mut state = controller.state.lock().unwrap();
     while state.held.is_some() && Instant::now() < deadline {
-      state = coordinator.changed.wait_timeout(state, Duration::from_millis(20)).unwrap().0;
+      state = controller.changed.wait_timeout(state, Duration::from_millis(20)).unwrap().0;
     }
     assert!(state.held.is_none());
     drop(state);
-    assert_eq!(coordinator.up(id).unwrap().selected_path, InputDeliveryPath::Noop);
+    assert_eq!(controller.up(id).unwrap().selected_path, InputDeliveryPath::Noop);
     assert_eq!(*backend.events.lock().unwrap(), vec![(0, true), (0, false)]);
   }
 
   #[test]
   fn deadline_releases_an_abandoned_hold() {
-    let coordinator = Arc::new(KeyboardCoordinator::default());
+    let controller = Arc::new(KeyboardHoldController::default());
     let backend = FakeBackend::new(1);
-    let id = coordinator.down(backend.clone(), Duration::from_millis(10)).unwrap().into_id();
+    let id = controller.down(backend.clone(), Duration::from_millis(10)).unwrap().into_id();
     let deadline = Instant::now() + Duration::from_secs(1);
-    let mut state = coordinator.state.lock().unwrap();
+    let mut state = controller.state.lock().unwrap();
     while state.held.is_some() && Instant::now() < deadline {
-      state = coordinator.changed.wait_timeout(state, Duration::from_millis(20)).unwrap().0;
+      state = controller.changed.wait_timeout(state, Duration::from_millis(20)).unwrap().0;
     }
     assert!(state.held.is_none());
     drop(state);
-    assert_eq!(coordinator.up(id).unwrap().selected_path, InputDeliveryPath::Noop);
+    assert_eq!(controller.up(id).unwrap().selected_path, InputDeliveryPath::Noop);
     assert_eq!(*backend.events.lock().unwrap(), vec![(0, true), (0, false)]);
   }
 }
