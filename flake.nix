@@ -43,6 +43,15 @@
 
               # clang
               clang
+
+              # native vendored libraries
+              cmake
+            ]) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+              (pkgs.writeShellScriptBin "swiftc" ''
+                unset DEVELOPER_DIR
+                unset SDKROOT
+                exec /usr/bin/swiftc "$@"
+              '')
             ];
 
             buildInputs = (with pkgs; [
@@ -50,6 +59,8 @@
               tesseract
               leptonica
               llvmPackages.libclang
+            ]) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (with pkgs; [
+              libiconv
             ]) ++ pkgs.lib.optionals pkgs.stdenv.isLinux (with pkgs; [
               wayland
               libglvnd
