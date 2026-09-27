@@ -107,11 +107,37 @@ impl YoloWorldDetector {
     self.config.confidence_threshold = threshold;
   }
 
-  pub fn detect(&self, image: &DynamicImage) -> Result<Vec<Detection>, String> {
+  pub fn with_custom_embeddings(mut self, classes: Vec<String>, embeds_flat: Vec<f32>) -> Result<Self, String> {
+    if embeds_flat.len() != classes.len() * 512 {
+      return Err(format!("expected {} floats for {} classes with 512-dim, got {}", classes.len() * 512, classes.len(), embeds_flat.len()));
+    }
+    self.num_classes = classes.len();
+    self.config.classes = classes;
+    self.text_embeds_flat = embeds_flat;
+    Ok(self)
+  }
+
+  pub fn with_embeddings_json(mut self, json_str: &str) -> Result<Self, String> {
+    let parsed: StoredEmbeddings = serde_json::from_str(json_str).map_err(|err| format!("failed to parse custom embeddings: {err}"))?;
+    let num_classes = parsed.classes.len();
+    let mut flat = Vec::with_capacity(num_classes * 512);
+    for row in parsed.embeds {
+      if row.len() != 512 {
+        return Err(format!("expected 512-dim embedding, got {}", row.len()));
+      }
+      flat.extend(row);
+    }
+    self.num_classes = num_classes;
+    self.config.classes = parsed.classes;
+    self.text_embeds_flat = flat;
+    Ok(self)
+  }
+
+  fn run_forward(&self, image: &DynamicImage) -> Result<(F32Tensor, f64, f64), String> {
     let orig_w = image.width() as f64;
     let orig_h = image.height() as f64;
     if orig_w == 0.0 || orig_h == 0.0 {
-      return Ok(Vec::new());
+      return Err("image dimensions must be non-zero".to_string());
     }
 
     let input_sz = self.config.input_size;
@@ -151,11 +177,41 @@ impl YoloWorldDetector {
       return Err(format!("unexpected output0 shape: {:?}", out.shape));
     }
     let channels = out.shape[1];
-    let num_anchors = out.shape[2];
     if channels < 4 + self.num_classes {
       return Err(format!("output channels ({channels}) smaller than 4 + {}", self.num_classes));
     }
 
+    Ok((out, orig_w, orig_h))
+  }
+
+  pub fn max_scores_by_class(&self, image: &DynamicImage) -> Result<Vec<(String, f64)>, String> {
+    let (out, _, _) = self.run_forward(image)?;
+    let num_anchors = out.shape[2];
+    let mut res = Vec::with_capacity(self.num_classes);
+    for c in 0..self.num_classes {
+      let mut max_score = 0.0f32;
+      for a in 0..num_anchors {
+        let score = out.data[(4 + c) * num_anchors + a];
+        if score > max_score {
+          max_score = score;
+        }
+      }
+      let label = self.config.classes.get(c).cloned().unwrap_or_else(|| format!("class_{c}"));
+      res.push((label, f64::from(max_score)));
+    }
+    Ok(res)
+  }
+
+  pub fn detect(&self, image: &DynamicImage) -> Result<Vec<Detection>, String> {
+    let orig_w = image.width() as f64;
+    let orig_h = image.height() as f64;
+    if orig_w == 0.0 || orig_h == 0.0 {
+      return Ok(Vec::new());
+    }
+
+    let (out, orig_w, orig_h) = self.run_forward(image)?;
+    let num_anchors = out.shape[2];
+    let input_sz = self.config.input_size;
     let scale_x = orig_w / f64::from(input_sz);
     let scale_y = orig_h / f64::from(input_sz);
 
