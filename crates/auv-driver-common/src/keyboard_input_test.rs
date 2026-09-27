@@ -71,8 +71,8 @@ fn failed_release_retains_hold_for_explicit_retry() {
 fn cancellation_releases_without_waiting_for_timeout() {
   let controller = Arc::new(KeyboardHoldController::default());
   let backend = FakeBackend::new(1);
-  let flag = Arc::new(crate::mouse_input::InputCancellation::default());
-  let id = crate::mouse_input::with_input_cancellation(flag.clone(), || controller.down(backend.clone(), Duration::from_secs(5)))
+  let flag = Arc::new(crate::input_cancellation::InputCancellation::default());
+  let id = crate::input_cancellation::with_input_cancellation(flag.clone(), || controller.down(backend.clone(), Duration::from_secs(5)))
     .unwrap()
     .into_id();
   flag.cancel();

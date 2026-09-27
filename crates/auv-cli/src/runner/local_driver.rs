@@ -1916,7 +1916,7 @@ mod tests;
 async fn run_input_blocking<T: Send + 'static>(
   operation: impl FnOnce() -> auv_driver::DriverResult<T> + Send + 'static,
 ) -> Result<T, Status> {
-  struct CancelOnDrop(Option<std::sync::Arc<auv_driver::mouse_input::InputCancellation>>);
+  struct CancelOnDrop(Option<std::sync::Arc<auv_driver::input_cancellation::InputCancellation>>);
   impl Drop for CancelOnDrop {
     fn drop(&mut self) {
       if let Some(flag) = &self.0 {
@@ -1924,9 +1924,9 @@ async fn run_input_blocking<T: Send + 'static>(
       }
     }
   }
-  let flag = std::sync::Arc::new(auv_driver::mouse_input::InputCancellation::default());
+  let flag = std::sync::Arc::new(auv_driver::input_cancellation::InputCancellation::default());
   let mut guard = CancelOnDrop(Some(flag.clone()));
-  let result = tokio::task::spawn_blocking(move || auv_driver::mouse_input::with_input_cancellation(flag, operation))
+  let result = tokio::task::spawn_blocking(move || auv_driver::input_cancellation::with_input_cancellation(flag, operation))
     .await
     .map_err(|error| Status::internal(format!("input task failed: {error}")))?;
   guard.0 = None;

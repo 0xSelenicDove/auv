@@ -5,6 +5,7 @@ pub mod display;
 pub mod error;
 pub mod geometry;
 pub mod input;
+pub mod input_cancellation;
 pub mod keyboard;
 pub mod keyboard_input;
 pub mod mouse;

@@ -22,7 +22,7 @@ struct Held {
   backend: Arc<dyn KeyboardBackend>,
   deadline: Instant,
   uncertain: bool,
-  cancellation: Option<Arc<crate::mouse_input::InputCancellation>>,
+  cancellation: Option<Arc<crate::input_cancellation::InputCancellation>>,
 }
 
 #[derive(Default)]
@@ -78,7 +78,7 @@ impl KeyboardHoldController {
         backend: backend.clone(),
         deadline,
         uncertain: false,
-        cancellation: crate::mouse_input::current_input_cancellation(),
+        cancellation: crate::input_cancellation::current_input_cancellation(),
       });
       state.posting = true;
       id
@@ -215,7 +215,7 @@ impl KeyboardHold {
       state = self.controller.changed.wait_timeout(state, remaining.min(Duration::from_millis(10))).unwrap().0;
     }
     drop(state);
-    cancelled |= crate::mouse_input::current_input_cancellation().as_ref().is_some_and(|flag| flag.is_cancelled());
+    cancelled |= crate::input_cancellation::current_input_cancellation().as_ref().is_some_and(|flag| flag.is_cancelled());
     let release = self.release();
     if cancelled {
       return Err(combine(invalid("keyboard hold cancelled"), release.err()));
