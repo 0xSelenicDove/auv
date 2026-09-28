@@ -28,6 +28,7 @@
 
 ## 相关文档
 
+- [`2026-09-28-yolo-v2-weakclass.md`](2026-09-28-yolo-v2-weakclass.md) - Step 6d 闭集方块检测 YOLOv8n v2 弱类补录训练与同验证集对比报告（定向补录、同 val 对比、门禁全绿通过、ONNX 导出）
 - [`2026-09-28-step7-live-verification.md`](2026-09-28-step7-live-verification.md) - Step 7 实机验证报告（Live 游戏窗口下的 5 分钟 1Hz 闭环运转、Phase A 纯观测、Phase B 有界点击实战）
 - [`2026-09-28-step6c-integration.md`](2026-09-28-step6c-integration.md) - Step 6c Rust 端集成闭集方块检测模型实操报告（替换 YOLO-World、per-class 阈值政策、端到端延迟与全链路闭环验证）
 - [`2026-09-28-yolo-closedset-training.md`](2026-09-28-yolo-closedset-training.md) - Step 6b 闭集方块检测 YOLOv8n 训练与闭环验证报告（50 epochs、0.926 mAP、ONNX 导出与域漂移彻底逆转）
