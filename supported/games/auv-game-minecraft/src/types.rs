@@ -326,7 +326,7 @@ fn point_lies_on_target_face(point: Vec3, block_pos: BlockPosition, face: BlockF
   }
 }
 
-fn forward_direction(player_pose: PlayerPose) -> Vec3 {
+pub fn forward_direction(player_pose: PlayerPose) -> Vec3 {
   let yaw_radians = player_pose.yaw.to_radians();
   let pitch_radians = player_pose.pitch.to_radians();
   Vec3::new(-yaw_radians.sin() * pitch_radians.cos(), -pitch_radians.sin(), yaw_radians.cos() * pitch_radians.cos())

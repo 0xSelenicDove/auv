@@ -634,4 +634,51 @@ mod tests {
     assert_eq!(answer.visibility, VisibilityClass::Visible);
     assert!(answer.limitations.iter().any(|lim| lim.contains("target confirmed visible")));
   }
+
+  #[test]
+  fn test_t0_pure_math_chest_recall_p1_to_p0_west_yaw() {
+    // ROOT CAUSE / RATIONALE:
+    // Step 8 Brief (Chest Recall T0 Math Verification):
+    // Target P0 is located at an arbitrary base coordinate.
+    // Observer P1 is located at P0 + (30, 0, 0).
+    // Vector from P1 to P0 is (-30, 0, 0), pointing West (-X direction).
+    // In Minecraft convention:
+    //   South = 0 deg (+Z)
+    //   West = +90 deg (-X)
+    //   North = 180 deg (-Z)
+    //   East = -90 / 270 deg (+X)
+    // Hand calculation: Expected target yaw from P1 to P0 is +90.0 deg.
+
+    let p0 = Vec3::new(100.0, 64.0, 200.0);
+    let p1 = Vec3::new(p0.x + 30.0, p0.y, p0.z);
+
+    let dx = p0.x - p1.x; // -30.0
+    let dz = p0.z - p1.z; // 0.0
+
+    // Code implementation from spatial_memory_query.rs:186:
+    // target_yaw = (-dx).atan2(dz).to_degrees();
+    let calculated_yaw = (-dx).atan2(dz).to_degrees();
+    let expected_yaw = 90.0f64;
+
+    let error = (calculated_yaw - expected_yaw).abs();
+    assert!(
+      error < 5.0,
+      "T0 Math Check failed: calculated {} deg, expected {} deg, error {} deg >= 5 deg",
+      calculated_yaw,
+      expected_yaw,
+      error
+    );
+    assert_eq!(calculated_yaw, 90.0);
+
+    // Cross-verify with forward_direction from types.rs:330
+    let pose = PlayerPose {
+      eye_position: p1,
+      yaw: calculated_yaw,
+      pitch: 0.0,
+    };
+    let fwd = crate::types::forward_direction(pose);
+    assert!((fwd.x - (-1.0)).abs() < 1e-5, "forward vector X must be -1.0 (West), got {}", fwd.x);
+    assert!(fwd.y.abs() < 1e-5, "forward vector Y must be 0.0, got {}", fwd.y);
+    assert!(fwd.z.abs() < 1e-5, "forward vector Z must be 0.0, got {}", fwd.z);
+  }
 }
