@@ -578,6 +578,7 @@ pub struct VisualPerceptionIngest<'a> {
   pub observation_ref: ObservationRef,
   pub static_whitelist: Option<Vec<String>>,
   pub confidence_threshold: Option<f64>,
+  pub precomputed_depth_map: Option<DepthMap>,
 }
 
 impl<'a> VisualPerceptionIngest<'a> {
@@ -602,6 +603,7 @@ impl<'a> VisualPerceptionIngest<'a> {
       observation_ref,
       static_whitelist: None,
       confidence_threshold: None,
+      precomputed_depth_map: None,
     }
   }
 
@@ -612,6 +614,11 @@ impl<'a> VisualPerceptionIngest<'a> {
 
   pub fn with_confidence_threshold(mut self, threshold: f64) -> Self {
     self.confidence_threshold = Some(threshold);
+    self
+  }
+
+  pub fn with_precomputed_depth_map(mut self, depth_map: DepthMap) -> Self {
+    self.precomputed_depth_map = Some(depth_map);
     self
   }
 }
@@ -647,16 +654,22 @@ impl<'a> LandmarkIngest for VisualPerceptionIngest<'a> {
       }
     };
 
+    report.detections = detections.iter().map(|d| format!("{}:{:.2}", d.label, d.confidence)).collect();
+
     if detections.is_empty() {
       return report;
     }
 
-    let depth_map = match self.depth.estimate(self.screenshot) {
-      Ok(dm) => dm,
-      Err(e) => {
-        report.observations_skipped += 1;
-        report.skipped_reason = Some(format!("depth estimator failure: {e}"));
-        return report;
+    let depth_map = if let Some(dm) = &self.precomputed_depth_map {
+      dm.clone()
+    } else {
+      match self.depth.estimate(self.screenshot) {
+        Ok(dm) => dm,
+        Err(e) => {
+          report.observations_skipped += 1;
+          report.skipped_reason = Some(format!("depth estimator failure: {e}"));
+          return report;
+        }
       }
     };
 
@@ -998,6 +1011,7 @@ mod tests {
       },
       static_whitelist: None,
       confidence_threshold: None,
+      precomputed_depth_map: None,
     };
 
     let tmp = tempfile::NamedTempFile::new().unwrap();

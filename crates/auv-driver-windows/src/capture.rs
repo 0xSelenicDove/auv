@@ -246,8 +246,7 @@ mod window_native {
     pub rgba: Vec<u8>,
   }
 
-  pub(super) fn capture_window_rgba(window: &Window) -> DriverResult<WindowPixels> {
-    let hwnd = window_handle(window)?;
+  fn capture_window_rgba_local(hwnd: HWND) -> DriverResult<WindowPixels> {
     let (width, height) = window_pixel_size(hwnd)?;
     let bgra = print_window_bgra(hwnd, width, height)?;
     Ok(WindowPixels {
@@ -255,6 +254,32 @@ mod window_native {
       height: height as u32,
       rgba: bgra_to_rgba(bgra),
     })
+  }
+
+  pub(super) fn capture_window_rgba(window: &Window) -> DriverResult<WindowPixels> {
+    let hwnd = window_handle(window)?;
+    match capture_window_rgba_local(hwnd) {
+      Ok(pixels) => Ok(pixels),
+      Err(first_err) => {
+        let window_clone = window.clone();
+        std::thread::spawn(move || {
+          use windows::Win32::System::StationsAndDesktops::{CloseDesktop, DESKTOP_CONTROL_FLAGS, OpenDesktopA, SetThreadDesktop};
+          use windows::core::s;
+          unsafe {
+            let desk = OpenDesktopA(s!("default"), DESKTOP_CONTROL_FLAGS(0), false, 0x01FF);
+            if let Ok(hdesk) = desk {
+              let _ = SetThreadDesktop(hdesk);
+              let res = window_handle(&window_clone).and_then(capture_window_rgba_local);
+              let _ = CloseDesktop(hdesk);
+              return res;
+            }
+          }
+          Err(first_err)
+        })
+        .join()
+        .map_err(|_| backend("worker thread panicked during window capture"))?
+      }
+    }
   }
 
   fn window_pixel_size(hwnd: HWND) -> DriverResult<(i32, i32)> {

@@ -86,6 +86,7 @@ fn test_visual_perception_replay_end_to_end() {
     observation_ref: obs_ref,
     static_whitelist: None,
     confidence_threshold: None,
+    precomputed_depth_map: None,
   };
 
   // 4. Ingest into fresh store

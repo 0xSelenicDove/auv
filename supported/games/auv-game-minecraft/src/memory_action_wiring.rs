@@ -26,6 +26,12 @@ pub trait ActionExecutor {
   fn click(&self, point: WindowPoint) -> Result<auv_driver::InputActionResult, String>;
 }
 
+impl<T: ActionExecutor + ?Sized> ActionExecutor for &T {
+  fn click(&self, point: WindowPoint) -> Result<auv_driver::InputActionResult, String> {
+    (**self).click(point)
+  }
+}
+
 /// Mock executor for testing and offline harness validation.
 #[derive(Default)]
 pub struct MockActionExecutor {

@@ -268,17 +268,36 @@ mod native {
   use super::{KeyChord, normalize_absolute};
   use crate::error::backend;
 
-  /// Sends one batch of synthetic input events, failing if the OS rejected any
-  /// (a blocked input session or UIPI denial returns a short count).
   fn send_inputs(inputs: &[INPUT]) -> DriverResult<()> {
     if inputs.is_empty() {
       return Ok(());
     }
     let sent = unsafe { SendInput(inputs, size_of::<INPUT>() as i32) };
-    if sent as usize != inputs.len() {
-      return Err(backend(format!("SendInput injected {sent} of {} events (input may be blocked)", inputs.len())));
+    if sent as usize == inputs.len() {
+      return Ok(());
     }
-    Ok(())
+    let inputs_vec = inputs.to_vec();
+    thread::spawn(move || {
+      unsafe {
+        let desk = windows::Win32::System::StationsAndDesktops::OpenDesktopA(
+          windows::core::s!("default"),
+          windows::Win32::System::StationsAndDesktops::DESKTOP_CONTROL_FLAGS(0),
+          false,
+          0x01FF,
+        );
+        if let Ok(hdesk) = desk {
+          let _ = windows::Win32::System::StationsAndDesktops::SetThreadDesktop(hdesk);
+          let sent = SendInput(&inputs_vec, size_of::<INPUT>() as i32);
+          let _ = windows::Win32::System::StationsAndDesktops::CloseDesktop(hdesk);
+          if sent as usize == inputs_vec.len() {
+            return Ok(());
+          }
+        }
+      }
+      Err(backend(format!("SendInput injected {sent} of {} events (input may be blocked)", inputs_vec.len())))
+    })
+    .join()
+    .map_err(|_| backend("worker thread panicked during send_inputs"))?
   }
 
   fn mouse_input(dx: i32, dy: i32, mouse_data: i32, flags: MOUSE_EVENT_FLAGS) -> INPUT {

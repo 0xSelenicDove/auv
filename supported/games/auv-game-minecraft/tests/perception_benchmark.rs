@@ -294,6 +294,7 @@ fn test_perception_and_spatial_memory_benchmarks() {
     observation_ref: obs_ref.clone(),
     static_whitelist: None,
     confidence_threshold: None,
+    precomputed_depth_map: None,
   };
 
   let mut temp_store =
@@ -320,6 +321,7 @@ fn test_perception_and_spatial_memory_benchmarks() {
     observation_ref: obs_ref.clone(),
     static_whitelist: None,
     confidence_threshold: None,
+    precomputed_depth_map: None,
   };
   let mut e2e_da2_times = Vec::with_capacity(rounds);
   for _ in 0..rounds {

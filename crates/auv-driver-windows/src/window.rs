@@ -145,6 +145,7 @@ mod native {
   use auv_driver_common::window::{Window, WindowRef};
   use windows::Win32::Foundation::{BOOL, CloseHandle, FALSE, GetLastError, HWND, LPARAM, RECT, SetLastError, TRUE, WIN32_ERROR};
   use windows::Win32::Graphics::Dwm::{DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute};
+  use windows::Win32::System::StationsAndDesktops::{CloseDesktop, DESKTOP_CONTROL_FLAGS, OpenDesktopA, SetThreadDesktop};
   use windows::Win32::System::Threading::{
     AttachThreadInput, GetCurrentThreadId, OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
   };
@@ -152,11 +153,11 @@ mod native {
     BringWindowToTop, EnumWindows, GetForegroundWindow, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
     IsWindowVisible, SW_RESTORE, SetForegroundWindow, ShowWindow,
   };
-  use windows::core::PWSTR;
+  use windows::core::{PWSTR, s};
 
   use crate::error::backend;
 
-  pub(super) fn list_windows() -> DriverResult<Vec<Window>> {
+  fn list_windows_local() -> DriverResult<Vec<Window>> {
     let mut handles: Vec<HWND> = Vec::new();
     unsafe { SetLastError(WIN32_ERROR(0)) };
     // SAFETY: `enum_proc` only pushes into the Vec referenced by `lparam`, which
@@ -185,7 +186,37 @@ mod native {
     Ok(windows)
   }
 
-  pub(super) fn activate_window(window: &Window) -> DriverResult<()> {
+  pub(super) fn list_windows() -> DriverResult<Vec<Window>> {
+    let mut windows = list_windows_local().unwrap_or_default();
+    // NOTICE(windows-secondary-desktop-fallback): When running under an agent runner,
+    // CI job, or non-interactive service, the current thread may be assigned to an
+    // isolated secondary desktop (e.g. "exebox-..."). Query the interactive "default"
+    // desktop on a clean worker thread as well, merging any windows found.
+    let default_windows = std::thread::spawn(|| {
+      unsafe {
+        let desk = OpenDesktopA(s!("default"), DESKTOP_CONTROL_FLAGS(0), false, 0x01FF);
+        if let Ok(hdesk) = desk {
+          let _ = SetThreadDesktop(hdesk);
+          let res = list_windows_local();
+          let _ = CloseDesktop(hdesk);
+          return res;
+        }
+      }
+      Ok(Vec::new())
+    })
+    .join()
+    .unwrap_or_else(|_| Ok(Vec::new()))
+    .unwrap_or_default();
+
+    for dw in default_windows {
+      if !windows.iter().any(|w| w.reference == dw.reference) {
+        windows.push(dw);
+      }
+    }
+    Ok(windows)
+  }
+
+  fn activate_window_local(window: &Window) -> DriverResult<()> {
     let hwnd = super::window_handle(window)?;
     let current_thread = unsafe { GetCurrentThreadId() };
     let foreground = unsafe { GetForegroundWindow() };
@@ -216,7 +247,30 @@ mod native {
     if activated {
       Ok(())
     } else {
-      Err(backend("SetForegroundWindow was refused; interact with NetEase Music once and retry"))
+      Err(backend("SetForegroundWindow was refused"))
+    }
+  }
+
+  pub(super) fn activate_window(window: &Window) -> DriverResult<()> {
+    match activate_window_local(window) {
+      Ok(()) => Ok(()),
+      Err(first_err) => {
+        let window_clone = window.clone();
+        std::thread::spawn(move || {
+          unsafe {
+            let desk = OpenDesktopA(s!("default"), DESKTOP_CONTROL_FLAGS(0), false, 0x01FF);
+            if let Ok(hdesk) = desk {
+              let _ = SetThreadDesktop(hdesk);
+              let res = activate_window_local(&window_clone);
+              let _ = CloseDesktop(hdesk);
+              return res;
+            }
+          }
+          Err(first_err)
+        })
+        .join()
+        .map_err(|_| backend("worker thread panicked during activate_window"))?
+      }
     }
   }
 

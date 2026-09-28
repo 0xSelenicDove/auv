@@ -100,9 +100,13 @@ impl LiveCapture {
 pub struct TickReport {
   pub landmarks_created: usize,
   pub landmarks_merged: usize,
+  pub raycast_landmarks_created: usize,
+  pub visual_landmarks_created: usize,
   pub observations_skipped: usize,
   pub pruned_count: usize,
   pub visual_skipped_reason: Option<String>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub detections: Vec<String>,
   pub elapsed_millis: u64,
 }
 
@@ -213,12 +217,15 @@ impl AgentMemoryLoop {
       captured_at_millis: capture.monotonic_timestamp_ms,
     };
 
+    let mut precomputed_depth_map = None;
+
     // 3. Telemetry Raycast Ingest
     if let Some(hit) = &capture.raycast_hit {
       let before_len = self.store.len();
       self.store.upsert_from_raycast(hit, &obs_ref);
       if self.store.len() > before_len {
         report.landmarks_created += 1;
+        report.raycast_landmarks_created += 1;
       } else {
         report.landmarks_merged += 1;
       }
@@ -247,6 +254,7 @@ impl AgentMemoryLoop {
               let dz = hit_center.z - pose.eye_position.z;
               let true_dist = (dx * dx + dy * dy + dz * dz).sqrt() as f32;
               self.calibrator.add_anchor(pred_center as f32, true_dist);
+              precomputed_depth_map = Some(dm);
             }
           }
         }
@@ -274,13 +282,16 @@ impl AgentMemoryLoop {
             observation_ref: obs_ref,
             static_whitelist: Some(self.config.static_whitelist.clone()),
             confidence_threshold: Some(self.config.yolo_confidence_threshold),
+            precomputed_depth_map,
           };
 
           let visual_report = visual_ingest.ingest(&mut self.store, capture.monotonic_timestamp_ms);
           report.landmarks_created += visual_report.landmarks_created;
+          report.visual_landmarks_created += visual_report.landmarks_created;
           report.landmarks_merged += visual_report.landmarks_merged;
           report.observations_skipped += visual_report.observations_skipped;
           report.visual_skipped_reason = visual_report.skipped_reason;
+          report.detections = visual_report.detections;
         }
       }
     }

@@ -17,6 +17,8 @@ pub struct IngestReport {
   pub observations_skipped: usize,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub skipped_reason: Option<String>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub detections: Vec<String>,
 }
 
 /// Pluggable interface for ingesting platform-specific observations into spatial memory.
