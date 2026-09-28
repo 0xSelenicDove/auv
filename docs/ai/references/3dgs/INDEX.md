@@ -28,6 +28,7 @@
 
 ## 相关文档
 
+- [`2026-09-28-yolo-closedset-training.md`](2026-09-28-yolo-closedset-training.md) - Step 6b 闭集方块检测 YOLOv8n 训练与闭环验证报告（50 epochs、0.926 mAP、ONNX 导出与域漂移彻底逆转）
 - [`2026-09-27-autolabel-spike.md`](2026-09-27-autolabel-spike.md) - Step 6a 自动标注 Spike 验证报告（闭集 YOLO 数据管线可行性与吞吐硬实测）
 - [`2026-09-27-yolo-domain-drift-measurement.md`](2026-09-27-yolo-domain-drift-measurement.md) - YOLO-World 零样本在 Minecraft 实机截图上的域漂移实测与必须微调裁决
 - [`2026-09-27-step5-agent-integration.md`](2026-09-27-step5-agent-integration.md) - Step 5 Agent 集成与有界实战测试（1Hz 循环、记忆动作 wiring、实测指标）

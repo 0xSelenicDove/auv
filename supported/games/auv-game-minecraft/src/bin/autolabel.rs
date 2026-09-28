@@ -167,11 +167,12 @@ fn class_color(class_id: usize) -> image::Rgb<u8> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
   let mut telemetry_path = PathBuf::from(r"F:\pcl\.minecraft\versions\1.21.1-Fabric 0.16.10\auv\telemetry.jsonl");
   let mut session_dir: Option<PathBuf> = Some(PathBuf::from(r"F:\auv\.tmp\m2-session"));
+  let mut frames_dir: Option<PathBuf> = None;
   let mut output_dir = PathBuf::from(r"F:\auv\.tmp\autolabel-dataset");
   let mut max_frames = 0usize;
   let mut export_overlays_count = 10usize;
   let min_distance = 1.0f64;
-  let max_distance = 20.0f64;
+  let mut max_distance = 8.0f64;
 
   let args: Vec<String> = std::env::args().collect();
   let mut i = 1;
@@ -186,6 +187,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       "--session-dir" => {
         if i + 1 < args.len() {
           session_dir = Some(PathBuf::from(&args[i + 1]));
+          i += 1;
+        }
+      }
+      "--frames-dir" => {
+        if i + 1 < args.len() {
+          frames_dir = Some(PathBuf::from(&args[i + 1]));
+          i += 1;
+        }
+      }
+      "--max-distance" => {
+        if i + 1 < args.len() {
+          max_distance = args[i + 1].parse().unwrap_or(8.0);
           i += 1;
         }
       }
@@ -213,10 +226,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   }
 
   println!("=== AUV Minecraft Auto-Labeling Pipeline ===");
-  println!("Telemetry source: {}", telemetry_path.display());
   println!("Output directory: {}", output_dir.display());
-  if let Some(ref sdir) = session_dir {
-    println!("Session directory: {}", sdir.display());
+  println!("Max distance filter: {:.1}m", max_distance);
+  if let Some(ref fdir) = frames_dir {
+    println!("Frames directory: {}", fdir.display());
   }
 
   // Create YOLO dataset directories
@@ -227,7 +240,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   fs::create_dir_all(output_dir.join("overlays"))?;
 
   // Load session frames with screenshots if available
-  let mut session_screenshots: HashMap<String, (PathBuf, MinecraftSpatialFrame)> = HashMap::new();
+  let mut session_screenshots: Vec<(String, PathBuf, MinecraftSpatialFrame)> = Vec::new();
   let search_roots = [
     session_dir.clone().unwrap_or_else(|| PathBuf::from(r"F:\auv\.tmp\m2-session")),
     PathBuf::from(r"F:\auv\.tmp\m1-baseline"),
@@ -245,7 +258,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
               if let Ok(content) = fs::read_to_string(&telem_path) {
                 if let Some(first_line) = content.lines().next() {
                   if let Ok(frame) = serde_json::from_str::<MinecraftSpatialFrame>(first_line) {
-                    session_screenshots.insert(frame.spatial_frame_id.clone(), (img_path.clone(), frame));
+                    session_screenshots.push((frame.spatial_frame_id.clone(), img_path.clone(), frame));
                   }
                 }
               }
@@ -255,10 +268,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       }
     }
   }
-  println!("Loaded {} session views with screenshots.", session_screenshots.len());
 
-  let file = File::open(&telemetry_path)?;
-  let reader = BufReader::new(file);
+  // Load frames from frames-dir (paired frame_*.png and frame_*_telemetry.json)
+  if let Some(ref fdir) = frames_dir {
+    if fdir.is_dir() {
+      if let Ok(entries) = fs::read_dir(fdir) {
+        let mut json_files: Vec<PathBuf> = entries
+          .flatten()
+          .map(|e| e.path())
+          .filter(|p| p.is_file() && p.file_stem().and_then(|s| s.to_str()).map_or(false, |s| s.ends_with("_telemetry")))
+          .collect();
+        json_files.sort();
+
+        for json_path in json_files {
+          let stem = json_path.file_stem().unwrap().to_str().unwrap();
+          let base_stem = stem.strip_suffix("_telemetry").unwrap();
+          let png_path = fdir.join(format!("{}.png", base_stem));
+          if png_path.is_file() {
+            if let Ok(content) = fs::read_to_string(&json_path) {
+              if let Ok(frame) = serde_json::from_str::<MinecraftSpatialFrame>(&content) {
+                session_screenshots.push((format!("village_{}", base_stem), png_path, frame));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  println!("Loaded {} total paired frames with screenshots.", session_screenshots.len());
 
   let start_time = Instant::now();
   let mut total_frames = 0usize;
@@ -271,21 +308,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let mut overlay_images_generated: Vec<String> = Vec::new();
 
-  for (_line_idx, line_res) in reader.lines().enumerate() {
+  for (frame_id, src_png, frame) in &session_screenshots {
     if max_frames > 0 && total_frames >= max_frames {
       break;
     }
-    let line = line_res?;
-    if line.trim().is_empty() {
-      continue;
-    }
-
-    let frame: MinecraftSpatialFrame = match serde_json::from_str(&line) {
-      Ok(f) => f,
-      Err(_) => continue,
-    };
-
     total_frames += 1;
+
     let projector = match MinecraftProjector::new(frame.clone()) {
       Ok(p) => p,
       Err(_) => continue,
@@ -348,8 +376,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       total_boxes += 1;
     }
 
-    // Determine split: 9:1 train/val split
-    let split = if total_frames % 10 == 0 {
+    // Determine split: 8:2 train/val split per brief
+    let split = if total_frames % 5 == 0 {
       "val"
     } else {
       "train"
@@ -361,98 +389,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       label_content.push_str(&format!("{} {:.6} {:.6} {:.6} {:.6}\n", b.class_id, b.yolo[0], b.yolo[1], b.yolo[2], b.yolo[3]));
     }
 
-    let frame_file_name = format!("frame_{:06}", total_frames);
+    let frame_file_name = format!("frame_{:06}_{}", total_frames, frame_id);
     let label_path = output_dir.join("labels").join(split).join(format!("{}.txt", frame_file_name));
     fs::write(&label_path, label_content)?;
 
-    // Check if this frame has a matching screenshot
-    let matching_screenshot = session_screenshots.get(&frame.spatial_frame_id);
-    if let Some((src_png, _)) = matching_screenshot {
-      let dst_img_path = output_dir.join("images").join(split).join(format!("{}.png", frame_file_name));
-      let _ = fs::copy(src_png, &dst_img_path);
+    let dst_img_path = output_dir.join("images").join(split).join(format!("{}.png", frame_file_name));
+    let _ = fs::copy(src_png, &dst_img_path);
 
-      // Generate visual overlay if under count
-      if overlay_images_generated.len() < export_overlays_count {
-        if let Ok(dynamic_img) = image::open(src_png) {
-          let mut rgb_img = dynamic_img.to_rgb8();
-          for b in &frame_boxes {
-            let min_x = b.pixel[0].max(0.0) as u32;
-            let min_y = b.pixel[1].max(0.0) as u32;
-            let max_x = b.pixel[2].max(0.0) as u32;
-            let max_y = b.pixel[3].max(0.0) as u32;
-            let color = class_color(b.class_id);
-            draw_box(&mut rgb_img, min_x, min_y, max_x, max_y, color, 2);
-          }
-          let overlay_path = output_dir.join("overlays").join(format!("{}_overlay.png", frame_file_name));
-          if rgb_img.save(&overlay_path).is_ok() {
-            overlay_images_generated.push(overlay_path.to_string_lossy().to_string());
-          }
+    // Generate visual overlay if under count
+    if overlay_images_generated.len() < export_overlays_count && !frame_boxes.is_empty() {
+      if let Ok(dynamic_img) = image::open(src_png) {
+        let mut rgb_img = dynamic_img.to_rgb8();
+        for b in &frame_boxes {
+          let min_x = b.pixel[0].max(0.0) as u32;
+          let min_y = b.pixel[1].max(0.0) as u32;
+          let max_x = b.pixel[2].max(0.0) as u32;
+          let max_y = b.pixel[3].max(0.0) as u32;
+          let color = class_color(b.class_id);
+          draw_box(&mut rgb_img, min_x, min_y, max_x, max_y, color, 2);
         }
-      }
-    }
-  }
-
-  // Also process the session screenshots specifically to ensure we have visual verification overlays
-  for (sf_id, (src_png, frame)) in &session_screenshots {
-    if overlay_images_generated.len() >= export_overlays_count {
-      break;
-    }
-    let projector = match MinecraftProjector::new(frame.clone()) {
-      Ok(p) => p,
-      Err(_) => continue,
-    };
-    let eye = frame.player_pose.eye_position;
-    let mut frame_boxes = Vec::new();
-    for block in &frame.nearby_blocks {
-      let Some(class_id) = match_whitelist_class(&block.block_id) else {
-        continue;
-      };
-      let class_name = WHITELIST_CLASSES[class_id].0;
-      let center = block.block_pos.center();
-      let dx = center.x - eye.x;
-      let dy = center.y - eye.y;
-      let dz = center.z - eye.z;
-      let dist = (dx * dx + dy * dy + dz * dz).sqrt();
-      if dist < min_distance || dist > max_distance {
-        continue;
-      }
-      if is_occluded_by_closer_block(eye, center, block.block_pos, &frame.nearby_blocks) {
-        continue;
-      }
-      let yolo_bbox = match projector.project_block_yolo_bbox(block.block_pos) {
-        Ok(Some(bbox)) => bbox,
-        _ => continue,
-      };
-      let pixel_bbox = match projector.project_block_2d_bbox(block.block_pos) {
-        Ok(Some(bbox)) => bbox,
-        _ => continue,
-      };
-      if yolo_bbox[2] < 0.005 || yolo_bbox[3] < 0.005 {
-        continue;
-      }
-      frame_boxes.push(ProjectedBBox {
-        class_id,
-        class_name,
-        block_pos: block.block_pos,
-        distance: dist,
-        yolo: yolo_bbox,
-        pixel: pixel_bbox,
-      });
-    }
-
-    if let Ok(dynamic_img) = image::open(src_png) {
-      let mut rgb_img = dynamic_img.to_rgb8();
-      for b in &frame_boxes {
-        let min_x = b.pixel[0].max(0.0) as u32;
-        let min_y = b.pixel[1].max(0.0) as u32;
-        let max_x = b.pixel[2].max(0.0) as u32;
-        let max_y = b.pixel[3].max(0.0) as u32;
-        let color = class_color(b.class_id);
-        draw_box(&mut rgb_img, min_x, min_y, max_x, max_y, color, 2);
-      }
-      let overlay_path = output_dir.join("overlays").join(format!("session_{}_overlay.png", sf_id));
-      if rgb_img.save(&overlay_path).is_ok() {
-        if !overlay_images_generated.contains(&overlay_path.to_string_lossy().to_string()) {
+        let overlay_path = output_dir.join("overlays").join(format!("{}_overlay.png", frame_file_name));
+        if rgb_img.save(&overlay_path).is_ok() {
           overlay_images_generated.push(overlay_path.to_string_lossy().to_string());
         }
       }
