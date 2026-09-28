@@ -192,7 +192,7 @@ fn parse_args() -> Args {
         println!("Usage: live_verify --model <ONNX_PATH> [OPTIONS]");
         println!();
         println!("Options:");
-        println!("  --model <PATH>          Explicit path to block-detector-v1.onnx (REQUIRED)");
+        println!("  --model <PATH>          Explicit path to block-detector-v2.onnx (REQUIRED)");
         println!("  --depth-model <PATH>    Path to MiDaS model-small.onnx (default: F:\\auv\\.tmp\\models\\model-small.onnx)");
         println!("  --telemetry <PATH>      Path to telemetry.jsonl (default: F:\\pcl\\...\\telemetry.jsonl)");
         println!("  --target-title <TITLE>  Target window title substring (default: Minecraft)");

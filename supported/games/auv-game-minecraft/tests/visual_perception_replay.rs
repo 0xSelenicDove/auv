@@ -61,7 +61,7 @@ fn test_visual_perception_replay_end_to_end() {
 
   // 2. Initialize BlockDetector
   let detector_config = BlockDetectorConfig {
-    model_path: PathBuf::from("assets/block-detector-v1.onnx"),
+    model_path: PathBuf::from("assets/block-detector-v2.onnx"),
     per_class_threshold: [0.05; 6],
     enable_crafting_table: true,
     iou_threshold: 0.45,

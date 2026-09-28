@@ -41,7 +41,7 @@ fn test_perception_and_spatial_memory_benchmarks() {
   // Load models
   println!("Loading BlockDetector...");
   let block_config = BlockDetectorConfig {
-    model_path: PathBuf::from("assets/block-detector-v1.onnx"),
+    model_path: PathBuf::from("assets/block-detector-v2.onnx"),
     per_class_threshold: [0.05; 6],
     enable_crafting_table: true,
     iou_threshold: 0.45,

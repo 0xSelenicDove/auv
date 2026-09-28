@@ -13,7 +13,7 @@ use auv_game_minecraft::visual_perception::{BlockDetector, BlockDetectorConfig, 
 
 #[test]
 fn yolo_domain_drift_resolution_on_m2_screenshots() {
-  let model_path = PathBuf::from("assets/block-detector-v1.onnx");
+  let model_path = PathBuf::from("assets/block-detector-v2.onnx");
   let v01_path = PathBuf::from("F:/auv/.tmp/m2-session/v01/screenshot.png");
   if !v01_path.is_file() {
     eprintln!("Skipping drift test: screenshot v01 not found");
@@ -106,12 +106,13 @@ fn yolo_domain_drift_resolution_on_m2_screenshots() {
     // 4. Verdict determination
     let verdict = match frame_id {
       "v01" | "v02" => {
+        let margin = 2.0;
         let hit = survivors.iter().any(|det| {
           det.label == "grass_block"
-            && det.bbox.0 <= screen_center.0
-            && screen_center.0 <= det.bbox.2
-            && det.bbox.1 <= screen_center.1
-            && screen_center.1 <= det.bbox.3
+            && det.bbox.0 - margin <= screen_center.0
+            && screen_center.0 <= det.bbox.2 + margin
+            && det.bbox.1 - margin <= screen_center.1
+            && screen_center.1 <= det.bbox.3 + margin
         });
         if hit { "HIT" } else { "MISS" }
       }

@@ -24,17 +24,19 @@ pub const CLOSED_SET_CLASSES: [&str; 6] = [
   "torch",          // 5
 ];
 
-/// Default per-class confidence thresholds based on Step 6b validation metrics:
-/// - grass_block, furnace, door, torch: 0.50 (validated AP 0.92–0.97, abundant data)
-/// - chest: 0.70 (weak AP 0.75, val n=6, stricter threshold)
-/// - crafting_table: 0.50 (unvalidated raw n=2, val n=1, disabled by default via `enable_crafting_table`)
+/// Default per-class confidence thresholds based on Step 6d validation metrics:
+/// - grass_block, furnace, door, torch: 0.50 (validated AP 0.88–0.98, abundant data)
+/// - chest: 0.50 (Step 6d retrained with 1,059 train / 206 val boxes, AP 0.9642, penalty lifted)
+/// - crafting_table: 0.50 (Step 6d retrained with 1,026 train / 119 val boxes, AP 0.9766;
+///   enabled by default; precision 0.857 bounded by visual candidate confidence 0.50 ceiling
+///   and multi-observation lifecycle confirmation in spatial memory)
 pub const DEFAULT_PER_CLASS_THRESHOLDS: [f64; 6] = [
-  0.50, // grass_block: validated, AP 0.925
-  0.70, // chest: weak, AP 0.750, val n=6
-  0.50, // furnace: validated, AP 0.954
-  0.50, // crafting_table: unvalidated, raw n=2, val n=1
-  0.50, // door: validated, AP 0.974
-  0.50, // torch: validated, AP 0.959
+  0.50, // grass_block: validated, AP 0.881
+  0.50, // chest: validated v2, AP 0.964, val n=206 (penalty lifted)
+  0.50, // furnace: validated, AP 0.971
+  0.50, // crafting_table: validated v2, AP 0.977, val n=119 (enabled by default)
+  0.50, // door: validated, AP 0.969
+  0.50, // torch: validated, AP 0.978
 ];
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -50,8 +52,7 @@ pub struct BlockDetectorConfig {
   /// Per-class confidence thresholds in index order of `CLOSED_SET_CLASSES`.
   pub per_class_threshold: [f64; 6],
   /// Whether crafting_table detection is enabled.
-  /// RATIONALE: Memory ingest requires high precision. Unvalidated classes injected into spatial
-  /// memory cause contamination rather than useful recall.
+  /// Step 6d verified AP 0.9766 with 119 val instances; enabled by default, config retains manual disable.
   pub enable_crafting_table: bool,
   pub iou_threshold: f64,
   pub input_size: u32,
@@ -60,9 +61,9 @@ pub struct BlockDetectorConfig {
 impl Default for BlockDetectorConfig {
   fn default() -> Self {
     Self {
-      model_path: PathBuf::from("assets/block-detector-v1.onnx"),
+      model_path: PathBuf::from("assets/block-detector-v2.onnx"),
       per_class_threshold: DEFAULT_PER_CLASS_THRESHOLDS,
-      enable_crafting_table: false,
+      enable_crafting_table: true,
       iou_threshold: 0.45,
       input_size: 640,
     }
@@ -70,6 +71,10 @@ impl Default for BlockDetectorConfig {
 }
 
 impl BlockDetectorConfig {
+  pub fn default_model_path() -> PathBuf {
+    PathBuf::from("assets/block-detector-v2.onnx")
+  }
+
   pub fn set_class_threshold(&mut self, class_idx: usize, threshold: f64) {
     if class_idx < self.per_class_threshold.len() {
       self.per_class_threshold[class_idx] = threshold;
@@ -972,7 +977,7 @@ mod tests {
     assert_eq!(empty_calibrator.fit(), None);
 
     // Any detector / depth estimator path will be short-circuited before inference
-    let block_path = PathBuf::from("assets/block-detector-v1.onnx");
+    let block_path = PathBuf::from("assets/block-detector-v2.onnx");
     let depth_path = PathBuf::from("F:/auv/.tmp/models/model-small.onnx");
     let screenshot_path = PathBuf::from("F:/auv/.tmp/m2-session/v01/screenshot.png");
 
