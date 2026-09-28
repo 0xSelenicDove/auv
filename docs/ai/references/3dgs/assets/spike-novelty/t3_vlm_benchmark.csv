@@ -1,0 +1,31 @@
+item_id,fname,category,note,vlm_response,enc_latency_s,gen_latency_s,total_latency_s
+0,crop_f061_b01_c4_conf0.437.png,known_miss,low-conf door duplicate/partial (IoU=0.60),Door,0.0144,0.082,0.0965
+1,crop_f063_b02_c0_conf0.379.png,known_miss,sub-threshold grass_block facet (conf=0.379),Grass,0.0109,0.0826,0.0935
+2,crop_f064_b00_c0_conf0.494.png,known_miss,sub-threshold grass_block facet (conf=0.494),Tree,0.0131,0.0744,0.0876
+3,crop_f064_b13_c0_conf0.170.png,known_miss,low-conf duplicate of accepted grass_block (IoU=0.59),White cube,0.0137,0.0954,0.1091
+4,crop_f067_b01_c4_conf0.366.png,known_miss,low-conf door duplicate/partial (IoU=0.65),Minecraft,0.0141,0.0775,0.0916
+5,crop_f069_b01_c1_conf0.257.png,known_miss,"chest in scene (conf=0.257, IoU=0.61)",Building,0.0115,0.0742,0.0857
+6,crop_f106_b03_c0_conf0.429.png,known_miss,low-conf duplicate of accepted grass_block (IoU=0.65),Grass,0.0119,0.0776,0.0895
+7,crop_f106_b27_c0_conf0.206.png,known_miss,low-conf duplicate of accepted grass_block (IoU=0.65),Grass,0.0124,0.0795,0.092
+8,crop_f106_b22_c0_conf0.225.png,noise,player viewmodel hand/arm foreground artifact,Picture,0.0113,0.0788,0.0901
+9,crop_f192_b02_c0_conf0.291.png,noise,player viewmodel hand/arm foreground artifact,Wall,0.0112,0.0809,0.0921
+10,crop_f052_b01_c0_conf0.291.png,noise,top window border / sky sliver,Table,0.0138,0.0768,0.0906
+11,crop_f052_b03_c0_conf0.213.png,noise,top window border / sky sliver,Vase,0.0115,0.0992,0.1107
+12,crop_f100_b01_c0_conf0.182.png,noise,continuous flat grass lawn texture (no block boundary),White,0.0113,0.0729,0.0841
+13,crop_f104_b01_c0_conf0.313.png,noise,continuous flat grass lawn texture (no block boundary),Grass,0.0143,0.0779,0.0922
+14,crop_f106_b17_c0_conf0.272.png,noise,continuous flat grass lawn texture (no block boundary),Box,0.011,0.0807,0.0918
+15,crop_f106_b18_c0_conf0.260.png,noise,continuous flat grass lawn texture (no block boundary),Grass,0.0144,0.0787,0.0931
+16,crop_f106_b35_c0_conf0.193.png,noise,continuous flat grass lawn texture (no block boundary),Window,0.0125,0.086,0.0986
+17,crop_f107_b01_c0_conf0.484.png,noise,continuous flat grass lawn texture (no block boundary),Grass,0.0109,0.0831,0.094
+18,crop_f107_b06_c0_conf0.429.png,noise,continuous flat grass lawn texture (no block boundary),Tree,0.0117,0.0788,0.0904
+19,crop_f107_b17_c0_conf0.310.png,noise,continuous flat grass lawn texture (no block boundary),Grass,0.0112,0.0764,0.0875
+20,crop_f107_b19_c0_conf0.289.png,noise,continuous flat grass lawn texture (no block boundary),Grass,0.0114,0.0815,0.093
+21,crop_f107_b20_c0_conf0.289.png,noise,continuous flat grass lawn texture (no block boundary),Building,0.0117,0.083,0.0946
+22,crop_f048_b09_c0_conf0.200.png,noise,cliff dirt/rain texture or rain reflection,Grass,0.0111,0.0768,0.0879
+23,crop_f055_b05_c0_conf0.152.png,noise,cliff dirt/rain texture or rain reflection,River,0.013,0.0785,0.0915
+24,crop_f061_b00_c0_conf0.485.png,noise,cliff dirt/rain texture or rain reflection,Grass,0.0114,0.0811,0.0925
+25,crop_f063_b01_c0_conf0.484.png,noise,cliff dirt/rain texture or rain reflection,Building,0.0105,0.0841,0.0947
+26,novelty_cow_f008.png,non6_object,cow (non6),Tree,0.0138,0.0803,0.0941
+27,novelty_horse_f015.png,non6_object,horse/cow on ridge (non6),Tree,0.0116,0.0763,0.0879
+28,novelty_tree_f075.png,non6_object,oak tree (non6),House,0.0126,0.0731,0.0857
+29,novelty_house_f376.png,non6_object,village house (non6),Tree,0.0108,0.076,0.0868

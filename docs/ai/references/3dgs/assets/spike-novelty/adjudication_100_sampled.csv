@@ -1,0 +1,101 @@
+crop_id,box_idx,crop_fname,frame_idx,pred_cls,conf,iou_accepted,verdict,note
+0,20,crop_f048_b09_c0_conf0.200.png,48,grass_block,0.200,0.34,noise,cliff dirt/rain texture or rain reflection
+1,31,crop_f052_b01_c0_conf0.291.png,52,grass_block,0.291,0.00,noise,top window border / sky sliver
+2,33,crop_f052_b03_c0_conf0.213.png,52,grass_block,0.213,0.00,noise,top window border / sky sliver
+3,35,crop_f053_b00_c0_conf0.466.png,53,grass_block,0.466,0.02,noise,bottom screen / hotbar edge sliver
+4,37,crop_f053_b02_c0_conf0.340.png,53,grass_block,0.340,0.06,noise,bottom screen / hotbar edge sliver
+5,38,crop_f053_b03_c0_conf0.206.png,53,grass_block,0.206,0.02,noise,bottom screen / hotbar edge sliver
+6,39,crop_f053_b04_c0_conf0.193.png,53,grass_block,0.193,0.09,noise,top window border / sky sliver
+7,47,crop_f055_b05_c0_conf0.152.png,55,grass_block,0.152,0.31,noise,cliff dirt/rain texture or rain reflection
+8,49,crop_f061_b00_c0_conf0.485.png,61,grass_block,0.485,0.02,noise,cliff dirt/rain texture or rain reflection
+9,50,crop_f061_b01_c4_conf0.437.png,61,door,0.437,0.60,known_miss,low-conf door duplicate/partial (IoU=0.60)
+10,59,crop_f063_b01_c0_conf0.484.png,63,grass_block,0.484,0.04,noise,cliff dirt/rain texture or rain reflection
+11,60,crop_f063_b02_c0_conf0.379.png,63,grass_block,0.379,0.31,known_miss,sub-threshold grass_block facet (conf=0.379)
+12,61,crop_f063_b03_c0_conf0.198.png,63,grass_block,0.198,0.06,noise,left window margin sliver
+13,63,crop_f063_b05_c0_conf0.167.png,63,grass_block,0.167,0.02,noise,cliff dirt/rain texture or rain reflection
+14,64,crop_f064_b00_c0_conf0.494.png,64,grass_block,0.494,0.43,known_miss,sub-threshold grass_block facet (conf=0.494)
+15,71,crop_f064_b07_c0_conf0.262.png,64,grass_block,0.262,0.18,noise,cliff dirt/rain texture or rain reflection
+16,74,crop_f064_b10_c0_conf0.196.png,64,grass_block,0.196,0.28,noise,cliff dirt/rain texture or rain reflection
+17,77,crop_f064_b13_c0_conf0.170.png,64,grass_block,0.170,0.59,known_miss,low-conf duplicate of accepted grass_block (IoU=0.59)
+18,83,crop_f067_b00_c0_conf0.446.png,67,grass_block,0.446,0.16,noise,cliff dirt/rain texture or rain reflection
+19,84,crop_f067_b01_c4_conf0.366.png,67,door,0.366,0.65,known_miss,low-conf door duplicate/partial (IoU=0.65)
+20,88,crop_f067_b05_c0_conf0.295.png,67,grass_block,0.295,0.00,noise,top window border / sky sliver
+21,92,crop_f067_b09_c0_conf0.200.png,67,grass_block,0.200,0.00,noise,top window border / sky sliver
+22,96,crop_f067_b13_c0_conf0.177.png,67,grass_block,0.177,0.00,noise,top window border / sky sliver
+23,99,crop_f069_b01_c1_conf0.257.png,69,chest,0.257,0.61,known_miss,"chest in scene (conf=0.257, IoU=0.61)"
+24,105,crop_f070_b02_c0_conf0.193.png,70,grass_block,0.193,0.23,noise,cliff dirt/rain texture or rain reflection
+25,120,crop_f074_b02_c0_conf0.317.png,74,grass_block,0.317,0.01,noise,cliff dirt/rain texture or rain reflection
+26,126,crop_f075_b01_c0_conf0.343.png,75,grass_block,0.343,0.00,noise,bottom screen / hotbar edge sliver
+27,136,crop_f082_b01_c0_conf0.290.png,82,grass_block,0.290,0.20,noise,cliff dirt/rain texture or rain reflection
+28,138,crop_f100_b01_c0_conf0.182.png,100,grass_block,0.182,0.00,noise,continuous flat grass lawn texture (no block boundary)
+29,147,crop_f104_b01_c0_conf0.313.png,104,grass_block,0.313,0.00,noise,continuous flat grass lawn texture (no block boundary)
+30,154,crop_f105_b02_c0_conf0.356.png,105,grass_block,0.356,0.00,noise,bottom screen / hotbar edge sliver
+31,160,crop_f106_b03_c0_conf0.429.png,106,grass_block,0.429,0.65,known_miss,low-conf duplicate of accepted grass_block (IoU=0.65)
+32,174,crop_f106_b17_c0_conf0.272.png,106,grass_block,0.272,0.12,noise,continuous flat grass lawn texture (no block boundary)
+33,175,crop_f106_b18_c0_conf0.260.png,106,grass_block,0.260,0.17,noise,continuous flat grass lawn texture (no block boundary)
+34,179,crop_f106_b22_c0_conf0.225.png,106,grass_block,0.225,0.25,noise,player viewmodel hand/arm foreground artifact
+35,184,crop_f106_b27_c0_conf0.206.png,106,grass_block,0.206,0.65,known_miss,low-conf duplicate of accepted grass_block (IoU=0.65)
+36,185,crop_f106_b28_c0_conf0.203.png,106,grass_block,0.203,0.64,known_miss,low-conf duplicate of accepted grass_block (IoU=0.64)
+37,192,crop_f106_b35_c0_conf0.193.png,106,grass_block,0.193,0.18,noise,continuous flat grass lawn texture (no block boundary)
+38,210,crop_f107_b01_c0_conf0.484.png,107,grass_block,0.484,0.19,noise,continuous flat grass lawn texture (no block boundary)
+39,214,crop_f107_b05_c1_conf0.436.png,107,chest,0.436,0.00,known_miss,"chest in scene (conf=0.436, IoU=0.00)"
+40,215,crop_f107_b06_c0_conf0.429.png,107,grass_block,0.429,0.17,noise,continuous flat grass lawn texture (no block boundary)
+41,219,crop_f107_b10_c0_conf0.373.png,107,grass_block,0.373,0.20,known_miss,sub-threshold grass_block facet (conf=0.373)
+42,226,crop_f107_b17_c0_conf0.310.png,107,grass_block,0.310,0.27,noise,continuous flat grass lawn texture (no block boundary)
+43,228,crop_f107_b19_c0_conf0.289.png,107,grass_block,0.289,0.31,noise,continuous flat grass lawn texture (no block boundary)
+44,229,crop_f107_b20_c0_conf0.289.png,107,grass_block,0.289,0.13,noise,continuous flat grass lawn texture (no block boundary)
+45,233,crop_f107_b24_c0_conf0.242.png,107,grass_block,0.242,0.37,noise,continuous flat grass lawn texture (no block boundary)
+46,242,crop_f107_b33_c0_conf0.221.png,107,grass_block,0.221,0.22,noise,continuous flat grass lawn texture (no block boundary)
+47,246,crop_f107_b37_c0_conf0.202.png,107,grass_block,0.202,0.26,noise,continuous flat grass lawn texture (no block boundary)
+48,249,crop_f107_b40_c0_conf0.186.png,107,grass_block,0.186,0.29,noise,continuous flat grass lawn texture (no block boundary)
+49,250,crop_f107_b41_c0_conf0.186.png,107,grass_block,0.186,0.30,noise,continuous flat grass lawn texture (no block boundary)
+50,254,crop_f107_b45_c0_conf0.179.png,107,grass_block,0.179,0.33,noise,continuous flat grass lawn texture (no block boundary)
+51,262,crop_f107_b53_c0_conf0.162.png,107,grass_block,0.162,0.65,known_miss,low-conf duplicate of accepted grass_block (IoU=0.65)
+52,285,crop_f108_b19_c0_conf0.181.png,108,grass_block,0.181,0.22,noise,continuous flat grass lawn texture (no block boundary)
+53,293,crop_f109_b00_c0_conf0.443.png,109,grass_block,0.443,0.21,known_miss,sub-threshold grass_block facet (conf=0.443)
+54,296,crop_f109_b03_c0_conf0.381.png,109,grass_block,0.381,0.00,noise,continuous flat grass lawn texture (no block boundary)
+55,304,crop_f109_b11_c0_conf0.233.png,109,grass_block,0.233,0.25,noise,continuous flat grass lawn texture (no block boundary)
+56,306,crop_f109_b13_c0_conf0.211.png,109,grass_block,0.211,0.22,noise,continuous flat grass lawn texture (no block boundary)
+57,307,crop_f109_b14_c0_conf0.201.png,109,grass_block,0.201,0.30,noise,continuous flat grass lawn texture (no block boundary)
+58,311,crop_f109_b18_c0_conf0.193.png,109,grass_block,0.193,0.00,noise,continuous flat grass lawn texture (no block boundary)
+59,315,crop_f109_b22_c0_conf0.177.png,109,grass_block,0.177,0.00,noise,bottom screen / hotbar edge sliver
+60,321,crop_f109_b28_c0_conf0.158.png,109,grass_block,0.158,0.14,noise,continuous flat grass lawn texture (no block boundary)
+61,331,crop_f110_b05_c0_conf0.268.png,110,grass_block,0.268,0.33,noise,continuous flat grass lawn texture (no block boundary)
+62,340,crop_f110_b14_c0_conf0.153.png,110,grass_block,0.153,0.21,noise,continuous flat grass lawn texture (no block boundary)
+63,342,crop_f111_b00_c0_conf0.221.png,111,grass_block,0.221,0.00,noise,continuous flat grass lawn texture (no block boundary)
+64,355,crop_f112_b10_c0_conf0.166.png,112,grass_block,0.166,0.09,noise,continuous flat grass lawn texture (no block boundary)
+65,356,crop_f112_b11_c0_conf0.164.png,112,grass_block,0.164,0.19,noise,continuous flat grass lawn texture (no block boundary)
+66,370,crop_f115_b04_c0_conf0.262.png,115,grass_block,0.262,0.15,noise,continuous flat grass lawn texture (no block boundary)
+67,373,crop_f115_b07_c0_conf0.229.png,115,grass_block,0.229,0.68,known_miss,low-conf duplicate of accepted grass_block (IoU=0.68)
+68,374,crop_f115_b08_c0_conf0.206.png,115,grass_block,0.206,0.61,known_miss,low-conf duplicate of accepted grass_block (IoU=0.61)
+69,381,crop_f122_b05_c0_conf0.355.png,122,grass_block,0.355,0.16,noise,continuous flat grass lawn texture (no block boundary)
+70,387,crop_f122_b11_c0_conf0.251.png,122,grass_block,0.251,0.00,noise,continuous flat grass lawn texture (no block boundary)
+71,391,crop_f122_b15_c0_conf0.208.png,122,grass_block,0.208,0.59,known_miss,low-conf duplicate of accepted grass_block (IoU=0.59)
+72,404,crop_f125_b00_c0_conf0.313.png,125,grass_block,0.313,0.07,noise,continuous flat grass lawn texture (no block boundary)
+73,406,crop_f125_b02_c0_conf0.242.png,125,grass_block,0.242,0.09,noise,continuous flat grass lawn texture (no block boundary)
+74,408,crop_f128_b00_c0_conf0.288.png,128,grass_block,0.288,0.00,noise,continuous flat grass lawn texture (no block boundary)
+75,418,crop_f132_b01_c3_conf0.169.png,132,crafting_table,0.169,0.00,known_miss,crafting table in scene (conf=0.169)
+76,428,crop_f133_b09_c0_conf0.172.png,133,grass_block,0.172,0.37,noise,continuous flat grass lawn texture (no block boundary)
+77,429,crop_f133_b10_c0_conf0.165.png,133,grass_block,0.165,0.19,noise,continuous flat grass lawn texture (no block boundary)
+78,430,crop_f133_b11_c0_conf0.158.png,133,grass_block,0.158,0.28,noise,continuous flat grass lawn texture (no block boundary)
+79,434,crop_f135_b02_c0_conf0.272.png,135,grass_block,0.272,0.57,known_miss,low-conf duplicate of accepted grass_block (IoU=0.57)
+80,437,crop_f135_b05_c0_conf0.200.png,135,grass_block,0.200,0.01,noise,top window border / sky sliver
+81,444,crop_f137_b00_c0_conf0.156.png,137,grass_block,0.156,0.33,noise,continuous flat grass lawn texture (no block boundary)
+82,448,crop_f139_b01_c0_conf0.186.png,139,grass_block,0.186,0.30,noise,continuous flat grass lawn texture (no block boundary)
+83,464,crop_f152_b00_c0_conf0.280.png,152,grass_block,0.280,0.33,noise,continuous flat grass lawn texture (no block boundary)
+84,476,crop_f162_b00_c0_conf0.471.png,162,grass_block,0.471,0.12,noise,continuous flat grass lawn texture (no block boundary)
+85,477,crop_f162_b01_c0_conf0.471.png,162,grass_block,0.471,0.25,known_miss,sub-threshold grass_block facet (conf=0.471)
+86,501,crop_f171_b00_c0_conf0.356.png,171,grass_block,0.356,0.00,noise,continuous flat grass lawn texture (no block boundary)
+87,506,crop_f172_b01_c0_conf0.221.png,172,grass_block,0.221,0.57,known_miss,low-conf duplicate of accepted grass_block (IoU=0.57)
+88,508,crop_f172_b03_c3_conf0.190.png,172,crafting_table,0.190,0.00,known_miss,crafting table in scene (conf=0.190)
+89,509,crop_f172_b04_c0_conf0.159.png,172,grass_block,0.159,0.15,noise,bottom screen / hotbar edge sliver
+90,510,crop_f173_b00_c0_conf0.498.png,173,grass_block,0.498,0.26,known_miss,sub-threshold grass_block facet (conf=0.498)
+91,516,crop_f175_b01_c0_conf0.186.png,175,grass_block,0.186,0.62,known_miss,low-conf duplicate of accepted grass_block (IoU=0.62)
+92,519,crop_f176_b01_c0_conf0.319.png,176,grass_block,0.319,0.09,noise,continuous flat grass lawn texture (no block boundary)
+93,534,crop_f188_b00_c0_conf0.483.png,188,grass_block,0.483,0.54,known_miss,low-conf duplicate of accepted grass_block (IoU=0.54)
+94,536,crop_f188_b02_c0_conf0.414.png,188,grass_block,0.414,0.13,noise,continuous flat grass lawn texture (no block boundary)
+95,538,crop_f188_b04_c0_conf0.305.png,188,grass_block,0.305,0.44,noise,continuous flat grass lawn texture (no block boundary)
+96,545,crop_f192_b02_c0_conf0.291.png,192,grass_block,0.291,0.20,noise,player viewmodel hand/arm foreground artifact
+97,548,crop_f192_b05_c0_conf0.265.png,192,grass_block,0.265,0.60,known_miss,low-conf duplicate of accepted grass_block (IoU=0.60)
+98,557,crop_f196_b02_c0_conf0.331.png,196,grass_block,0.331,0.28,noise,continuous flat grass lawn texture (no block boundary)
+99,562,crop_f197_b01_c0_conf0.269.png,197,grass_block,0.269,0.15,noise,continuous flat grass lawn texture (no block boundary)
