@@ -225,8 +225,8 @@ pub use verify::{
   evaluate_world_diff,
 };
 pub use visual_perception::{
-  DEFAULT_MINECRAFT_CLASSES, DepthEstimator, DepthMap, Detection, PerceivedLandmark, VisualPerceptionIngest, YoloWorldConfig,
-  YoloWorldDetector, back_project, robust_bbox_depth,
+  BlockDetector, BlockDetectorConfig, CLOSED_SET_CLASSES, DEFAULT_PER_CLASS_THRESHOLDS, DepthEstimator, DepthMap, Detection,
+  PerceivedLandmark, VisualPerceptionIngest, back_project, robust_bbox_depth,
 };
 
 // NOTICE(mc4-live-refusal): MC-4 refusal logic now closes crate-local mismatch cases that can be

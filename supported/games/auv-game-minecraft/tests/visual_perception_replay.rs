@@ -13,17 +13,14 @@ use auv_game_minecraft::spatial_memory_ingest::LandmarkIngest;
 use auv_game_minecraft::spatial_memory_observation::SpatialClaimStatus;
 use auv_game_minecraft::spatial_memory_store::{LandmarkSource, ObservationRef, SpatialMemoryStore};
 use auv_game_minecraft::types::{PlayerPose, Vec3, Viewport};
-use auv_game_minecraft::visual_perception::{
-  DEFAULT_MINECRAFT_CLASSES, DepthEstimator, VisualPerceptionIngest, YoloWorldConfig, YoloWorldDetector,
-};
+use auv_game_minecraft::visual_perception::{BlockDetector, BlockDetectorConfig, DepthEstimator, VisualPerceptionIngest};
 
 #[test]
 fn test_visual_perception_replay_end_to_end() {
-  let yolo_path = PathBuf::from("F:/auv/.tmp/models/yolov8s-worldv2.onnx");
   let depth_path = PathBuf::from("F:/auv/.tmp/models/model-small.onnx");
   let screenshot_path = PathBuf::from("F:/auv/.tmp/m2-session/v01/screenshot.png");
 
-  if !yolo_path.is_file() || !depth_path.is_file() || !screenshot_path.is_file() {
+  if !depth_path.is_file() || !screenshot_path.is_file() {
     eprintln!("Skipping visual perception replay: models or screenshot not found");
     return;
   }
@@ -62,16 +59,15 @@ fn test_visual_perception_replay_end_to_end() {
   calibrator.add_anchor(pred_depth_center as f32 * 0.5, true_depth_at_crosshair as f32 * 0.5);
   assert!(calibrator.fit().is_some(), "calibrator must be fitted");
 
-  // 2. Initialize YOLO-World detector
-  let yolo_config = YoloWorldConfig {
-    model_path: yolo_path,
-    // Use low threshold (0.05) to ensure Minecraft pixel-art detections trigger on natural terrain
-    confidence_threshold: 0.05,
+  // 2. Initialize BlockDetector
+  let detector_config = BlockDetectorConfig {
+    model_path: PathBuf::from("assets/block-detector-v1.onnx"),
+    per_class_threshold: [0.05; 6],
+    enable_crafting_table: true,
     iou_threshold: 0.45,
     input_size: 640,
-    classes: DEFAULT_MINECRAFT_CLASSES.iter().map(|s| s.to_string()).collect(),
   };
-  let detector = YoloWorldDetector::new(yolo_config).expect("load YOLO-World");
+  let detector = BlockDetector::new(detector_config).expect("load BlockDetector");
 
   // 3. Build VisualPerceptionIngest
   let obs_ref = ObservationRef {

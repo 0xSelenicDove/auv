@@ -123,93 +123,123 @@ pub fn wire_memory_query_to_action(
   executor: &impl ActionExecutor,
 ) -> MemoryActionOutcome {
   let lower_label = query.label.to_lowercase();
-  let matched_landmark = store.landmarks().values().find(|lm| {
-    if let Some(desc) = &lm.description {
-      if desc.to_lowercase().contains(&lower_label) {
-        return true;
-      }
-    }
-    for obs in &lm.observations {
-      if let Some(bid) = &obs.block_id {
-        if bid.to_lowercase().contains(&lower_label) {
+  let mut matching_landmarks: Vec<_> = store
+    .landmarks()
+    .values()
+    .filter(|lm| {
+      if let Some(desc) = &lm.description {
+        if desc.to_lowercase().contains(&lower_label) {
           return true;
         }
       }
-    }
-    if lm.landmark_id.to_lowercase().contains(&lower_label) {
-      return true;
-    }
-    false
+      for obs in &lm.observations {
+        if let Some(bid) = &obs.block_id {
+          if bid.to_lowercase().contains(&lower_label) {
+            return true;
+          }
+        }
+      }
+      if lm.landmark_id.to_lowercase().contains(&lower_label) {
+        return true;
+      }
+      false
+    })
+    .collect();
+
+  // If multiple landmarks match the requested label, select the one nearest to the observer.
+  matching_landmarks.sort_by(|a, b| {
+    let ca = a.position.center();
+    let cb = b.position.center();
+    let da = (ca.x - query.observer.eye_position.x).powi(2)
+      + (ca.y - query.observer.eye_position.y).powi(2)
+      + (ca.z - query.observer.eye_position.z).powi(2);
+    let db = (cb.x - query.observer.eye_position.x).powi(2)
+      + (cb.y - query.observer.eye_position.y).powi(2)
+      + (cb.z - query.observer.eye_position.z).powi(2);
+    da.total_cmp(&db)
   });
 
-  let Some(landmark) = matched_landmark else {
+  if matching_landmarks.is_empty() {
     return MemoryActionOutcome {
       attempted: false,
       window_point: None,
       refusal_reason: Some("no such landmark".to_string()),
       known_limits: vec![],
     };
-  };
-
-  let mut spatial_query =
-    SpatialMemoryQuery::new(query.observer, LandmarkTarget::LandmarkId(landmark.landmark_id.clone()), QueryKind::ScreenProjection);
-  if let Some(frame) = &query.observer_frame {
-    spatial_query.observer_frame = Some(frame.clone());
-  }
-  if let Some(vp) = query.viewport {
-    spatial_query = spatial_query.with_viewport(vp);
-  }
-  if let Some(fov) = query.vertical_fov_deg {
-    spatial_query = spatial_query.with_vertical_fov(fov);
   }
 
-  let answer = query_spatial_memory(store, &spatial_query, query.depth_map);
+  let mut last_refusal = None;
+  let mut last_limits = vec![];
 
-  match answer.visibility {
-    VisibilityClass::Occluded => MemoryActionOutcome {
-      attempted: false,
-      window_point: None,
-      refusal_reason: Some("target occluded".to_string()),
-      known_limits: answer.limitations,
-    },
-    VisibilityClass::OutOfFrustum => MemoryActionOutcome {
-      attempted: false,
-      window_point: None,
-      refusal_reason: Some("target out of frustum".to_string()),
-      known_limits: answer.limitations,
-    },
-    VisibilityClass::Unknown => MemoryActionOutcome {
-      attempted: false,
-      window_point: None,
-      refusal_reason: Some("target visibility unknown".to_string()),
-      known_limits: answer.limitations,
-    },
-    VisibilityClass::Visible => {
-      let Some((sx, sy)) = answer.screen_xy else {
-        return MemoryActionOutcome {
-          attempted: false,
-          window_point: None,
-          refusal_reason: Some("visible target missing screen projection".to_string()),
-          known_limits: answer.limitations,
+  for landmark in matching_landmarks {
+    let mut spatial_query =
+      SpatialMemoryQuery::new(query.observer, LandmarkTarget::LandmarkId(landmark.landmark_id.clone()), QueryKind::ScreenProjection);
+    if let Some(frame) = &query.observer_frame {
+      spatial_query.observer_frame = Some(frame.clone());
+    }
+    if let Some(vp) = query.viewport {
+      spatial_query = spatial_query.with_viewport(vp);
+    }
+    if let Some(fov) = query.vertical_fov_deg {
+      spatial_query = spatial_query.with_vertical_fov(fov);
+    }
+
+    let answer = query_spatial_memory(store, &spatial_query, query.depth_map);
+
+    match answer.visibility {
+      VisibilityClass::Visible => {
+        let Some((sx, sy)) = answer.screen_xy else {
+          last_refusal = Some("visible target missing screen projection".to_string());
+          last_limits = answer.limitations;
+          continue;
         };
-      };
 
-      let window_point = WindowPoint::new(sx, sy);
-      match executor.click(window_point) {
-        Ok(_) => MemoryActionOutcome {
-          attempted: true,
-          window_point: Some(window_point),
-          refusal_reason: None,
-          known_limits: answer.limitations,
-        },
-        Err(err) => MemoryActionOutcome {
-          attempted: true,
-          window_point: Some(window_point),
-          refusal_reason: Some(err),
-          known_limits: answer.limitations,
-        },
+        let window_point = WindowPoint::new(sx, sy);
+        match executor.click(window_point) {
+          Ok(_) => {
+            return MemoryActionOutcome {
+              attempted: true,
+              window_point: Some(window_point),
+              refusal_reason: None,
+              known_limits: answer.limitations,
+            };
+          }
+          Err(err) => {
+            return MemoryActionOutcome {
+              attempted: true,
+              window_point: Some(window_point),
+              refusal_reason: Some(err),
+              known_limits: answer.limitations,
+            };
+          }
+        }
+      }
+      VisibilityClass::Occluded => {
+        if last_refusal.is_none() {
+          last_refusal = Some("target occluded".to_string());
+          last_limits = answer.limitations;
+        }
+      }
+      VisibilityClass::OutOfFrustum => {
+        if last_refusal.is_none() {
+          last_refusal = Some("target out of frustum".to_string());
+          last_limits = answer.limitations;
+        }
+      }
+      VisibilityClass::Unknown => {
+        if last_refusal.is_none() {
+          last_refusal = Some("target visibility unknown".to_string());
+          last_limits = answer.limitations;
+        }
       }
     }
+  }
+
+  MemoryActionOutcome {
+    attempted: false,
+    window_point: None,
+    refusal_reason: last_refusal.or_else(|| Some("no visible matching landmark".to_string())),
+    known_limits: last_limits,
   }
 }
 

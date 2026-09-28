@@ -15,20 +15,27 @@ use crate::spatial_memory_ingest::{IngestReport, LandmarkIngest};
 use crate::spatial_memory_store::{LandmarkKind, ObservationRef, SpatialMemoryStore};
 use crate::types::{BlockPosition, PlayerPose, Vec3, Viewport};
 
-pub const DEFAULT_MINECRAFT_CLASSES: [&str; 10] = [
-  "chest",
-  "furnace",
-  "crafting table",
-  "door",
-  "bed",
-  "torch",
-  "tree",
-  "sheep",
-  "pig",
-  "cow",
+pub const CLOSED_SET_CLASSES: [&str; 6] = [
+  "grass_block",    // 0
+  "chest",          // 1
+  "furnace",        // 2
+  "crafting_table", // 3
+  "door",           // 4
+  "torch",          // 5
 ];
 
-const EMBEDDINGS_JSON: &str = include_str!("../assets/minecraft_classes_embeds.json");
+/// Default per-class confidence thresholds based on Step 6b validation metrics:
+/// - grass_block, furnace, door, torch: 0.50 (validated AP 0.92–0.97, abundant data)
+/// - chest: 0.70 (weak AP 0.75, val n=6, stricter threshold)
+/// - crafting_table: 0.50 (unvalidated raw n=2, val n=1, disabled by default via `enable_crafting_table`)
+pub const DEFAULT_PER_CLASS_THRESHOLDS: [f64; 6] = [
+  0.50, // grass_block: validated, AP 0.925
+  0.70, // chest: weak, AP 0.750, val n=6
+  0.50, // furnace: validated, AP 0.954
+  0.50, // crafting_table: unvalidated, raw n=2, val n=1
+  0.50, // door: validated, AP 0.974
+  0.50, // torch: validated, AP 0.959
+];
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Detection {
@@ -38,157 +45,177 @@ pub struct Detection {
 }
 
 #[derive(Clone, Debug)]
-pub struct YoloWorldConfig {
+pub struct BlockDetectorConfig {
   pub model_path: PathBuf,
-  pub confidence_threshold: f64,
+  /// Per-class confidence thresholds in index order of `CLOSED_SET_CLASSES`.
+  pub per_class_threshold: [f64; 6],
+  /// Whether crafting_table detection is enabled.
+  /// RATIONALE: Memory ingest requires high precision. Unvalidated classes injected into spatial
+  /// memory cause contamination rather than useful recall.
+  pub enable_crafting_table: bool,
   pub iou_threshold: f64,
   pub input_size: u32,
-  pub classes: Vec<String>,
 }
 
-impl Default for YoloWorldConfig {
+impl Default for BlockDetectorConfig {
   fn default() -> Self {
     Self {
-      model_path: PathBuf::from("F:/.auv/.tmp/models/yolov8s-worldv2.onnx"),
-      confidence_threshold: 0.30,
+      model_path: PathBuf::from("assets/block-detector-v1.onnx"),
+      per_class_threshold: DEFAULT_PER_CLASS_THRESHOLDS,
+      enable_crafting_table: false,
       iou_threshold: 0.45,
       input_size: 640,
-      classes: DEFAULT_MINECRAFT_CLASSES.iter().map(|s| s.to_string()).collect(),
     }
   }
 }
 
-#[derive(Deserialize)]
-struct StoredEmbeddings {
-  classes: Vec<String>,
-  embeds: Vec<Vec<f32>>,
+impl BlockDetectorConfig {
+  pub fn set_class_threshold(&mut self, class_idx: usize, threshold: f64) {
+    if class_idx < self.per_class_threshold.len() {
+      self.per_class_threshold[class_idx] = threshold;
+    }
+  }
 }
 
-pub struct YoloWorldDetector {
+pub struct BlockDetector {
   session: OrtSession,
-  config: YoloWorldConfig,
-  text_embeds_flat: Vec<f32>,
-  num_classes: usize,
+  config: BlockDetectorConfig,
 }
 
-impl YoloWorldDetector {
-  pub fn new(config: YoloWorldConfig) -> Result<Self, String> {
+fn resolve_model_path(path: &Path) -> PathBuf {
+  if path.is_file() {
+    return path.to_path_buf();
+  }
+  if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+    let candidate = Path::new(&manifest_dir).join(path);
+    if candidate.is_file() {
+      return candidate;
+    }
+  }
+  let candidate = Path::new("supported/games/auv-game-minecraft").join(path);
+  if candidate.is_file() {
+    return candidate;
+  }
+  path.to_path_buf()
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LetterboxParams {
+  pub orig_w: f64,
+  pub orig_h: f64,
+  pub scale: f64,
+  pub pad_left: f64,
+  pub pad_top: f64,
+}
+
+impl BlockDetector {
+  pub fn new(config: BlockDetectorConfig) -> Result<Self, String> {
+    let resolved_path = resolve_model_path(&config.model_path);
     let session = OrtSession::load(OrtModelConfig {
-      model_path: config.model_path.clone(),
+      model_path: resolved_path,
       execution_provider: ExecutionProvider::Cpu,
     })
-    .map_err(|err| format!("failed to load YOLO-World ONNX model: {err}"))?;
+    .map_err(|err| format!("failed to load block detector ONNX model: {err}"))?;
 
-    let parsed: StoredEmbeddings =
-      serde_json::from_str(EMBEDDINGS_JSON).map_err(|err| format!("failed to parse embedded Minecraft CLIP embeddings: {err}"))?;
-
-    let num_classes = parsed.classes.len();
-    let mut flat = Vec::with_capacity(num_classes * 512);
-    for row in parsed.embeds {
-      if row.len() != 512 {
-        return Err(format!("expected 512-dim embedding, got {}", row.len()));
-      }
-      flat.extend(row);
-    }
-
-    Ok(Self {
-      session,
-      config,
-      text_embeds_flat: flat,
-      num_classes,
-    })
+    Ok(Self { session, config })
   }
 
-  pub fn config(&self) -> &YoloWorldConfig {
+  pub fn config(&self) -> &BlockDetectorConfig {
     &self.config
   }
 
+  pub fn set_class_threshold(&mut self, class_idx: usize, threshold: f64) {
+    if class_idx < self.config.per_class_threshold.len() {
+      self.config.per_class_threshold[class_idx] = threshold;
+    }
+  }
+
+  pub fn set_all_thresholds(&mut self, threshold: f64) {
+    self.config.per_class_threshold = [threshold; 6];
+  }
+
   pub fn set_confidence_threshold(&mut self, threshold: f64) {
-    self.config.confidence_threshold = threshold;
+    self.config.per_class_threshold = [threshold; 6];
   }
 
-  pub fn with_custom_embeddings(mut self, classes: Vec<String>, embeds_flat: Vec<f32>) -> Result<Self, String> {
-    if embeds_flat.len() != classes.len() * 512 {
-      return Err(format!("expected {} floats for {} classes with 512-dim, got {}", classes.len() * 512, classes.len(), embeds_flat.len()));
-    }
-    self.num_classes = classes.len();
-    self.config.classes = classes;
-    self.text_embeds_flat = embeds_flat;
-    Ok(self)
+  pub fn set_enable_crafting_table(&mut self, enable: bool) {
+    self.config.enable_crafting_table = enable;
   }
 
-  pub fn with_embeddings_json(mut self, json_str: &str) -> Result<Self, String> {
-    let parsed: StoredEmbeddings = serde_json::from_str(json_str).map_err(|err| format!("failed to parse custom embeddings: {err}"))?;
-    let num_classes = parsed.classes.len();
-    let mut flat = Vec::with_capacity(num_classes * 512);
-    for row in parsed.embeds {
-      if row.len() != 512 {
-        return Err(format!("expected 512-dim embedding, got {}", row.len()));
-      }
-      flat.extend(row);
-    }
-    self.num_classes = num_classes;
-    self.config.classes = parsed.classes;
-    self.text_embeds_flat = flat;
-    Ok(self)
-  }
-
-  fn run_forward(&self, image: &DynamicImage) -> Result<(F32Tensor, f64, f64), String> {
+  fn run_forward(&self, image: &DynamicImage) -> Result<(F32Tensor, LetterboxParams), String> {
     let orig_w = image.width() as f64;
     let orig_h = image.height() as f64;
     if orig_w == 0.0 || orig_h == 0.0 {
       return Err("image dimensions must be non-zero".to_string());
     }
 
-    let input_sz = self.config.input_size;
-    let resized = image.resize_exact(input_sz, input_sz, image::imageops::FilterType::Triangle);
+    let input_sz = self.config.input_size as f64;
+    let scale = (input_sz / orig_w).min(input_sz / orig_h);
+    let new_unpad_w = (orig_w * scale).round() as u32;
+    let new_unpad_h = (orig_h * scale).round() as u32;
+    let pad_w = (input_sz - new_unpad_w as f64) / 2.0;
+    let pad_h = (input_sz - new_unpad_h as f64) / 2.0;
+    let pad_left = (pad_w - 0.1).round().max(0.0);
+    let pad_top = (pad_h - 0.1).round().max(0.0);
+
+    let params = LetterboxParams {
+      orig_w,
+      orig_h,
+      scale,
+      pad_left,
+      pad_top,
+    };
+
+    let resized = image.resize_exact(new_unpad_w, new_unpad_h, image::imageops::FilterType::Triangle);
     let rgb = resized.to_rgb8();
 
-    // Construct images tensor: [1, 3, H, W] in [0.0, 1.0]
-    let mut img_data = vec![0.0f32; 3 * (input_sz as usize) * (input_sz as usize)];
-    let stride = (input_sz as usize) * (input_sz as usize);
-    for (i, pixel) in rgb.pixels().enumerate() {
-      img_data[i] = f32::from(pixel[0]) / 255.0;
-      img_data[i + stride] = f32::from(pixel[1]) / 255.0;
-      img_data[i + stride * 2] = f32::from(pixel[2]) / 255.0;
+    let sz_usize = self.config.input_size as usize;
+    let stride = sz_usize * sz_usize;
+    // Standard YOLO letterbox padding value is 114 / 255.0 = 0.44705883
+    let fill_val = 114.0f32 / 255.0f32;
+    let mut img_data = vec![fill_val; 3 * stride];
+
+    for (x, y, pixel) in rgb.enumerate_pixels() {
+      let dst_x = x as usize + pad_left as usize;
+      let dst_y = y as usize + pad_top as usize;
+      if dst_x < sz_usize && dst_y < sz_usize {
+        let idx = dst_y * sz_usize + dst_x;
+        img_data[idx] = f32::from(pixel[0]) / 255.0;
+        img_data[idx + stride] = f32::from(pixel[1]) / 255.0;
+        img_data[idx + stride * 2] = f32::from(pixel[2]) / 255.0;
+      }
     }
 
     let images_tensor = F32Tensor {
       name: "images".to_string(),
-      shape: vec![1, 3, input_sz as usize, input_sz as usize],
+      shape: vec![1, 3, sz_usize, sz_usize],
       data: img_data,
     };
 
-    let txt_tensor = F32Tensor {
-      name: "txt_feats".to_string(),
-      shape: vec![1, self.num_classes, 512],
-      data: self.text_embeds_flat.clone(),
-    };
-
-    let outputs = self.session.run_tensors(vec![images_tensor, txt_tensor]).map_err(|err| format!("YOLO-World inference failed: {err}"))?;
+    let outputs = self.session.run_tensors(vec![images_tensor]).map_err(|err| format!("block detector inference failed: {err}"))?;
 
     let out = outputs
       .into_iter()
       .find(|t| t.name == "output0" || t.name == "output")
-      .ok_or_else(|| "missing output0 tensor in YOLO-World result".to_string())?;
+      .ok_or_else(|| "missing output0 tensor in block detector result".to_string())?;
 
     // out.shape is [1, 4 + num_classes, num_anchors]
     if out.shape.len() != 3 {
       return Err(format!("unexpected output0 shape: {:?}", out.shape));
     }
     let channels = out.shape[1];
-    if channels < 4 + self.num_classes {
-      return Err(format!("output channels ({channels}) smaller than 4 + {}", self.num_classes));
+    if channels < 4 + CLOSED_SET_CLASSES.len() {
+      return Err(format!("output channels ({channels}) smaller than 4 + {}", CLOSED_SET_CLASSES.len()));
     }
 
-    Ok((out, orig_w, orig_h))
+    Ok((out, params))
   }
 
   pub fn max_scores_by_class(&self, image: &DynamicImage) -> Result<Vec<(String, f64)>, String> {
-    let (out, _, _) = self.run_forward(image)?;
+    let (out, _) = self.run_forward(image)?;
     let num_anchors = out.shape[2];
-    let mut res = Vec::with_capacity(self.num_classes);
-    for c in 0..self.num_classes {
+    let mut res = Vec::with_capacity(CLOSED_SET_CLASSES.len());
+    for c in 0..CLOSED_SET_CLASSES.len() {
       let mut max_score = 0.0f32;
       for a in 0..num_anchors {
         let score = out.data[(4 + c) * num_anchors + a];
@@ -196,8 +223,7 @@ impl YoloWorldDetector {
           max_score = score;
         }
       }
-      let label = self.config.classes.get(c).cloned().unwrap_or_else(|| format!("class_{c}"));
-      res.push((label, f64::from(max_score)));
+      res.push((CLOSED_SET_CLASSES[c].to_string(), f64::from(max_score)));
     }
     Ok(res)
   }
@@ -209,18 +235,15 @@ impl YoloWorldDetector {
       return Ok(Vec::new());
     }
 
-    let (out, orig_w, orig_h) = self.run_forward(image)?;
+    let (out, params) = self.run_forward(image)?;
     let num_anchors = out.shape[2];
-    let input_sz = self.config.input_size;
-    let scale_x = orig_w / f64::from(input_sz);
-    let scale_y = orig_h / f64::from(input_sz);
 
     let mut raw_candidates: Vec<Detection> = Vec::new();
 
     for a in 0..num_anchors {
       let mut best_cls = 0;
       let mut best_score = 0.0f32;
-      for c in 0..self.num_classes {
+      for c in 0..CLOSED_SET_CLASSES.len() {
         let score = out.data[(4 + c) * num_anchors + a];
         if score > best_score {
           best_score = score;
@@ -228,19 +251,27 @@ impl YoloWorldDetector {
         }
       }
 
+      // Policy: crafting_table is disabled by default until more training samples are collected.
+      // RATIONALE: Memory ingest requires precision; unvalidated classes injected into spatial memory
+      // cause contamination rather than useful recall.
+      if best_cls == 3 && !self.config.enable_crafting_table {
+        continue;
+      }
+
       let conf = f64::from(best_score);
-      if conf >= self.config.confidence_threshold {
+      let threshold = self.config.per_class_threshold[best_cls];
+      if conf >= threshold {
         let cx = f64::from(out.data[a]);
         let cy = f64::from(out.data[num_anchors + a]);
         let w = f64::from(out.data[2 * num_anchors + a]);
         let h = f64::from(out.data[3 * num_anchors + a]);
 
-        let x1 = ((cx - w * 0.5) * scale_x).clamp(0.0, orig_w);
-        let y1 = ((cy - h * 0.5) * scale_y).clamp(0.0, orig_h);
-        let x2 = ((cx + w * 0.5) * scale_x).clamp(0.0, orig_w);
-        let y2 = ((cy + h * 0.5) * scale_y).clamp(0.0, orig_h);
+        let x1 = ((cx - w * 0.5 - params.pad_left) / params.scale).clamp(0.0, params.orig_w);
+        let y1 = ((cy - h * 0.5 - params.pad_top) / params.scale).clamp(0.0, params.orig_h);
+        let x2 = ((cx + w * 0.5 - params.pad_left) / params.scale).clamp(0.0, params.orig_w);
+        let y2 = ((cy + h * 0.5 - params.pad_top) / params.scale).clamp(0.0, params.orig_h);
 
-        let label = self.config.classes.get(best_cls).cloned().unwrap_or_else(|| format!("class_{best_cls}"));
+        let label = CLOSED_SET_CLASSES[best_cls].to_string();
 
         raw_candidates.push(Detection {
           bbox: (x1, y1, x2, y2),
@@ -535,9 +566,9 @@ pub struct PerceivedLandmark {
   pub metric_depth: f64,
 }
 
-/// Pluggable LandmarkIngest implementation using YOLO-World 2D detection and monocular depth.
+/// Pluggable LandmarkIngest implementation using closed-set BlockDetector 2D detection and monocular depth.
 pub struct VisualPerceptionIngest<'a> {
-  pub detector: &'a YoloWorldDetector,
+  pub detector: &'a BlockDetector,
   pub depth: &'a DepthEstimator,
   pub calibrator: &'a AffineDepthCalibrator,
   pub screenshot: &'a DynamicImage,
@@ -551,7 +582,7 @@ pub struct VisualPerceptionIngest<'a> {
 
 impl<'a> VisualPerceptionIngest<'a> {
   pub fn new(
-    detector: &'a YoloWorldDetector,
+    detector: &'a BlockDetector,
     depth: &'a DepthEstimator,
     calibrator: &'a AffineDepthCalibrator,
     screenshot: &'a DynamicImage,
@@ -593,7 +624,7 @@ impl<'a> VisualPerceptionIngest<'a> {
 /// - Unknown categories: defaulted to Dynamic as a conservative fallback.
 pub fn is_static_category(label: &str) -> bool {
   let lower = label.to_lowercase();
-  matches!(lower.as_str(), "chest" | "furnace" | "crafting table" | "crafting_table" | "door" | "bed" | "torch")
+  matches!(lower.as_str(), "grass_block" | "chest" | "furnace" | "crafting table" | "crafting_table" | "door" | "bed" | "torch")
 }
 
 impl<'a> LandmarkIngest for VisualPerceptionIngest<'a> {
@@ -835,6 +866,7 @@ mod tests {
 
   #[test]
   fn test_visual_perception_category_routing() {
+    assert!(is_static_category("grass_block"));
     assert!(is_static_category("chest"));
     assert!(is_static_category("Furnace"));
     assert!(is_static_category("crafting table"));
@@ -883,21 +915,23 @@ mod tests {
     assert!((pred_dist - true_dist).abs() < 1e-4, "expected ~{true_dist}, got {pred_dist}");
 
     // Test YOLO-World detector
-    let yolo_config = YoloWorldConfig {
-      model_path: yolo_path,
-      confidence_threshold: 0.05, // test with low threshold to assert detection structure
+    // Test BlockDetector
+    let block_config = BlockDetectorConfig {
+      model_path: PathBuf::from("assets/block-detector-v1.onnx"),
+      per_class_threshold: [0.05; 6],
+      enable_crafting_table: true,
       iou_threshold: 0.45,
       input_size: 640,
-      classes: DEFAULT_MINECRAFT_CLASSES.iter().map(|s| s.to_string()).collect(),
     };
-    let detector = YoloWorldDetector::new(yolo_config).expect("failed to load YOLO-World");
-    let detections = detector.detect(&img).expect("YOLO detection failed");
-    assert!(!detections.is_empty(), "expected at least one detection with threshold 0.05");
-    for det in &detections {
-      assert!(!det.label.is_empty());
-      assert!(det.confidence >= 0.05);
-      assert!(det.bbox.2 >= det.bbox.0);
-      assert!(det.bbox.3 >= det.bbox.1);
+    if let Ok(detector) = BlockDetector::new(block_config) {
+      let detections = detector.detect(&img).expect("Block detection failed");
+      assert!(!detections.is_empty(), "expected at least one detection with threshold 0.05");
+      for det in &detections {
+        assert!(!det.label.is_empty());
+        assert!(det.confidence >= 0.05);
+        assert!(det.bbox.2 >= det.bbox.0);
+        assert!(det.bbox.3 >= det.bbox.1);
+      }
     }
   }
 
@@ -925,23 +959,25 @@ mod tests {
     assert_eq!(empty_calibrator.fit(), None);
 
     // Any detector / depth estimator path will be short-circuited before inference
-    // We construct a mock-like or real instance if models exist, or test gate directly
-    let yolo_path = PathBuf::from("F:/auv/.tmp/models/yolov8s-worldv2.onnx");
+    let block_path = PathBuf::from("assets/block-detector-v1.onnx");
     let depth_path = PathBuf::from("F:/auv/.tmp/models/model-small.onnx");
     let screenshot_path = PathBuf::from("F:/auv/.tmp/m2-session/v01/screenshot.png");
-    if !yolo_path.is_file() || !depth_path.is_file() || !screenshot_path.is_file() {
+
+    let detector = match BlockDetector::new(BlockDetectorConfig {
+      model_path: block_path,
+      per_class_threshold: [0.05; 6],
+      enable_crafting_table: true,
+      iou_threshold: 0.45,
+      input_size: 640,
+    }) {
+      Ok(d) => d,
+      Err(_) => return,
+    };
+    if !depth_path.is_file() || !screenshot_path.is_file() {
       return;
     }
 
     let img = image::open(&screenshot_path).unwrap();
-    let detector = YoloWorldDetector::new(YoloWorldConfig {
-      model_path: yolo_path,
-      confidence_threshold: 0.05,
-      iou_threshold: 0.45,
-      input_size: 640,
-      classes: DEFAULT_MINECRAFT_CLASSES.iter().map(|s| s.to_string()).collect(),
-    })
-    .unwrap();
     let depth = DepthEstimator::new(&depth_path).unwrap();
 
     let ingest = VisualPerceptionIngest {

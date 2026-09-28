@@ -349,7 +349,6 @@ impl SpatialMemoryStore {
     }
 
     if let Some(id) = matching_id {
-      let _ = self.record_observation(&id, obs.captured_at_millis);
       let landmark = self.landmarks.get_mut(&id).expect("landmark exists");
       landmark.observations.push(LandmarkObservation {
         observation_ref: obs.clone(),
@@ -357,8 +356,21 @@ impl SpatialMemoryStore {
         hit_face: None,
         block_id: None,
       });
+      landmark.observation_count += 1;
+      landmark.consecutive_misses = 0;
+      landmark.last_observed_millis = obs.captured_at_millis;
+
       // Multi-engine fusion: status takes higher authority (Confirmed > Candidate)
-      // Confirmed stays Confirmed; if it was Candidate, it stays Candidate.
+      // If Confirmed (e.g. from raycast), extra observations increase confidence up to 0.99.
+      // If still Candidate (pure visual perception), confidence remains capped at Candidate level (<= 0.50).
+      if landmark.status == SpatialClaimStatus::Confirmed {
+        let extra = (landmark.observation_count.saturating_sub(1) as f64) * 0.02;
+        landmark.confidence = (0.90 + extra).min(0.99);
+      } else {
+        let candidate_conf = (detection_confidence * 0.5).clamp(0.1, 0.5);
+        landmark.confidence = landmark.confidence.max(candidate_conf);
+      }
+
       // Semantic label from visual perception enriches the description:
       landmark.description = Some(label.to_string());
       id
@@ -420,7 +432,6 @@ impl SpatialMemoryStore {
     });
 
     if let Some(id) = matching_id {
-      let _ = self.record_observation(&id, obs.captured_at_millis);
       let landmark = self.landmarks.get_mut(&id).expect("landmark exists");
       landmark.position = block_pos;
       landmark.continuous_position = continuous_pos;
@@ -430,6 +441,18 @@ impl SpatialMemoryStore {
         hit_face: None,
         block_id: None,
       });
+      landmark.observation_count += 1;
+      landmark.consecutive_misses = 0;
+      landmark.last_observed_millis = obs.captured_at_millis;
+
+      if landmark.status == SpatialClaimStatus::Confirmed {
+        let extra = (landmark.observation_count.saturating_sub(1) as f64) * 0.02;
+        landmark.confidence = (0.90 + extra).min(0.99);
+      } else {
+        let candidate_conf = (detection_confidence * 0.5).clamp(0.1, 0.5);
+        landmark.confidence = landmark.confidence.max(candidate_conf);
+      }
+
       landmark.description = Some(label.to_string());
       landmark.kind = LandmarkKind::Dynamic {
         track_id,

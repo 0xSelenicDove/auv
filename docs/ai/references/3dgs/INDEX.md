@@ -28,6 +28,7 @@
 
 ## 相关文档
 
+- [`2026-09-28-step6c-integration.md`](2026-09-28-step6c-integration.md) - Step 6c Rust 端集成闭集方块检测模型实操报告（替换 YOLO-World、per-class 阈值政策、端到端延迟与全链路闭环验证）
 - [`2026-09-28-yolo-closedset-training.md`](2026-09-28-yolo-closedset-training.md) - Step 6b 闭集方块检测 YOLOv8n 训练与闭环验证报告（50 epochs、0.926 mAP、ONNX 导出与域漂移彻底逆转）
 - [`2026-09-27-autolabel-spike.md`](2026-09-27-autolabel-spike.md) - Step 6a 自动标注 Spike 验证报告（闭集 YOLO 数据管线可行性与吞吐硬实测）
 - [`2026-09-27-yolo-domain-drift-measurement.md`](2026-09-27-yolo-domain-drift-measurement.md) - YOLO-World 零样本在 Minecraft 实机截图上的域漂移实测与必须微调裁决

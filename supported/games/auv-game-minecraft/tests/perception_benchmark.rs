@@ -9,9 +9,7 @@ use auv_game_minecraft::depth_calibration::AffineDepthCalibrator;
 use auv_game_minecraft::spatial_memory_ingest::LandmarkIngest;
 use auv_game_minecraft::spatial_memory_store::{ObservationRef, SpatialMemoryConfig, SpatialMemoryStore};
 use auv_game_minecraft::types::{BlockPosition, PlayerPose, Vec3, Viewport};
-use auv_game_minecraft::visual_perception::{
-  DEFAULT_MINECRAFT_CLASSES, DepthEstimator, VisualPerceptionIngest, YoloWorldConfig, YoloWorldDetector, back_project,
-};
+use auv_game_minecraft::visual_perception::{BlockDetector, BlockDetectorConfig, DepthEstimator, VisualPerceptionIngest, back_project};
 
 fn stats(times_ms: &[f64]) -> (f64, f64, f64, f64) {
   let mut sorted = times_ms.to_vec();
@@ -31,7 +29,6 @@ fn stats(times_ms: &[f64]) -> (f64, f64, f64, f64) {
 #[test]
 #[ignore = "benchmark suite for manual stress testing"]
 fn test_perception_and_spatial_memory_benchmarks() {
-  let yolo_path = PathBuf::from("F:/auv/.tmp/models/yolov8s-worldv2.onnx");
   let depth_midas_path = PathBuf::from("F:/auv/.tmp/models/model-small.onnx");
   let depth_da2_path = PathBuf::from("F:/auv/.tmp/models/depth_anything_v2_vits.onnx");
 
@@ -42,15 +39,15 @@ fn test_perception_and_spatial_memory_benchmarks() {
   println!("=======================================================\n");
 
   // Load models
-  println!("Loading YOLO-World detector...");
-  let yolo_config = YoloWorldConfig {
-    model_path: yolo_path.clone(),
-    confidence_threshold: 0.05,
+  println!("Loading BlockDetector...");
+  let block_config = BlockDetectorConfig {
+    model_path: PathBuf::from("assets/block-detector-v1.onnx"),
+    per_class_threshold: [0.05; 6],
+    enable_crafting_table: true,
     iou_threshold: 0.45,
     input_size: 640,
-    classes: DEFAULT_MINECRAFT_CLASSES.iter().map(|s| s.to_string()).collect(),
   };
-  let mut detector = YoloWorldDetector::new(yolo_config).expect("load yolo-world");
+  let mut detector = BlockDetector::new(block_config).expect("load BlockDetector");
 
   println!("Loading Depth Estimator (MiDaS v2.1 Small)...");
   let midas_estimator = DepthEstimator::new(&depth_midas_path).expect("load midas");
@@ -240,7 +237,7 @@ fn test_perception_and_spatial_memory_benchmarks() {
     yolo_times.push(start.elapsed().as_secs_f64() * 1000.0);
   }
   let (y_min, y_max, y_mean, y_med) = stats(&yolo_times);
-  println!("  YOLO-World (640x640, 10 classes):");
+  println!("  BlockDetector (640x640, 6 classes):");
   println!("    Min: {:.2} ms | Max: {:.2} ms | Mean: {:.2} ms | Median: {:.2} ms", y_min, y_max, y_mean, y_med);
 
   // Warmup MiDaS

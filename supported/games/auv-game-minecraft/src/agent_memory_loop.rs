@@ -21,7 +21,7 @@ use crate::memory_maintenance::MemoryMaintenance;
 use crate::spatial_memory_ingest::LandmarkIngest;
 use crate::spatial_memory_store::{ObservationRef, SpatialMemoryStore};
 use crate::types::{PlayerPose, RaycastHit, Viewport};
-use crate::visual_perception::{DepthEstimator, VisualPerceptionIngest, YoloWorldDetector};
+use crate::visual_perception::{BlockDetector, DepthEstimator, VisualPerceptionIngest};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AgentMemoryLoopConfig {
@@ -129,7 +129,7 @@ pub struct AgentMemoryLoop {
   store: SpatialMemoryStore,
   calibrator: AffineDepthCalibrator,
   maintenance: MemoryMaintenance,
-  detector: Option<YoloWorldDetector>,
+  detector: Option<BlockDetector>,
   depth_estimator: Option<DepthEstimator>,
   config: AgentMemoryLoopConfig,
 }
@@ -156,7 +156,7 @@ impl AgentMemoryLoop {
     self
   }
 
-  pub fn with_models(mut self, detector: YoloWorldDetector, depth: DepthEstimator) -> Self {
+  pub fn with_models(mut self, detector: BlockDetector, depth: DepthEstimator) -> Self {
     self.detector = Some(detector);
     self.depth_estimator = Some(depth);
     self
@@ -368,21 +368,15 @@ mod tests {
     let store = SpatialMemoryStore::open(tmp.path()).unwrap();
     let mut agent_loop = AgentMemoryLoop::new(store, AgentMemoryLoopConfig::default());
 
-    let yolo_path = PathBuf::from("F:/auv/.tmp/models/yolov8s-worldv2.onnx");
+    let detector = match BlockDetector::new(crate::visual_perception::BlockDetectorConfig::default()) {
+      Ok(d) => d,
+      Err(_) => return,
+    };
     let depth_path = PathBuf::from("F:/auv/.tmp/models/model-small.onnx");
     let screenshot_path = PathBuf::from("F:/auv/.tmp/m2-session/v03/screenshot.png");
-    if !yolo_path.is_file() || !depth_path.is_file() || !screenshot_path.is_file() {
+    if !depth_path.is_file() || !screenshot_path.is_file() {
       return;
     }
-
-    let detector = YoloWorldDetector::new(crate::visual_perception::YoloWorldConfig {
-      model_path: yolo_path,
-      confidence_threshold: 0.50,
-      iou_threshold: 0.45,
-      input_size: 640,
-      classes: crate::visual_perception::DEFAULT_MINECRAFT_CLASSES.iter().map(|s| s.to_string()).collect(),
-    })
-    .unwrap();
     let depth = DepthEstimator::new(&depth_path).unwrap();
     agent_loop = agent_loop.with_models(detector, depth);
 

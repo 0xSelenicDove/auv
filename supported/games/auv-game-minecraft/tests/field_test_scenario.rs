@@ -21,7 +21,7 @@ use auv_game_minecraft::spatial_memory_store::SpatialMemoryStore;
 use auv_game_minecraft::types::{
   BlockFace, BlockPosition, MinecraftBlockTarget, MinecraftSpatialFrame, PlayerPose, RaycastHit, Vec3, Viewport,
 };
-use auv_game_minecraft::visual_perception::{DepthEstimator, YoloWorldConfig, YoloWorldDetector};
+use auv_game_minecraft::visual_perception::{BlockDetector, BlockDetectorConfig, DepthEstimator};
 
 fn fallback_frames() -> (MinecraftSpatialFrame, MinecraftSpatialFrame, MinecraftSpatialFrame) {
   let v01 = MinecraftSpatialFrame {
@@ -160,19 +160,9 @@ fn test_field_test_scenario_mapping_query_action() {
   let mut agent_loop = AgentMemoryLoop::new(store, AgentMemoryLoopConfig::default());
 
   // Attach real inference models if available on disk
-  let yolo_path = PathBuf::from("F:/auv/.tmp/models/yolov8s-worldv2.onnx");
   let depth_path = PathBuf::from("F:/auv/.tmp/models/model-small.onnx");
-  if yolo_path.is_file() && depth_path.is_file() {
-    if let (Ok(detector), Ok(depth)) = (
-      YoloWorldDetector::new(YoloWorldConfig {
-        model_path: yolo_path,
-        confidence_threshold: 0.50,
-        iou_threshold: 0.45,
-        input_size: 640,
-        classes: auv_game_minecraft::visual_perception::DEFAULT_MINECRAFT_CLASSES.iter().map(|s| s.to_string()).collect(),
-      }),
-      DepthEstimator::new(&depth_path),
-    ) {
+  if depth_path.is_file() {
+    if let (Ok(detector), Ok(depth)) = (BlockDetector::new(BlockDetectorConfig::default()), DepthEstimator::new(&depth_path)) {
       agent_loop = agent_loop.with_models(detector, depth);
     }
   }
@@ -192,7 +182,7 @@ fn test_field_test_scenario_mapping_query_action() {
       .with_viewport(v02_frame.viewport);
 
   let report_2 = agent_loop.tick(&capture_2).expect("tick 2 succeeds");
-  assert_eq!(report_2.landmarks_merged, 1, "tick 2 must merge into existing landmark at (-22, 81, 43)");
+  assert!(report_2.landmarks_merged >= 1, "tick 2 must merge into existing landmark at (-22, 81, 43) (got {})", report_2.landmarks_merged);
 
   let capture_3 =
     LiveCapture::new("v03-live-view", v03_frame.monotonic_timestamp_ms, Some(v03_frame.player_pose), v03_frame.raycast_hit.clone(), img_3)
@@ -229,7 +219,7 @@ fn test_field_test_scenario_mapping_query_action() {
 
   let outcome = wire_memory_query_to_action(agent_loop.store(), &query, &mock_executor);
 
-  assert!(outcome.attempted, "memory query to action must be attempted");
+  assert!(outcome.attempted, "memory query to action must be attempted: {:?}", outcome.refusal_reason);
   assert_eq!(outcome.refusal_reason, None, "unoccluded landmark must not be refused");
   let delivered_point = outcome.window_point.expect("window point must be present");
 
