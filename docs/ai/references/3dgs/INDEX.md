@@ -28,6 +28,7 @@
 
 ## 相关文档
 
+- [`2026-09-28-spike-s2-spatial-hash.md`](2026-09-28-spike-s2-spatial-hash.md) - Spike S2 Projection 标签诚实化与 100k Landmark 空间哈希调研报告（projection_self_consistency_px 诚实化、100k uniform grid spatial hash 原型、78.3x 加速与 GO 裁决）
 - [`2026-09-28-spike-novelty.md`](2026-09-28-spike-novelty.md) - Spike S1 Novelty / 未知物体路径可行性调研报告（拒识区间扫描、100 框人工 Adjudication、moondream2 VLM 延迟基准与 NO-GO 裁决）
 - [`2026-09-28-step6e-v2-swap.md`](2026-09-28-step6e-v2-swap.md) - Step 6e v2 模型换装与阈值政策正常化实操报告（v2 入库、弱类惩罚解除、全量回归通过、误报实战排查）
 - [`2026-09-28-yolo-v2-weakclass.md`](2026-09-28-yolo-v2-weakclass.md) - Step 6d 闭集方块检测 YOLOv8n v2 弱类补录训练与同验证集对比报告（定向补录、同 val 对比、门禁全绿通过、ONNX 导出）

@@ -105,15 +105,15 @@ pub fn wire_memory_query_to_action(
 
 ```text
 ================ FIELD TEST SCENARIO METRICS ================
-  recall_success:      true
-  projection_error_px: 0.0000 px
-  false_landmarks:     0
-  visual_gated_ticks:  1
+  recall_success:                 true
+  projection_self_consistency_px: 0.0000 px
+  false_landmarks:                0
+  visual_gated_ticks:             1
 =============================================================
 ```
 
 - **`recall_success` (`true`)**：建图后能够在记忆中准确召回目标 landmark。
-- **`projection_error_px` (`0.0000 px`)**：反投影派发点击坐标与真实投影真值完全重合（误差远小于 2.0px 上限）。
+- **`projection_self_consistency_px` (`0.0000 px`)**：检查 projector 自洽（同一 projector 算两次），是 wiring 一致性，不是独立精度；独立精度见 2026-09-27 补测：v01 21.8px / v02 60.0px。
 - **`false_landmarks` (`0`)**：静态白名单与高置信度门限生效，没有产生白名单外或无真值对应的错误 landmark。
 - **`visual_gated_ticks` (`1`)**：在缺乏充分深度锚点的 Tick 1 中，零锚点门控成功拦截未标定的反投影，防止空气墙与漂移污染。
 

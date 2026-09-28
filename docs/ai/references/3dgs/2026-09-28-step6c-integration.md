@@ -127,15 +127,15 @@
 运行结果：
 ```text
 ================ FIELD TEST SCENARIO METRICS ================
-  recall_success:      true
-  projection_error_px: 0.0000 px
-  false_landmarks:     3
-  visual_gated_ticks:  1
+  recall_success:                 true
+  projection_self_consistency_px: 0.0000 px
+  false_landmarks:                3
+  visual_gated_ticks:             1
 =============================================================
 test test_field_test_scenario_mapping_query_action ... ok
 ```
 - **记忆召回**: `true`（地标准确匹配并融合）。
-- **端到端动作投影误差**: `0.0000 px`（准星中心与目标方块上表面投影重合）。
+- **端到端动作投影自洽性 (`projection_self_consistency_px`)**: `0.0000 px`（检查 projector 自洽，同一 projector 算两次，是 wiring 一致性，不是独立精度；独立精度见 2026-09-27 补测：v01 21.8px / v02 60.0px）。
 - **点击下发**: `executor` 收到精确的一次窗口点击。
 
 ---

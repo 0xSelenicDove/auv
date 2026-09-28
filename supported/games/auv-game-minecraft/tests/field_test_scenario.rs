@@ -6,7 +6,7 @@
 //! 3. Action Delivery: Projects landmark to observer window coordinates and dispatches click to `ActionExecutor`.
 //! 4. Verifications & Metrics:
 //!    - `recall_success`: Memory successfully recalls target landmark.
-//!    - `projection_error_px`: 3D->2D projection error relative to v02 ground truth.
+//!    - `projection_self_consistency_px`: 检查 projector 自洽（同一 projector 算两次），是 wiring 一致性，不是独立精度；独立精度见 2026-09-27 补测：v01 21.8px / v02 60.0px。
 //!    - `false_landmarks`: Landmarks created outside the static whitelist.
 //!    - `visual_gated_ticks`: Ticks where visual perception was gated.
 //!
@@ -228,7 +228,9 @@ fn test_field_test_scenario_mapping_query_action() {
   assert_eq!(clicks[0], delivered_point, "clicked coordinates must match delivered window point");
 
   // -------------------------------------------------------------
-  // STAGE 4: PROJECTION ERROR CALCULATION RELATIVE TO TRUTH
+  // STAGE 4: PROJECTION SELF-CONSISTENCY CALCULATION
+  // 检查 projector 自洽（同一 projector 算两次），是 wiring 一致性，不是独立精度；
+  // 独立精度见 2026-09-27 补测：v01 21.8px / v02 60.0px。
   // -------------------------------------------------------------
   let projector = MinecraftProjector::new(v02_frame.clone()).expect("projector creates");
   let mut block_target = MinecraftBlockTarget::new(target_block);
@@ -238,9 +240,13 @@ fn test_field_test_scenario_mapping_query_action() {
 
   let dx = delivered_point.0.x - truth_point.x;
   let dy = delivered_point.0.y - truth_point.y;
-  let projection_error_px = (dx * dx + dy * dy).sqrt();
+  let projection_self_consistency_px = (dx * dx + dy * dy).sqrt();
 
-  assert!(projection_error_px < 2.0, "projection error must be < 2px from v02 truth, got {:.4}px", projection_error_px);
+  assert!(
+    projection_self_consistency_px < 2.0,
+    "projection self-consistency error must be < 2px from v02 truth, got {:.4}px",
+    projection_self_consistency_px
+  );
 
   // False landmarks: count any landmarks whose descriptions are outside the static whitelist
   let false_landmarks = agent_loop
@@ -261,9 +267,9 @@ fn test_field_test_scenario_mapping_query_action() {
   // METRICS REPORTING
   // -------------------------------------------------------------
   println!("\n================ FIELD TEST SCENARIO METRICS ================");
-  println!("  recall_success:      {}", recall_success);
-  println!("  projection_error_px: {:.4} px", projection_error_px);
-  println!("  false_landmarks:     {}", false_landmarks);
-  println!("  visual_gated_ticks:  {}", visual_gated_ticks);
+  println!("  recall_success:                 {}", recall_success);
+  println!("  projection_self_consistency_px: {:.4} px", projection_self_consistency_px);
+  println!("  false_landmarks:                {}", false_landmarks);
+  println!("  visual_gated_ticks:             {}", visual_gated_ticks);
   println!("=============================================================\n");
 }
