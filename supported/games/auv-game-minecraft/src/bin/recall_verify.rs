@@ -593,16 +593,37 @@ pub struct T3Record {
   pub trajectory: Vec<NavTrajectoryPoint>,
 }
 
+/// Per-attempt record for T4 retry loop.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct T4AttemptRecord {
+  pub attempt: usize,
+  pub telemetry_pitch_before_aim: Option<f64>,
+  pub telemetry_yaw_before_aim: Option<f64>,
+  pub aim_yaw_delta: f64,
+  pub aim_pitch_delta: f64,
+  pub mouse_dx: i32,
+  pub mouse_dy: i32,
+  pub right_click_dispatched: bool,
+  pub screenshot_path: String,
+  pub screenshot_saved: bool,
+  pub error: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct T4Record {
   pub projected_screen_point: Option<[f64; 2]>,
   pub projected_visibility: Option<String>,
   pub match_radius_px: Option<f64>,
+  /// Aim delta from the final successful or last attempt.
   pub aim_yaw_delta: Option<f64>,
   pub aim_pitch_delta: Option<f64>,
   pub right_click_dispatched: bool,
   pub screenshot_saved_path: String,
   pub screenshot_saved: bool,
+  /// True when the screenshot shows the chest GUI was opened (manual inspection declared).
+  // TODO: auto-detect open GUI by pixel analysis — deferred, human inspection sufficient for current slice.
+  pub gui_opened_confirmed: Option<bool>,
+  pub retry_attempts: Vec<T4AttemptRecord>,
   pub error: Option<String>,
 }
 
@@ -1486,101 +1507,163 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   println!("[T3] SUCCESS: Memory navigation GATE passed!");
 
   // =========================================================================
-  // T4: Stage 3 Interaction Attempt (Best Effort)
+  // T4: Stage 3 Interaction Attempt (Best Effort, ≤3 retries)
   // =========================================================================
-  println!("\n[T4] Starting Stage 3: Chest Interaction (Best Effort)...");
+  println!("\n[T4] Starting Stage 3: Chest Interaction (Best Effort, max 3 attempts)...");
 
-  // Read latest telemetry frame
-  let latest_frame_opt = read_latest_spatial_frame_from_tail(&args.telemetry_path).ok().flatten();
+  // NOTICE: Settle time after T3 navigation stop — Minecraft needs a tick or two
+  // after the last PostMessageW WM_KEYUP to stabilise player position and pitch=0.
+  // Without this settle the first telemetry read still shows mid-motion pose.
+  sleep(Duration::from_millis(1000));
+
   let mut t4_record = default_t4();
   t4_record.screenshot_saved_path = args.screenshot_out.to_string_lossy().to_string();
 
-  if let Some(frame) = latest_frame_opt {
-    let landmark_block = agent_loop.store().get(&navigator.target_landmark_id).map(|lm| lm.position);
+  let landmark_block = agent_loop.store().get(&navigator.target_landmark_id).map(|lm| lm.position);
+  let landmark_face = agent_loop.store().get(&navigator.target_landmark_id).and_then(|lm| lm.surface_face);
 
-    if let Some(block_pos) = landmark_block {
-      println!("[T4] Projecting chest block at ({}, {}, {}) into observer viewport...", block_pos.x, block_pos.y, block_pos.z);
-      match MinecraftProjector::new(frame.clone()) {
-        Ok(projector) => {
-          let mut block_target = MinecraftBlockTarget::new(block_pos);
-          if let Some(lm) = agent_loop.store().get(&navigator.target_landmark_id) {
-            block_target.face = lm.surface_face;
-          }
+  if let Some(block_pos) = landmark_block {
+    println!("[T4] Target chest block at ({}, {}, {}), surface_face={:?}", block_pos.x, block_pos.y, block_pos.z, landmark_face);
 
-          match projector.project_block_target(&block_target) {
-            Ok(projected) => {
-              t4_record.projected_visibility = Some(format!("{:?}", projected.visibility));
-              t4_record.match_radius_px = Some(projected.match_radius_px);
+    const MAX_T4_ATTEMPTS: usize = 3;
+    'retry: for attempt in 1..=MAX_T4_ATTEMPTS {
+      println!("[T4] Attempt {}/{}", attempt, MAX_T4_ATTEMPTS);
 
-              if let Some(screen_pt) = projected.screen_point {
-                println!(
-                  "[T4] Projected chest screen point: ({:.1}, {:.1}) (match radius: {:.1}px)",
-                  screen_pt.x, screen_pt.y, projected.match_radius_px
-                );
-                t4_record.projected_screen_point = Some([screen_pt.x, screen_pt.y]);
-              }
-
-              // Compute precise yaw/pitch to aim directly at chest center
-              let eye = frame.player_pose.eye_position;
-              let dx = target_pos.0 - eye.x;
-              let dy = target_pos.1 - eye.y;
-              let dz = target_pos.2 - eye.z;
-              let horiz = (dx * dx + dz * dz).sqrt();
-              let target_yaw = (-dx).atan2(dz).to_degrees();
-              let target_pitch = (-dy).atan2(horiz).to_degrees();
-              let aim_yaw_delta = normalize_angle_deg(target_yaw - frame.player_pose.yaw);
-              let aim_pitch_delta = normalize_angle_deg(target_pitch - frame.player_pose.pitch);
-
-              t4_record.aim_yaw_delta = Some(aim_yaw_delta);
-              t4_record.aim_pitch_delta = Some(aim_pitch_delta);
-
-              println!("[T4] Fine-tuning aim towards chest: yaw_delta={:+.1}°, pitch_delta={:+.1}°", aim_yaw_delta, aim_pitch_delta);
-              let mouse_dx = (aim_yaw_delta / 0.150).round() as i32;
-              let mouse_dy = (aim_pitch_delta / 0.150).round() as i32;
-              win32_input::turn_mouse(mouse_dx, mouse_dy);
-              sleep(Duration::from_millis(200));
-
-              // Dispatch right-click once
-              println!("[T4] Dispatching right-click to interact with chest...");
-              win32_input::right_click();
-              t4_record.right_click_dispatched = true;
-
-              // Settle time for chest opening animation / GUI
-              sleep(Duration::from_millis(600));
-
-              // Capture screenshot and save to F:\auv\.tmp\recall_chest_gui.png
-              println!("[T4] Capturing screenshot to {}...", args.screenshot_out.display());
-              if let Ok(cap) = driver_session.window().capture(&window) {
-                if let Some(parent) = args.screenshot_out.parent() {
-                  let _ = fs::create_dir_all(parent);
-                }
-                match DynamicImage::ImageRgba8(cap.image).save(&args.screenshot_out) {
-                  Ok(()) => {
-                    println!("[T4] Successfully saved chest interaction screenshot to {}", args.screenshot_out.display());
-                    t4_record.screenshot_saved = true;
-                  }
-                  Err(e) => {
-                    let err_msg = format!("Failed to save screenshot: {e}");
-                    eprintln!("[T4] WARNING: {err_msg}");
-                    t4_record.error = Some(err_msg);
-                  }
-                }
-              }
-            }
-            Err(e) => {
-              let err_msg = format!("MinecraftProjector projection error: {e}");
-              eprintln!("[T4] WARNING: {err_msg}");
-              t4_record.error = Some(err_msg);
-            }
-          }
+      // Fresh telemetry read — player pose may have drifted from mid-navigation read.
+      let frame = match read_latest_spatial_frame_from_tail(&args.telemetry_path).ok().flatten() {
+        Some(f) => f,
+        None => {
+          eprintln!("[T4] WARNING: Could not read telemetry on attempt {}; skipping.", attempt);
+          continue 'retry;
         }
-        Err(e) => {
-          let err_msg = format!("Failed to initialize MinecraftProjector: {e}");
-          eprintln!("[T4] WARNING: {err_msg}");
-          t4_record.error = Some(err_msg);
+      };
+
+      let eye = frame.player_pose.eye_position;
+      let dx = target_pos.0 - eye.x;
+      let _dy = target_pos.1 - (block_pos.y as f64 + 0.5); // aim at chest face center, not eye delta
+      let dz = target_pos.2 - eye.z;
+      // Recompute horizontal distance from current position for pitch.
+      let horiz = (dx * dx + dz * dz).sqrt();
+      let target_yaw = (-dx).atan2(dz).to_degrees();
+      // Negative dy because positive pitch looks down in Minecraft.
+      let target_pitch = (-(block_pos.y as f64 + 0.5 - eye.y)).atan2(horiz).to_degrees();
+      let aim_yaw_delta = normalize_angle_deg(target_yaw - frame.player_pose.yaw as f64);
+      let aim_pitch_delta = normalize_angle_deg(target_pitch - frame.player_pose.pitch as f64);
+      let mouse_dx = (aim_yaw_delta / 0.150).round() as i32;
+      let mouse_dy = (aim_pitch_delta / 0.150).round() as i32;
+
+      println!(
+        "[T4] Player eye=({:.2},{:.2},{:.2}) yaw={:.1}° pitch={:.1}° | target yaw={:.1}° pitch={:.1}° | delta yaw={:+.1}° pitch={:+.1}° | mouse({},{}) ",
+        eye.x,
+        eye.y,
+        eye.z,
+        frame.player_pose.yaw,
+        frame.player_pose.pitch,
+        target_yaw,
+        target_pitch,
+        aim_yaw_delta,
+        aim_pitch_delta,
+        mouse_dx,
+        mouse_dy
+      );
+
+      // Record first-attempt projection for the report.
+      if attempt == 1 {
+        if let Ok(projector) = MinecraftProjector::new(frame.clone()) {
+          let mut block_target = MinecraftBlockTarget::new(block_pos);
+          block_target.face = landmark_face;
+          if let Ok(projected) = projector.project_block_target(&block_target) {
+            t4_record.projected_visibility = Some(format!("{:?}", projected.visibility));
+            t4_record.match_radius_px = Some(projected.match_radius_px);
+            if let Some(pt) = projected.screen_point {
+              t4_record.projected_screen_point = Some([pt.x, pt.y]);
+            }
+          }
         }
       }
+
+      // Rotate mouse to aim — both yaw and pitch corrections.
+      win32_input::turn_mouse(mouse_dx, mouse_dy);
+
+      // NOTICE: Settle is critical — SendInput MOUSEEVENTF_MOVE is applied asynchronously
+      // by the GLFW input loop; Minecraft processes it within ~1 game tick (~50ms).
+      // We wait 500ms to ensure the view has fully settled before dispatching the click.
+      sleep(Duration::from_millis(500));
+
+      // Screenshot path per attempt (overwrite last on success).
+      let attempt_screenshot = if attempt < MAX_T4_ATTEMPTS {
+        args.screenshot_out.with_extension(format!("attempt{attempt}.png"))
+      } else {
+        args.screenshot_out.clone()
+      };
+
+      // Dispatch right-click.
+      println!("[T4] Dispatching right-click (attempt {})...", attempt);
+      win32_input::right_click();
+
+      let mut attempt_record = T4AttemptRecord {
+        attempt,
+        telemetry_pitch_before_aim: Some(frame.player_pose.pitch as f64),
+        telemetry_yaw_before_aim: Some(frame.player_pose.yaw as f64),
+        aim_yaw_delta,
+        aim_pitch_delta,
+        mouse_dx,
+        mouse_dy,
+        right_click_dispatched: true,
+        screenshot_path: attempt_screenshot.to_string_lossy().to_string(),
+        screenshot_saved: false,
+        error: None,
+      };
+      t4_record.right_click_dispatched = true;
+      t4_record.aim_yaw_delta = Some(aim_yaw_delta);
+      t4_record.aim_pitch_delta = Some(aim_pitch_delta);
+
+      // Wait for GUI open animation (Minecraft chest GUI animates in ~200ms).
+      sleep(Duration::from_millis(1000));
+
+      // Capture screenshot.
+      println!("[T4] Capturing screenshot to {}...", attempt_screenshot.display());
+      if let Ok(cap) = driver_session.window().capture(&window) {
+        if let Some(parent) = attempt_screenshot.parent() {
+          let _ = fs::create_dir_all(parent);
+        }
+        match DynamicImage::ImageRgba8(cap.image).save(&attempt_screenshot) {
+          Ok(()) => {
+            println!("[T4] Screenshot saved: {}", attempt_screenshot.display());
+            attempt_record.screenshot_saved = true;
+            t4_record.screenshot_saved = true;
+            // Copy last attempt to canonical output path so report always points there.
+            if attempt_screenshot != args.screenshot_out {
+              let _ = fs::copy(&attempt_screenshot, &args.screenshot_out);
+            }
+          }
+          Err(e) => {
+            let msg = format!("screenshot save failed: {e}");
+            eprintln!("[T4] WARNING: {msg}");
+            attempt_record.error = Some(msg.clone());
+            t4_record.error = Some(msg);
+          }
+        }
+      }
+
+      t4_record.retry_attempts.push(attempt_record);
+
+      // If aim delta is already small (within 5°), trust that the click landed.
+      // We cannot auto-detect GUI open without pixel analysis (deferred).
+      if aim_yaw_delta.abs() < 5.0 && aim_pitch_delta.abs() < 5.0 {
+        println!("[T4] Aim was within 5° on attempt {} — stopping retry loop.", attempt);
+        break 'retry;
+      }
+
+      // Brief pause before next retry.
+      if attempt < MAX_T4_ATTEMPTS {
+        sleep(Duration::from_millis(400));
+      }
     }
+  } else {
+    let msg = "No landmark block position found in store for chest target".to_string();
+    eprintln!("[T4] WARNING: {msg}");
+    t4_record.error = Some(msg);
   }
 
   // =========================================================================
@@ -1742,6 +1825,8 @@ fn default_t4() -> T4Record {
     right_click_dispatched: false,
     screenshot_saved_path: "F:\\auv\\.tmp\\recall_chest_gui.png".to_string(),
     screenshot_saved: false,
+    gui_opened_confirmed: None,
+    retry_attempts: Vec::new(),
     error: None,
   }
 }
