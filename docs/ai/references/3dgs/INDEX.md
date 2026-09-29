@@ -28,6 +28,7 @@
 
 ## 相关文档
 
+- [`2026-09-29-crafting-table-adversarial.md`](2026-09-29-crafting-table-adversarial.md) - crafting_table 对抗场景误报测试报告（5 个真值工作台+熔炉/门/火把干扰物，80 ticks 全覆盖采样，TP=45 / FP=25，precision_live=0.6429，预承诺决策 RECOMMEND_0.70）
 - [`2026-09-29-step8-1-t4-fixup.md`](2026-09-29-step8-1-t4-fixup.md) - Step 8.1 T4 时序修复 + 完整重跑验收报告（3-retry loop + 500ms settle 修复，第 3 次 retry pitch 误差 -0.1°，箱子 GUI 成功打开，人工截图确认）
 - [`2026-09-29-step8-chest-recall.md`](2026-09-29-step8-chest-recall.md) - Step 8 箱子召回：记忆驱动任务验收报告（看到箱子→传送 30m→纯记忆导航回来→尝试打开，5 阶段全 PASS，PostMessageW 键盘修复，1.47m 误差，19 tick 导航）
 - [`2026-09-29-v2-live-smoke-makeup.md`](2026-09-29-v2-live-smoke-makeup.md) - Step 6e v2 模型实机 Live Smoke 补测报告（60 ticks 100% 成功闭环、延迟 p95 165ms、chest 稳定检出、crafting_table 0 误报、债务清零）
