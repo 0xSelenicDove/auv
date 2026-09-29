@@ -123,33 +123,36 @@ async fn mcp_device_entry_uses_selected_daemon_and_does_not_create_a_run() -> Re
       arguments: Some(serde_json::json!({ "device_name": "mcp-entry-device" }).as_object().unwrap().clone()),
     })
     .await?;
-  #[cfg(target_os = "macos")]
-  {
-    // The macOS host now supports read-only session inventory. This test
-    // remains independent of the machine's actual console login state.
-    assert_eq!(list.is_error, Some(false), "local macOS session inventory failed: {list:?}");
-    assert!(list.structured_content.as_ref().unwrap()["sessions"].is_array());
-  }
-  #[cfg(not(target_os = "macos"))]
-  {
-    assert_eq!(list.is_error, Some(true), "unsupported host unexpectedly listed sessions: {list:?}");
-    assert_eq!(list.structured_content.as_ref().unwrap()["reason"], "UNSUPPORTED_OS_STATE");
-  }
+  // ROOT CAUSE:
+  // A headless Linux runner can have no logind session, so its supported
+  // inventory succeeds with an empty list. The old test treated every
+  // non-macOS result as unsupported. Check the routed response without
+  // requiring a particular console login on the runner.
+  let inventory_error = if list.is_error == Some(false) {
+    assert!(list.structured_content.as_ref().unwrap()["sessions"].is_array(), "invalid Device session inventory: {list:?}");
+    None
+  } else {
+    let reason = list.structured_content.as_ref().and_then(|value| value["reason"].as_str()).expect("typed inventory error");
+    if cfg!(target_os = "macos") {
+      panic!("macOS read-only inventory failed: {reason}");
+    }
+    assert!(
+      matches!(reason, "UNSUPPORTED_OS_STATE" | "SERVICE_UNAVAILABLE" | "AMBIGUOUS_USER"),
+      "unexpected Linux inventory error: {reason}"
+    );
+    Some(reason.to_owned())
+  };
 
   for (name, arguments, expected_reason) in [
     (
       "device_get_user_session",
       serde_json::json!({ "device_name": "mcp-entry-device", "session_selector": "seat0:42" }),
-      if cfg!(target_os = "macos") {
-        "STALE_SESSION"
-      } else {
-        "UNSUPPORTED_OS_STATE"
-      },
+      inventory_error.as_deref().unwrap_or("STALE_SESSION"),
     ),
     (
       "device_ensure_user_session_unlocked",
       serde_json::json!({ "device_name": "mcp-entry-device", "user": "__auv_no_such_user__" }),
-      "UNSUPPORTED_OS_STATE",
+      inventory_error.as_deref().unwrap_or("UNSUPPORTED_OS_STATE"),
     ),
   ] {
     let result = client
