@@ -178,6 +178,14 @@ impl AgentMemoryLoop {
     self.depth_estimator.as_ref()
   }
 
+  pub fn depth_estimator_mut(&mut self) -> Option<&mut DepthEstimator> {
+    self.depth_estimator.as_mut()
+  }
+
+  pub fn detector_mut(&mut self) -> Option<&mut BlockDetector> {
+    self.detector.as_mut()
+  }
+
   pub fn store_mut(&mut self) -> &mut SpatialMemoryStore {
     &mut self.store
   }

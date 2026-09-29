@@ -228,7 +228,7 @@ impl SpatialMemoryStore {
   }
 
   #[inline]
-  fn find_matching_landmark(&self, query_pos: BlockPosition) -> Option<String> {
+  pub fn find_matching_landmark(&self, query_pos: BlockPosition) -> Option<String> {
     let (ix, iy, iz) = cell_coords(query_pos, self.config.dedup_radius_m);
     let mut best_matching_slot: Option<usize> = None;
 
@@ -625,8 +625,48 @@ impl SpatialMemoryStore {
     }
   }
 
+  /// Relocate an existing landmark to a new position upon visual re-acquisition.
+  /// Updates the landmark's position, continuous position, observation history,
+  /// and migrates the landmark across spatial hash grid cells via `update_landmark_position`.
+  pub fn relocate_landmark(
+    &mut self,
+    landmark_id: &str,
+    new_pos: BlockPosition,
+    new_continuous_pos: Option<(f64, f64, f64)>,
+    obs: &ObservationRef,
+  ) -> Result<(), SpatialMemoryStoreError> {
+    let old_pos = {
+      let landmark =
+        self.landmarks.get_mut(landmark_id).ok_or_else(|| SpatialMemoryStoreError::LandmarkNotFound(landmark_id.to_string()))?;
+      let old_pos = landmark.position;
+      landmark.position = new_pos;
+      landmark.continuous_position = new_continuous_pos;
+      landmark.observations.push(LandmarkObservation {
+        observation_ref: obs.clone(),
+        source: LandmarkSource::VisualPerception,
+        hit_face: None,
+        block_id: None,
+      });
+      landmark.observation_count += 1;
+      landmark.consecutive_misses = 0;
+      landmark.last_observed_millis = obs.captured_at_millis;
+      old_pos
+    };
+    self.update_landmark_position(landmark_id, old_pos, new_pos);
+    Ok(())
+  }
+
   pub fn get(&self, id: &str) -> Option<&SpatialLandmark> {
     self.landmarks.get(id)
+  }
+
+  pub fn remove(&mut self, id: &str) -> Option<SpatialLandmark> {
+    if let Some(lm) = self.landmarks.remove(id) {
+      self.remove_from_index(id, lm.position);
+      Some(lm)
+    } else {
+      None
+    }
   }
 
   pub fn query_radius(&self, center: BlockPosition, radius_m: f64) -> Vec<&SpatialLandmark> {
@@ -1013,5 +1053,58 @@ mod tests {
     assert_eq!(store.len(), 1);
     assert!(store.get(&static_id).is_some(), "static landmark must remain unaffected by dynamic TTL");
     assert!(store.get(&dynamic_id).is_none(), "dynamic landmark must be pruned after TTL expires");
+  }
+
+  #[test]
+  fn test_relocate_landmark_migrates_spatial_hash_grid() {
+    let mut store = SpatialMemoryStore::open("memory.json").unwrap();
+    let p0 = BlockPosition::new(-45, 95, 270);
+    let p0_prime = BlockPosition::new(-37, 95, 270);
+
+    let obs1 = ObservationRef {
+      observation_id: "obs-1".to_string(),
+      captured_at_millis: 1000,
+    };
+    let lm_id = store.upsert_from_perception(p0, "chest (0.85)", 0.85, &obs1);
+    assert_eq!(store.len(), 1);
+    assert_eq!(store.find_matching_landmark(p0), Some(lm_id.clone()));
+    assert_eq!(store.find_matching_landmark(p0_prime), None);
+
+    let obs2 = ObservationRef {
+      observation_id: "obs-2".to_string(),
+      captured_at_millis: 2000,
+    };
+    store.relocate_landmark(&lm_id, p0_prime, Some((-37.0, 95.0, 270.0)), &obs2).expect("relocate landmark succeeds");
+
+    // Exactly 1 landmark remains in store
+    assert_eq!(store.len(), 1);
+    let lm = store.get(&lm_id).unwrap();
+    assert_eq!(lm.position, p0_prime);
+    assert_eq!(lm.continuous_position, Some((-37.0, 95.0, 270.0)));
+    assert_eq!(lm.observations.len(), 2);
+    assert_eq!(lm.last_observed_millis, 2000);
+
+    // Old cell query must be None, new cell query must find the exact same landmark ID
+    assert_eq!(store.find_matching_landmark(p0), None);
+    assert_eq!(store.find_matching_landmark(p0_prime), Some(lm_id));
+  }
+
+  #[test]
+  fn test_remove_cleans_landmarks_and_spatial_hash_grid() {
+    let mut store = SpatialMemoryStore::open("memory.json").unwrap();
+    let pos = BlockPosition::new(10, 64, 20);
+    let obs = ObservationRef {
+      observation_id: "obs-del".to_string(),
+      captured_at_millis: 1000,
+    };
+    let lm_id = store.upsert_from_perception(pos, "chest", 0.9, &obs);
+    assert_eq!(store.len(), 1);
+    assert_eq!(store.find_matching_landmark(pos), Some(lm_id.clone()));
+
+    let removed = store.remove(&lm_id);
+    assert!(removed.is_some());
+    assert_eq!(store.len(), 0);
+    assert_eq!(store.get(&lm_id), None);
+    assert_eq!(store.find_matching_landmark(pos), None);
   }
 }
