@@ -28,6 +28,8 @@
 
 ## 相关文档
 
+- [`2026-09-29-step9-multi-landmark-recall.md`](2026-09-29-step9-multi-landmark-recall.md) - Step 9 多地标分辨召回验收报告（3 箱子入库与去重断言、P1 40m 记忆隔离、动态第 2 地标无硬编码真值召回、26 ticks 单调递减、双条件距 B 2.27m / 距 A,C > 17m GO 裁决）
+- [`2026-09-29-s2-production-integration.md`](2026-09-29-s2-production-integration.md) - S2 生产接入设计与验证报告（Spatial Hash 进 Landmark Store：Candidate A 方案、5k 步交错操作 100% differential 零幽灵索引、100k 规模 1,810x 加速与 p95 8.7µs、直接合并 patch）
 - [`2026-09-29-crafting-table-adversarial.md`](2026-09-29-crafting-table-adversarial.md) - crafting_table 对抗场景误报测试报告（5 个真值工作台+熔炉/门/火把干扰物，80 ticks 全覆盖采样，TP=45 / FP=25，precision_live=0.6429，预承诺决策 RECOMMEND_0.70）
 - [`2026-09-29-step8-1-t4-fixup.md`](2026-09-29-step8-1-t4-fixup.md) - Step 8.1 T4 时序修复 + 完整重跑验收报告（3-retry loop + 500ms settle 修复，第 3 次 retry pitch 误差 -0.1°，箱子 GUI 成功打开，人工截图确认）
 - [`2026-09-29-step8-chest-recall.md`](2026-09-29-step8-chest-recall.md) - Step 8 箱子召回：记忆驱动任务验收报告（看到箱子→传送 30m→纯记忆导航回来→尝试打开，5 阶段全 PASS，PostMessageW 键盘修复，1.47m 误差，19 tick 导航）
