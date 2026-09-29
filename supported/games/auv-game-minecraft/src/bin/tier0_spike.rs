@@ -28,7 +28,6 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use auv_game_minecraft::agent_memory_loop::{AgentMemoryLoop, AgentMemoryLoopConfig, LiveCapture};
 use auv_game_minecraft::ingest::read_latest_spatial_frame_from_tail;
 use auv_game_minecraft::spatial_memory_store::{SpatialLandmark, SpatialMemoryStore};
-use auv_game_minecraft::types::MinecraftSpatialFrame;
 use auv_game_minecraft::visual_perception::{BlockDetector, BlockDetectorConfig, DepthEstimator};
 use image::DynamicImage;
 use serde::{Deserialize, Serialize};
@@ -133,6 +132,7 @@ mod win32_input {
     }
   }
 
+  #[allow(dead_code)]
   pub fn set_target_hwnd(hwnd: isize) {
     TARGET_HWND.store(hwnd, std::sync::atomic::Ordering::SeqCst);
   }
@@ -378,6 +378,15 @@ impl TelemetryCondition {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TerminationSource {
+  AgentVisualBbox,
+  AgentDeadReckoning,
+  HarnessDivergence,
+  HarnessTimeout,
+  AgentFailure,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FailureMode {
   /// Estimated pose arrived or stopped, but true distance >= 3.5m, or wandered > 35m away
   DriftLost,
@@ -421,6 +430,8 @@ pub struct SingleRunResult {
   pub ticks_completed: usize,
   pub failure_mode: Option<FailureMode>,
   pub drift_samples: Vec<DriftSample>,
+  pub termination_source: TerminationSource,
+  pub final_visual_bbox_h: Option<f64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -510,7 +521,10 @@ pub struct AgentPerceptionInput<'a> {
 pub enum AgentAction {
   TurnYaw(f32),
   StepForward(u64), // duration in ms
-  StopSuccess,
+  StopSuccess {
+    source: TerminationSource,
+    visual_bbox_h: Option<f64>,
+  },
   StopFailed(FailureMode),
 }
 
@@ -525,6 +539,7 @@ pub struct Tier0AgentContext {
   condition: TelemetryCondition,
   proprio_pose: EstimatedPose,
   target_pos: (f64, f64, f64),
+  #[allow(dead_code)]
   target_landmark_id: String,
   detector: Option<BlockDetector>,
   consecutive_turns: usize,
@@ -617,10 +632,15 @@ impl Tier0AgentContext {
             best.confidence, x1, y1, x2, y2, bbox_w, bbox_h, angle_offset_deg
           );
 
-          // Close-range arrival criterion: est_dist < 2.8m or visual bbox_h > 165px (< 3.2m distance)
-          if est_dist < 2.8 || bbox_h > 165.0 {
-            println!("    [Agent Visual Homing] Arrived at landmark! (est_dist={:.2}m, bbox_h={:.1}px)", est_dist, bbox_h);
-            return AgentAction::StopSuccess;
+          // Close-range arrival criterion: PURE VISUAL ARRIVAL GATING.
+          // Strictly NO est_dist < 2.8 branch here!
+          // Arrival during visual servoing requires visual bbox height threshold (> 160.0px).
+          if bbox_h > 160.0 {
+            println!("    [Agent Visual Homing] Arrived at landmark via Visual Bbox! (bbox_h={:.1}px, est_dist={:.2}m)", bbox_h, est_dist);
+            return AgentAction::StopSuccess {
+              source: TerminationSource::AgentVisualBbox,
+              visual_bbox_h: Some(bbox_h),
+            };
           }
 
           if angle_offset_deg.abs() > 10.0 {
@@ -648,10 +668,13 @@ impl Tier0AgentContext {
     let desired_yaw = (-dx).atan2(dz).to_degrees();
     let yaw_delta = normalize_angle_deg(desired_yaw - self.proprio_pose.yaw);
 
-    // If estimated distance < 2.8m, agent believes it has arrived
+    // If estimated distance < 2.8m, agent believes it has arrived (blind dead reckoning)
     if est_dist < 2.8 {
       println!("    [Agent Dead Reckoning] Estimated distance {:.2}m < 2.8m -> Declaring arrival!", est_dist);
-      return AgentAction::StopSuccess;
+      return AgentAction::StopSuccess {
+        source: TerminationSource::AgentDeadReckoning,
+        visual_bbox_h: None,
+      };
     }
 
     if yaw_delta.abs() > 15.0 {
@@ -747,7 +770,7 @@ fn prepare_site(hwnd: isize, telemetry_path: &Path) {
 
 fn execute_ingest(
   scenario: &SpikeScenario,
-  hwnd: isize,
+  _hwnd: isize,
   driver_session: &auv_driver::LocalDriverSession,
   window: &auv_driver::window::Window,
   model_path: &Path,
@@ -896,6 +919,8 @@ fn run_single_ablation(
   let mut final_est_distance = initial_dist;
   let mut final_pos_drift = 0.0;
   let mut final_yaw_drift = 0.0;
+  let mut final_termination_source: Option<TerminationSource> = None;
+  let mut final_bbox_h: Option<f64> = None;
 
   println!("\n--- Beginning Recall Control Loop (Max 120 ticks, 2Hz) ---");
   println!("| Tick | Proprio (X, Z) | Proprio Yaw | True (X, Z) | True Yaw | True Dist | Pos Drift | Action |");
@@ -987,9 +1012,12 @@ fn run_single_ablation(
         agent_ctx.apply_proprioception_step(ms);
         format!("Forward {}ms", ms)
       }
-      AgentAction::StopSuccess => {
-        println!("  -> Agent requested StopSuccess");
-        "StopSuccess".to_string()
+      AgentAction::StopSuccess {
+        source,
+        visual_bbox_h,
+      } => {
+        println!("  -> Agent requested StopSuccess via {:?} (bbox_h={:?})", source, visual_bbox_h);
+        format!("StopSuccess({:?})", source)
       }
       AgentAction::StopFailed(mode) => {
         println!("  -> Agent requested StopFailed({:?})", mode);
@@ -1004,15 +1032,23 @@ fn run_single_ablation(
 
     // Termination checks
     match action {
-      AgentAction::StopSuccess => {
+      AgentAction::StopSuccess {
+        source,
+        visual_bbox_h,
+      } => {
+        final_termination_source = Some(source);
+        final_bbox_h = visual_bbox_h;
         if cur_true_dist < 3.50 {
-          println!("\n[Result] PASS: Arrived within threshold! True distance: {:.2}m < 3.50m", cur_true_dist);
+          println!(
+            "\n[Result] PASS: Arrived within threshold via {:?}! True distance: {:.2}m < 3.50m (bbox_h={:?})",
+            source, cur_true_dist, visual_bbox_h
+          );
           passed = true;
           break;
         } else {
           println!(
-            "\n[Result] FAIL (DriftLost): Agent thought it arrived (est={:.2}m), but true distance is {:.2}m >= 3.50m!",
-            cur_est_dist, cur_true_dist
+            "\n[Result] FAIL (DriftLost): Agent declared arrival via {:?} (est={:.2}m), but true distance is {:.2}m >= 3.50m!",
+            source, cur_est_dist, cur_true_dist
           );
           failure_mode = Some(FailureMode::DriftLost);
           passed = false;
@@ -1020,6 +1056,7 @@ fn run_single_ablation(
         }
       }
       AgentAction::StopFailed(mode) => {
+        final_termination_source = Some(TerminationSource::AgentFailure);
         failure_mode = Some(mode);
         passed = false;
         break;
@@ -1027,16 +1064,12 @@ fn run_single_ablation(
       _ => {}
     }
 
-    // Check if true distance reached < 3.5m even if agent hasn't called stop yet
-    if cur_true_dist < 3.50 {
-      println!("\n[Result] PASS: Player arrived within 3.50m! Final true distance: {:.2}m", cur_true_dist);
-      passed = true;
-      break;
-    }
+    // Notice: NO harness auto-pass here! We do NOT intercept if cur_true_dist < 3.50! The agent must stop itself!
 
     // Check divergence (wandered too far)
     if cur_true_dist > initial_dist + 8.0 {
       println!("\n[Result] FAIL (WrongDirection): Distance monotonically increased from {:.2}m to {:.2}m!", initial_dist, cur_true_dist);
+      final_termination_source = Some(TerminationSource::HarnessDivergence);
       failure_mode = Some(FailureMode::WrongDirection);
       passed = false;
       break;
@@ -1050,6 +1083,7 @@ fn run_single_ablation(
 
   if !passed && failure_mode.is_none() {
     println!("\n[Result] FAIL (Timeout): Reached max {} ticks without reaching < 3.5m", MAX_TICKS);
+    final_termination_source = Some(TerminationSource::HarnessTimeout);
     failure_mode = Some(FailureMode::Timeout);
   }
 
@@ -1090,6 +1124,8 @@ fn run_single_ablation(
     ticks_completed,
     failure_mode,
     drift_samples,
+    termination_source: final_termination_source.unwrap_or(TerminationSource::HarnessTimeout),
+    final_visual_bbox_h: final_bbox_h,
   })
 }
 
