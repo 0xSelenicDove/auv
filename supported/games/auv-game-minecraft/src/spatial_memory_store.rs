@@ -146,11 +146,32 @@ impl fmt::Display for SpatialMemoryStoreError {
 
 impl std::error::Error for SpatialMemoryStoreError {}
 
+pub type CellKey = (i64, i64, i64);
+
+#[derive(Clone, Debug, PartialEq)]
+struct LandmarkSlot {
+  id: String,
+  position: BlockPosition,
+  is_alive: bool,
+}
+
+#[inline]
+fn cell_coords(pos: BlockPosition, cell_size: f64) -> CellKey {
+  (
+    (f64::from(pos.x) / cell_size).floor() as i64,
+    (f64::from(pos.y) / cell_size).floor() as i64,
+    (f64::from(pos.z) / cell_size).floor() as i64,
+  )
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct SpatialMemoryStore {
   landmarks: HashMap<String, SpatialLandmark>,
   path: PathBuf,
   config: SpatialMemoryConfig,
+  grid: HashMap<CellKey, Vec<usize>>,
+  slots: Vec<LandmarkSlot>,
+  id_to_slot: HashMap<String, usize>,
 }
 
 impl SpatialMemoryStore {
@@ -162,17 +183,129 @@ impl SpatialMemoryStore {
         landmarks: HashMap::new(),
         path: path_buf,
         config,
+        grid: HashMap::new(),
+        slots: Vec::new(),
+        id_to_slot: HashMap::new(),
       });
     }
 
     let data: SpatialMemoryStoreData =
       read_json_file(&path_buf).map_err(|err| SpatialMemoryStoreError::Serialization(format!("{err:?}")))?;
 
-    Ok(Self {
+    let mut store = Self {
       landmarks: data.landmarks,
       path: path_buf,
       config: data.config.unwrap_or(config),
-    })
+      grid: HashMap::new(),
+      slots: Vec::new(),
+      id_to_slot: HashMap::new(),
+    };
+    store.rebuild_grid();
+    Ok(store)
+  }
+
+  pub fn rebuild_grid(&mut self) {
+    self.grid.clear();
+    self.slots.clear();
+    self.id_to_slot.clear();
+
+    let mut sorted_landmarks: Vec<_> = self.landmarks.values().collect();
+    sorted_landmarks.sort_by(|a, b| {
+      a.first_observed.captured_at_millis.cmp(&b.first_observed.captured_at_millis).then_with(|| a.landmark_id.cmp(&b.landmark_id))
+    });
+
+    for lm in sorted_landmarks {
+      let slot_idx = self.slots.len();
+      self.slots.push(LandmarkSlot {
+        id: lm.landmark_id.clone(),
+        position: lm.position,
+        is_alive: true,
+      });
+      self.id_to_slot.insert(lm.landmark_id.clone(), slot_idx);
+      let cell = cell_coords(lm.position, self.config.dedup_radius_m);
+      self.grid.entry(cell).or_default().push(slot_idx);
+    }
+  }
+
+  #[inline]
+  fn find_matching_landmark(&self, query_pos: BlockPosition) -> Option<String> {
+    let (ix, iy, iz) = cell_coords(query_pos, self.config.dedup_radius_m);
+    let mut best_matching_slot: Option<usize> = None;
+
+    for dx in -1..=1 {
+      for dy in -1..=1 {
+        for dz in -1..=1 {
+          let neighbor_cell = (ix + dx, iy + dy, iz + dz);
+          if let Some(indices) = self.grid.get(&neighbor_cell) {
+            for &slot_idx in indices {
+              let slot = &self.slots[slot_idx];
+              if !slot.is_alive {
+                continue;
+              }
+              let diff_x = f64::from(slot.position.x - query_pos.x);
+              let diff_y = f64::from(slot.position.y - query_pos.y);
+              let diff_z = f64::from(slot.position.z - query_pos.z);
+              let dist = (diff_x * diff_x + diff_y * diff_y + diff_z * diff_z).sqrt();
+              if dist < self.config.dedup_radius_m {
+                if best_matching_slot.map_or(true, |curr| slot_idx < curr) {
+                  best_matching_slot = Some(slot_idx);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    best_matching_slot.map(|idx| self.slots[idx].id.clone())
+  }
+
+  #[inline]
+  fn index_new_landmark(&mut self, landmark_id: &str, pos: BlockPosition) {
+    let slot_idx = self.slots.len();
+    self.slots.push(LandmarkSlot {
+      id: landmark_id.to_string(),
+      position: pos,
+      is_alive: true,
+    });
+    self.id_to_slot.insert(landmark_id.to_string(), slot_idx);
+    let cell = cell_coords(pos, self.config.dedup_radius_m);
+    self.grid.entry(cell).or_default().push(slot_idx);
+  }
+
+  #[inline]
+  fn remove_from_index(&mut self, landmark_id: &str, pos: BlockPosition) {
+    if let Some(slot_idx) = self.id_to_slot.remove(landmark_id) {
+      self.slots[slot_idx].is_alive = false;
+      let cell = cell_coords(pos, self.config.dedup_radius_m);
+      if let Some(indices) = self.grid.get_mut(&cell) {
+        indices.retain(|&idx| idx != slot_idx);
+        if indices.is_empty() {
+          self.grid.remove(&cell);
+        }
+      }
+    }
+  }
+
+  #[inline]
+  fn update_landmark_position(&mut self, landmark_id: &str, old_pos: BlockPosition, new_pos: BlockPosition) {
+    if old_pos == new_pos {
+      return;
+    }
+    if let Some(&slot_idx) = self.id_to_slot.get(landmark_id) {
+      self.slots[slot_idx].position = new_pos;
+      let old_cell = cell_coords(old_pos, self.config.dedup_radius_m);
+      let new_cell = cell_coords(new_pos, self.config.dedup_radius_m);
+      if old_cell != new_cell {
+        if let Some(indices) = self.grid.get_mut(&old_cell) {
+          indices.retain(|&idx| idx != slot_idx);
+          if indices.is_empty() {
+            self.grid.remove(&old_cell);
+          }
+        }
+        self.grid.entry(new_cell).or_default().push(slot_idx);
+      }
+    }
   }
 
   pub fn open(path: impl AsRef<Path>) -> Result<Self, SpatialMemoryStoreError> {
@@ -184,7 +317,11 @@ impl SpatialMemoryStore {
   }
 
   pub fn set_config(&mut self, config: SpatialMemoryConfig) {
+    let radius_changed = (self.config.dedup_radius_m - config.dedup_radius_m).abs() > 1e-9;
     self.config = config;
+    if radius_changed {
+      self.rebuild_grid();
+    }
   }
 
   pub fn save(&self) -> Result<(), SpatialMemoryStoreError> {
@@ -246,36 +383,37 @@ impl SpatialMemoryStore {
     let min_conf = self.config.min_confidence;
     let max_misses = self.config.max_consecutive_misses;
 
-    self.landmarks.retain(|_id, lm| match lm.kind {
-      LandmarkKind::Dynamic { ttl_millis, .. } => {
-        let is_expired = ttl_millis > 0 && lm.last_observed_millis > 0 && now_millis.saturating_sub(lm.last_observed_millis) > ttl_millis;
-        !is_expired
-      }
-      LandmarkKind::Static => {
-        let is_expired =
-          stale_threshold > 0 && lm.last_observed_millis > 0 && now_millis.saturating_sub(lm.last_observed_millis) > stale_threshold;
-        let is_low_confidence = lm.confidence < min_conf;
-        let is_too_many_misses = max_misses > 0 && lm.consecutive_misses >= max_misses;
+    let mut pruned = Vec::new();
+    self.landmarks.retain(|id, lm| {
+      let keep = match lm.kind {
+        LandmarkKind::Dynamic { ttl_millis, .. } => {
+          let is_expired = ttl_millis > 0 && lm.last_observed_millis > 0 && now_millis.saturating_sub(lm.last_observed_millis) > ttl_millis;
+          !is_expired
+        }
+        LandmarkKind::Static => {
+          let is_expired =
+            stale_threshold > 0 && lm.last_observed_millis > 0 && now_millis.saturating_sub(lm.last_observed_millis) > stale_threshold;
+          let is_low_confidence = lm.confidence < min_conf;
+          let is_too_many_misses = max_misses > 0 && lm.consecutive_misses >= max_misses;
 
-        !is_expired && !is_low_confidence && !is_too_many_misses
+          !is_expired && !is_low_confidence && !is_too_many_misses
+        }
+      };
+      if !keep {
+        pruned.push((id.clone(), lm.position));
       }
+      keep
     });
+
+    for (id, pos) in pruned {
+      self.remove_from_index(&id, pos);
+    }
 
     before_len - self.landmarks.len()
   }
 
   pub fn upsert_from_raycast(&mut self, hit: &RaycastHit, obs: &ObservationRef) -> String {
-    let mut matching_id = None;
-    for (id, landmark) in &self.landmarks {
-      let dx = f64::from(landmark.position.x - hit.block_pos.x);
-      let dy = f64::from(landmark.position.y - hit.block_pos.y);
-      let dz = f64::from(landmark.position.z - hit.block_pos.z);
-      let dist = (dx * dx + dy * dy + dz * dz).sqrt();
-      if dist < self.config.dedup_radius_m {
-        matching_id = Some(id.clone());
-        break;
-      }
-    }
+    let matching_id = self.find_matching_landmark(hit.block_pos);
 
     if let Some(id) = matching_id {
       let _ = self.record_observation(&id, obs.captured_at_millis);
@@ -313,6 +451,7 @@ impl SpatialMemoryStore {
         confidence: 0.90,
       };
       self.landmarks.insert(landmark_id.clone(), landmark);
+      self.index_new_landmark(&landmark_id, hit.block_pos);
       landmark_id
     }
   }
@@ -336,17 +475,7 @@ impl SpatialMemoryStore {
     detection_confidence: f64,
     obs: &ObservationRef,
   ) -> String {
-    let mut matching_id = None;
-    for (id, landmark) in &self.landmarks {
-      let dx = f64::from(landmark.position.x - block_pos.x);
-      let dy = f64::from(landmark.position.y - block_pos.y);
-      let dz = f64::from(landmark.position.z - block_pos.z);
-      let dist = (dx * dx + dy * dy + dz * dz).sqrt();
-      if dist < self.config.dedup_radius_m {
-        matching_id = Some(id.clone());
-        break;
-      }
-    }
+    let matching_id = self.find_matching_landmark(block_pos);
 
     if let Some(id) = matching_id {
       let landmark = self.landmarks.get_mut(&id).expect("landmark exists");
@@ -400,6 +529,7 @@ impl SpatialMemoryStore {
         confidence,
       };
       self.landmarks.insert(landmark_id.clone(), landmark);
+      self.index_new_landmark(&landmark_id, block_pos);
       landmark_id
     }
   }
@@ -432,6 +562,7 @@ impl SpatialMemoryStore {
     });
 
     if let Some(id) = matching_id {
+      let old_pos = self.landmarks.get(&id).map(|lm| lm.position).unwrap_or(block_pos);
       let landmark = self.landmarks.get_mut(&id).expect("landmark exists");
       landmark.position = block_pos;
       landmark.continuous_position = continuous_pos;
@@ -458,6 +589,7 @@ impl SpatialMemoryStore {
         track_id,
         ttl_millis,
       };
+      self.update_landmark_position(&id, old_pos, block_pos);
       id
     } else {
       let kind = LandmarkKind::Dynamic {
@@ -488,6 +620,7 @@ impl SpatialMemoryStore {
         confidence,
       };
       self.landmarks.insert(landmark_id.clone(), landmark);
+      self.index_new_landmark(&landmark_id, block_pos);
       landmark_id
     }
   }

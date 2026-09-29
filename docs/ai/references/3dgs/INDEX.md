@@ -28,6 +28,7 @@
 
 ## 相关文档
 
+- [`2026-09-29-s2-merge.md`](2026-09-29-s2-merge.md) - S2 合入结项报告（Spatial Hash 进生产 Landmark Store：真正代码合入、生产 store 5k 步交错差分 100% 一致、100k 规模 2,277.7x 加速与 p95 1.6µs、接口与持久化 0 变更、已合入生产）
 - [`2026-09-29-step9-multi-landmark-recall.md`](2026-09-29-step9-multi-landmark-recall.md) - Step 9 多地标分辨召回验收报告（3 箱子入库与去重断言、P1 40m 记忆隔离、动态第 2 地标无硬编码真值召回、26 ticks 单调递减、双条件距 B 2.27m / 距 A,C > 17m GO 裁决）
 - [`2026-09-29-s2-production-integration.md`](2026-09-29-s2-production-integration.md) - S2 生产接入设计与验证报告（Spatial Hash 进 Landmark Store：Candidate A 方案、5k 步交错操作 100% differential 零幽灵索引、100k 规模 1,810x 加速与 p95 8.7µs、直接合并 patch）
 - [`2026-09-29-crafting-table-adversarial.md`](2026-09-29-crafting-table-adversarial.md) - crafting_table 对抗场景误报测试报告（5 个真值工作台+熔炉/门/火把干扰物，80 ticks 全覆盖采样，TP=45 / FP=25，precision_live=0.6429，预承诺决策 RECOMMEND_0.70）

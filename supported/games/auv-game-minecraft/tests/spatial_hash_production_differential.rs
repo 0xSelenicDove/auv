@@ -1330,6 +1330,7 @@ fn test_differential_interleaved_full_lifecycle() {
   let mut lin_store = PureLinearScanStore::new("memory.json", config);
   let mut slot_store = SpatialHashSlotStore::new("memory.json", config);
   let mut str_store = SpatialHashStringStore::new("memory.json", config);
+  let mut prod_store = SpatialMemoryStore::open_with_config("memory.json", config).unwrap();
 
   let mut rng = Mt19937Rng::new_with_seed(2026_09_29);
   let mut now_millis = 1000u64;
@@ -1369,9 +1370,11 @@ fn test_differential_interleaved_full_lifecycle() {
       let id_lin = lin_store.upsert_from_raycast(&hit, &obs);
       let id_slot = slot_store.upsert_from_raycast(&hit, &obs);
       let id_str = str_store.upsert_from_raycast(&hit, &obs);
+      let id_prod = prod_store.upsert_from_raycast(&hit, &obs);
 
       assert_eq!(id_lin, id_slot, "Raycast mismatch at step {step}");
       assert_eq!(id_lin, id_str, "Raycast mismatch at step {step}");
+      assert_eq!(id_lin, id_prod, "Raycast prod mismatch at step {step}");
     } else if op < 70.0 {
       // 2. Perception Upsert (25%): testing visual perception Candidate status & authority upgrade
       let pos = if !pool_positions.is_empty() && rng.random_f64() < 0.40 {
@@ -1387,9 +1390,11 @@ fn test_differential_interleaved_full_lifecycle() {
       let id_lin = lin_store.upsert_from_perception(pos, "chest", conf, &obs);
       let id_slot = slot_store.upsert_from_perception(pos, "chest", conf, &obs);
       let id_str = str_store.upsert_from_perception(pos, "chest", conf, &obs);
+      let id_prod = prod_store.upsert_from_perception(pos, "chest", conf, &obs);
 
       assert_eq!(id_lin, id_slot, "Perception mismatch at step {step}");
       assert_eq!(id_lin, id_str, "Perception mismatch at step {step}");
+      assert_eq!(id_lin, id_prod, "Perception prod mismatch at step {step}");
     } else if op < 82.0 {
       // 3. Dynamic Landmark Upsert (12%): tracking moving mobs across cells
       let track_id = (rng.uniform(1.0, 10.0)) as u64; // small set of tracks to force movements
@@ -1399,9 +1404,11 @@ fn test_differential_interleaved_full_lifecycle() {
       let id_lin = lin_store.upsert_dynamic_landmark(track_id, ttl, pos, None, "cow", 0.8, &obs);
       let id_slot = slot_store.upsert_dynamic_landmark(track_id, ttl, pos, None, "cow", 0.8, &obs);
       let id_str = str_store.upsert_dynamic_landmark(track_id, ttl, pos, None, "cow", 0.8, &obs);
+      let id_prod = prod_store.upsert_dynamic_landmark(track_id, ttl, pos, None, "cow", 0.8, &obs);
 
       assert_eq!(id_lin, id_slot, "Dynamic mismatch at step {step}");
       assert_eq!(id_lin, id_str, "Dynamic mismatch at step {step}");
+      assert_eq!(id_lin, id_prod, "Dynamic prod mismatch at step {step}");
     } else if op < 92.0 {
       // 4. Record Miss (10%): penalizing existing landmarks
       if !lin_store.landmarks.is_empty() {
@@ -1411,21 +1418,25 @@ fn test_differential_interleaved_full_lifecycle() {
         let _ = lin_store.record_miss(&id);
         let _ = slot_store.record_miss(&id);
         let _ = str_store.record_miss(&id);
+        let _ = prod_store.record_miss(&id);
       }
     } else {
       // 5. Prune Stale (8%): advancing time and pruning expired / low confidence landmarks
       let pruned_lin = lin_store.prune_stale(now_millis);
       let pruned_slot = slot_store.prune_stale(now_millis);
       let pruned_str = str_store.prune_stale(now_millis);
+      let pruned_prod = prod_store.prune_stale(now_millis);
 
       assert_eq!(pruned_lin, pruned_slot, "Prune count mismatch at step {step}");
       assert_eq!(pruned_lin, pruned_str, "Prune count mismatch at step {step}");
+      assert_eq!(pruned_lin, pruned_prod, "Prune count prod mismatch at step {step}");
     }
 
     // Intermediate state assertions every 250 steps
     if step % 250 == 0 {
       assert_eq!(lin_store.len(), slot_store.len(), "Store length mismatch at step {step}");
       assert_eq!(lin_store.len(), str_store.len(), "Store length mismatch at step {step}");
+      assert_eq!(lin_store.len(), prod_store.len(), "Store length prod mismatch at step {step}");
 
       for (id, lm_lin) in &lin_store.landmarks {
         let lm_slot = slot_store.landmarks.get(id).expect("landmark in slot store");
@@ -1433,6 +1444,12 @@ fn test_differential_interleaved_full_lifecycle() {
         assert_eq!(lm_lin.observation_count, lm_slot.observation_count);
         assert!((lm_lin.confidence - lm_slot.confidence).abs() < 1e-6);
         assert_eq!(lm_lin.status, lm_slot.status);
+
+        let lm_prod = prod_store.landmarks().get(id).expect("landmark in prod store");
+        assert_eq!(lm_lin.position, lm_prod.position);
+        assert_eq!(lm_lin.observation_count, lm_prod.observation_count);
+        assert!((lm_lin.confidence - lm_prod.confidence).abs() < 1e-6);
+        assert_eq!(lm_lin.status, lm_prod.status);
       }
     }
   }
@@ -1440,14 +1457,17 @@ fn test_differential_interleaved_full_lifecycle() {
   // Final exact comparison across all remaining landmarks
   assert_eq!(lin_store.len(), slot_store.len());
   assert_eq!(lin_store.len(), str_store.len());
-  println!("\nDifferential 5,000 steps PASSED! Final live landmarks count: {}", slot_store.len());
+  assert_eq!(lin_store.len(), prod_store.len());
+  println!("\nDifferential 5,000 steps PASSED! Final live landmarks count: {}", prod_store.len());
 
   for (id, lm_lin) in &lin_store.landmarks {
     let lm_slot = slot_store.landmarks.get(id).unwrap();
     let lm_str = str_store.landmarks.get(id).unwrap();
+    let lm_prod = prod_store.landmarks().get(id).unwrap();
 
     assert_eq!(lm_lin, lm_slot, "Final landmark equality failed for {id}");
     assert_eq!(lm_lin, lm_str, "Final landmark equality failed for {id}");
+    assert_eq!(lm_lin, lm_prod, "Final prod landmark equality failed for {id}");
   }
 }
 
@@ -1493,7 +1513,7 @@ fn test_benchmark_suite_production_candidates() {
   println!("Seed: 7 (CPython MT19937 compatible)");
   println!("================================================================================\n");
 
-  println!("| Scale (N) | Store Backend               | Total (ms) | p50 (µs) | p95 (µs) | Max (µs) |");
+  println!("| Scale (N) | Store Backend                   | Total (ms) | p50 (µs) | p95 (µs) | Max (µs) |");
   println!("| :--- | :--- | :--- | :--- | :--- | :--- |");
 
   for &scale in &scales {
@@ -1503,7 +1523,7 @@ fn test_benchmark_suite_production_candidates() {
       points.push(rng.random_block_position(-1000, 1000));
     }
 
-    // 1. Pure Linear Scan Store
+    // 1. Pure Linear Scan Store (Old Baseline)
     let mut lin_store = PureLinearScanStore::new("memory.json", config);
     let mut lin_lats = Vec::with_capacity(scale);
     for (i, &pos) in points.iter().enumerate() {
@@ -1523,7 +1543,7 @@ fn test_benchmark_suite_production_candidates() {
     let lin_stats = compute_stats(lin_lats);
 
     println!(
-      "| {:>9} | Linear O(N) Baseline        | {:>10.2} | {:>8.2} | {:>8.2} | {:>8.2} |",
+      "| {:>9} | Linear O(N) Baseline            | {:>10.2} | {:>8.2} | {:>8.2} | {:>8.2} |",
       scale,
       lin_stats.total_ms,
       lin_stats.p50_ns / 1000.0,
@@ -1531,7 +1551,35 @@ fn test_benchmark_suite_production_candidates() {
       lin_stats.max_ns / 1000.0
     );
 
-    // 2. Candidate A: SpatialHashSlotStore (HashMap<CellKey, Vec<usize>>)
+    // 2. Production Store (SpatialMemoryStore with merged spatial hash)
+    let mut prod_store = SpatialMemoryStore::open_with_config("memory.json", config).unwrap();
+    let mut prod_lats = Vec::with_capacity(scale);
+    for (i, &pos) in points.iter().enumerate() {
+      let hit = RaycastHit {
+        block_pos: pos,
+        face: BlockFace::Up,
+        block_id: "minecraft:stone".to_string(),
+      };
+      let obs = ObservationRef {
+        observation_id: format!("obs-{}", i),
+        captured_at_millis: i as u64,
+      };
+      let t0 = Instant::now();
+      prod_store.upsert_from_raycast(&hit, &obs);
+      prod_lats.push(t0.elapsed().as_nanos() as f64);
+    }
+    let prod_stats = compute_stats(prod_lats);
+
+    println!(
+      "| {:>9} | Production Store (Spatial Hash) | {:>10.2} | {:>8.2} | {:>8.2} | {:>8.2} |",
+      scale,
+      prod_stats.total_ms,
+      prod_stats.p50_ns / 1000.0,
+      prod_stats.p95_ns / 1000.0,
+      prod_stats.max_ns / 1000.0
+    );
+
+    // 3. Candidate A: SpatialHashSlotStore (HashMap<CellKey, Vec<usize>>)
     let mut slot_store = SpatialHashSlotStore::new("memory.json", config);
     let mut slot_lats = Vec::with_capacity(scale);
     for (i, &pos) in points.iter().enumerate() {
@@ -1551,7 +1599,7 @@ fn test_benchmark_suite_production_candidates() {
     let slot_stats = compute_stats(slot_lats);
 
     println!(
-      "| {:>9} | Candidate A (Vec<usize>)    | {:>10.2} | {:>8.2} | {:>8.2} | {:>8.2} |",
+      "| {:>9} | Candidate A Prototype           | {:>10.2} | {:>8.2} | {:>8.2} | {:>8.2} |",
       scale,
       slot_stats.total_ms,
       slot_stats.p50_ns / 1000.0,
@@ -1559,52 +1607,24 @@ fn test_benchmark_suite_production_candidates() {
       slot_stats.max_ns / 1000.0
     );
 
-    // 3. Candidate B: SpatialHashStringStore (HashMap<CellKey, Vec<String>>)
-    let mut str_store = SpatialHashStringStore::new("memory.json", config);
-    let mut str_lats = Vec::with_capacity(scale);
-    for (i, &pos) in points.iter().enumerate() {
-      let hit = RaycastHit {
-        block_pos: pos,
-        face: BlockFace::Up,
-        block_id: "minecraft:stone".to_string(),
-      };
-      let obs = ObservationRef {
-        observation_id: format!("obs-{}", i),
-        captured_at_millis: i as u64,
-      };
-      let t0 = Instant::now();
-      str_store.upsert_from_raycast(&hit, &obs);
-      str_lats.push(t0.elapsed().as_nanos() as f64);
-    }
-    let str_stats = compute_stats(str_lats);
-
-    println!(
-      "| {:>9} | Candidate B (Vec<String>)   | {:>10.2} | {:>8.2} | {:>8.2} | {:>8.2} |",
-      scale,
-      str_stats.total_ms,
-      str_stats.p50_ns / 1000.0,
-      str_stats.p95_ns / 1000.0,
-      str_stats.max_ns / 1000.0
-    );
-
     if scale == 100_000 {
       let (idx_b, lm_b, total_b) = slot_store.estimate_memory_bytes();
       println!("\n--- 100k Memory & Speedup Inspection ---");
-      println!("Candidate A Index Memory: {:.2} MB", idx_b as f64 / (1024.0 * 1024.0));
-      println!("Candidate A Landmark Memory: {:.2} MB", lm_b as f64 / (1024.0 * 1024.0));
-      println!("Candidate A Total Memory: {:.2} MB", total_b as f64 / (1024.0 * 1024.0));
+      println!("Production Index Memory Est: {:.2} MB", idx_b as f64 / (1024.0 * 1024.0));
+      println!("Production Landmark Memory Est: {:.2} MB", lm_b as f64 / (1024.0 * 1024.0));
+      println!("Production Total Memory Est: {:.2} MB", total_b as f64 / (1024.0 * 1024.0));
 
-      let speedup_total = lin_stats.total_ms / slot_stats.total_ms.max(0.001);
-      let speedup_p95 = lin_stats.p95_ns / slot_stats.p95_ns.max(1.0);
-      println!("Speedup vs O(N) at 100k:");
+      let speedup_total = lin_stats.total_ms / prod_stats.total_ms.max(0.001);
+      let speedup_p95 = lin_stats.p95_ns / prod_stats.p95_ns.max(1.0);
+      println!("Production Speedup vs O(N) at 100k:");
       println!("  Total Time Speedup: {:.1}x", speedup_total);
       println!("  p95 Latency Speedup: {:.1}x", speedup_p95);
 
       // Verify GO gate: p95 < 1.0ms
       assert!(
-        slot_stats.p95_ns / 1_000_000.0 < 1.0,
-        "Candidate A p95 at 100k must be < 1.0ms, got {:.3}ms",
-        slot_stats.p95_ns / 1_000_000.0
+        prod_stats.p95_ns / 1_000_000.0 < 1.0,
+        "Production Store p95 at 100k must be < 1.0ms, got {:.3}ms",
+        prod_stats.p95_ns / 1_000_000.0
       );
     }
   }
