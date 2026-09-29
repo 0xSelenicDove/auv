@@ -30,16 +30,16 @@ function connectionFor(response: Uint8Array, onCall?: (call: Parameters<Transpor
   })
 }
 
-describe('Device user sessions', () => {
+describe('device user sessions', () => {
   it('derives both lock predicates from the three-state OS observation', async () => {
     const response = toBinary(ListUserSessionsResponseSchema, create(ListUserSessionsResponseSchema, {
       result: {
         case: 'list',
         value: {
           sessions: [
-            { sessionSelector: 'a', user: 'neko', lockState: UserSessionLockState.LOCKED, connectionKind: UserSessionConnectionKind.PHYSICAL },
-            { sessionSelector: 'b', user: 'neko', lockState: UserSessionLockState.USABLE, connectionKind: UserSessionConnectionKind.REMOTE },
-            { sessionSelector: 'c', user: 'guest', lockState: UserSessionLockState.UNKNOWN },
+            { connectionKind: UserSessionConnectionKind.PHYSICAL, lockState: UserSessionLockState.LOCKED, sessionSelector: 'a', user: 'neko' },
+            { connectionKind: UserSessionConnectionKind.REMOTE, lockState: UserSessionLockState.USABLE, sessionSelector: 'b', user: 'neko' },
+            { lockState: UserSessionLockState.UNKNOWN, sessionSelector: 'c', user: 'guest' },
           ],
         },
       },
@@ -47,9 +47,9 @@ describe('Device user sessions', () => {
     const connection = connectionFor(response, call => expect(call.method).toBe('/auv.api.daemon.v1.DeviceService/ListUserSessions'))
 
     await expect(listUserSessions(connection)).resolves.toEqual([
-      { sessionSelector: 'a', user: 'neko', lockState: 'locked', connectionKind: 'physical', seat: undefined, isLocked: true, isUnlocked: false },
-      { sessionSelector: 'b', user: 'neko', lockState: 'usable', connectionKind: 'remote', seat: undefined, isLocked: false, isUnlocked: true },
-      { sessionSelector: 'c', user: 'guest', lockState: 'unknown', connectionKind: 'unspecified', seat: undefined, isLocked: false, isUnlocked: false },
+      { connectionKind: 'physical', isLocked: true, isUnlocked: false, lockState: 'locked', seat: undefined, sessionSelector: 'a', user: 'neko' },
+      { connectionKind: 'remote', isLocked: false, isUnlocked: true, lockState: 'usable', seat: undefined, sessionSelector: 'b', user: 'neko' },
+      { connectionKind: 'unspecified', isLocked: false, isUnlocked: false, lockState: 'unknown', seat: undefined, sessionSelector: 'c', user: 'guest' },
     ])
   })
 
@@ -65,28 +65,30 @@ describe('Device user sessions', () => {
 
   it('exposes getUserSession through the bound client', async () => {
     const response = toBinary(GetUserSessionResponseSchema, create(GetUserSessionResponseSchema, {
-      result: { case: 'session', value: { sessionSelector: 'wts:1', user: 'neko', lockState: UserSessionLockState.LOCKED, seat: 'console' } },
+      result: { case: 'session', value: { lockState: UserSessionLockState.LOCKED, seat: 'console', sessionSelector: 'wts:1', user: 'neko' } },
     }))
     const connection = connectionFor(response, call => expect(call.method).toBe('/auv.api.daemon.v1.DeviceService/GetUserSession'))
 
     await expect(createAuv(connection).devices.getUserSession({ sessionSelector: 'wts:1' })).resolves.toMatchObject({
-      sessionSelector: 'wts:1',
-      seat: 'console',
       isLocked: true,
+      seat: 'console',
+      sessionSelector: 'wts:1',
     })
   })
 
   it('submits exactly one selector and returns the verified existing-session effect', async () => {
     const response = toBinary(EnsureUserSessionUnlockedResponseSchema, create(EnsureUserSessionUnlockedResponseSchema, {
-      result: { case: 'effect', value: { kind: DeviceEntryEffectKind.UNLOCKED_EXISTING_SESSION, user: 'neko', sessionSelector: 'wts:1' } },
+      result: { case: 'effect', value: { kind: DeviceEntryEffectKind.UNLOCKED_EXISTING_SESSION, sessionSelector: 'wts:1', user: 'neko' } },
     }))
-    const connection = connectionFor(response, call => {
+    const connection = connectionFor(response, (call) => {
       expect(call.method).toBe('/auv.api.daemon.v1.DeviceService/EnsureUserSessionUnlocked')
       expect(fromBinary(EnsureUserSessionUnlockedRequestSchema, call.body).target).toEqual({ case: 'sessionSelector', value: 'wts:1' })
     })
 
     await expect(ensureUserSessionUnlocked(connection, { sessionSelector: 'wts:1' })).resolves.toEqual({
-      kind: 'unlockedExistingSession', user: 'neko', sessionSelector: 'wts:1',
+      kind: 'unlockedExistingSession',
+      sessionSelector: 'wts:1',
+      user: 'neko',
     })
   })
 
@@ -95,7 +97,9 @@ describe('Device user sessions', () => {
     const response = toBinary(EnsureUserSessionUnlockedResponseSchema, create(EnsureUserSessionUnlockedResponseSchema, {
       result: { case: 'error', value: { reason: DeviceEntryErrorReason.UNENROLLED } },
     }))
-    const connection = connectionFor(response, () => { calls += 1 })
+    const connection = connectionFor(response, () => {
+      calls += 1
+    })
 
     await expect(ensureUserSessionUnlocked(connection, { user: '' })).rejects.toMatchObject({ name: 'AuvConfigurationError' })
     expect(calls).toBe(0)

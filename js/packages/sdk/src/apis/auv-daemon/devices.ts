@@ -10,9 +10,8 @@ import {
 } from '@auv-js/api-client'
 
 import {
-  DeviceService,
   DeviceEntryEffectKind,
-  DeviceEntryErrorReason as ProtoDeviceEntryErrorReason,
+  DeviceService,
   EnsureUserSessionUnlockedRequestSchema,
   EnsureUserSessionUnlockedResponseSchema,
   GetDeviceRequestSchema,
@@ -23,6 +22,7 @@ import {
   ListDevicesResponseSchema,
   ListUserSessionsRequestSchema,
   ListUserSessionsResponseSchema,
+  DeviceEntryErrorReason as ProtoDeviceEntryErrorReason,
   DevicePlatform as ProtoDevicePlatform,
   UserSessionConnectionKind as ProtoUserSessionConnectionKind,
   UserSessionLockState as ProtoUserSessionLockState,
@@ -39,56 +39,56 @@ export interface Device {
   platform: DevicePlatform
 }
 
+export type DeviceEntryErrorReason
+  = | 'ambiguousUser'
+    | 'auditUnavailable'
+    | 'credentialRejected'
+    | 'disabled'
+    | 'occupiedDesktop'
+    | 'outcomeUnverified'
+    | 'serviceUnavailable'
+    | 'staleSession'
+    | 'suspended'
+    | 'unauthorized'
+    | 'unenrolled'
+    | 'unsupportedOsState'
+
 export type DevicePlatform = 'linux' | 'macos' | 'unspecified' | 'windows'
+
+/** Select exactly one current session or its OS account; no credential crosses this RPC. */
+export type EnsureUserSessionUnlockedOptions = OperationOptions & (
+  | { sessionSelector: string, user?: never }
+  | { sessionSelector?: never, user: string }
+)
 
 export interface GetDeviceOptions extends OperationOptions {
   deviceId: string
 }
-
-/** One current OS login instance on the connected Device. */
-export interface UserSession {
-  sessionSelector: string
-  user: string
-  lockState: UserSessionLockState
-  connectionKind: UserSessionConnectionKind
-  seat: string | undefined
-  /** Both predicates are false when the OS could not determine the state. */
-  isLocked: boolean
-  isUnlocked: boolean
-}
-
-export type UserSessionLockState = 'locked' | 'unknown' | 'usable'
-export type UserSessionConnectionKind = 'physical' | 'remote' | 'unspecified'
-
 export interface GetUserSessionOptions extends OperationOptions {
   sessionSelector: string
 }
 
-/** Select exactly one current session or its OS account; no credential crosses this RPC. */
-export type EnsureUserSessionUnlockedOptions = OperationOptions & (
-  | { user: string, sessionSelector?: never }
-  | { sessionSelector: string, user?: never }
-)
+/** One current OS login instance on the connected Device. */
+export interface UserSession {
+  connectionKind: UserSessionConnectionKind
+  /** Both predicates are false when the OS could not determine the state. */
+  isLocked: boolean
+  isUnlocked: boolean
+  lockState: UserSessionLockState
+  seat: string | undefined
+  sessionSelector: string
+  user: string
+}
+
+export type UserSessionConnectionKind = 'physical' | 'remote' | 'unspecified'
+
+export type UserSessionLockState = 'locked' | 'unknown' | 'usable'
 
 export interface UserSessionUnlockEffect {
   kind: 'alreadyUsable' | 'unlockedExistingSession'
-  user: string
   sessionSelector: string | undefined
+  user: string
 }
-
-export type DeviceEntryErrorReason =
-  | 'unauthorized'
-  | 'disabled'
-  | 'unenrolled'
-  | 'suspended'
-  | 'ambiguousUser'
-  | 'staleSession'
-  | 'occupiedDesktop'
-  | 'unsupportedOsState'
-  | 'serviceUnavailable'
-  | 'credentialRejected'
-  | 'outcomeUnverified'
-  | 'auditUnavailable'
 
 /** A fixed, non-secret Device entry rejection returned by the target. */
 export class AuvDeviceEntryError extends AuvRemoteError {
@@ -132,50 +132,6 @@ const ensureUserSessionUnlockedRpc = {
   output: EnsureUserSessionUnlockedResponseSchema,
 } satisfies RpcDefinition<typeof EnsureUserSessionUnlockedRequestSchema, typeof EnsureUserSessionUnlockedResponseSchema>
 
-/** Gets one Device by canonical identity. */
-export async function getDevice(connection: AuvConnection, options: GetDeviceOptions): Promise<Device> {
-  const response = await connection.unary(getDeviceRpc, { device: { deviceId: options.deviceId } }, options)
-  if (response.device === undefined) {
-    throw new AuvProtocolError('AUV response omitted GetDeviceResponse.device')
-  }
-  return device(response.device)
-}
-
-/** Lists Devices visible to the connected caller. */
-export async function listDevices(connection: AuvConnection, options: OperationOptions = {}): Promise<readonly Device[]> {
-  const response = await connection.unary(listDevicesRpc, {}, options)
-  return response.devices.map(device)
-}
-
-/** Lists current OS login instances on the connected Device. */
-export async function listUserSessions(connection: AuvConnection, options: OperationOptions = {}): Promise<readonly UserSession[]> {
-  const response = await connection.unary(listUserSessionsRpc, {}, options)
-  switch (response.result.case) {
-    case 'list':
-      return response.result.value.sessions.map(userSession)
-    case 'error':
-      throw deviceEntryError(response.result.value.reason)
-    default:
-      throw new AuvProtocolError('AUV response omitted ListUserSessionsResponse.result')
-  }
-}
-
-/** Gets one current OS login instance by its opaque selector. */
-export async function getUserSession(connection: AuvConnection, options: GetUserSessionOptions): Promise<UserSession> {
-  if (!options.sessionSelector) {
-    throw new AuvConfigurationError('sessionSelector must be non-empty')
-  }
-  const response = await connection.unary(getUserSessionRpc, { sessionSelector: options.sessionSelector }, options)
-  switch (response.result.case) {
-    case 'session':
-      return userSession(response.result.value)
-    case 'error':
-      throw deviceEntryError(response.result.value.reason)
-    default:
-      throw new AuvProtocolError('AUV response omitted GetUserSessionResponse.result')
-  }
-}
-
 /** Ensures an existing selected OS login session is unlocked. */
 export async function ensureUserSessionUnlocked(
   connection: AuvConnection,
@@ -207,12 +163,56 @@ export async function ensureUserSessionUnlocked(
       if (!effect.user) {
         throw new AuvProtocolError('AUV response omitted EnsureUserSessionUnlockedEffect.user')
       }
-      return { kind, user: effect.user, sessionSelector: effect.sessionSelector || undefined }
+      return { kind, sessionSelector: effect.sessionSelector || undefined, user: effect.user }
     }
     case 'error':
       throw deviceEntryError(response.result.value.reason)
     default:
       throw new AuvProtocolError('AUV response omitted EnsureUserSessionUnlockedResponse.result')
+  }
+}
+
+/** Gets one Device by canonical identity. */
+export async function getDevice(connection: AuvConnection, options: GetDeviceOptions): Promise<Device> {
+  const response = await connection.unary(getDeviceRpc, { device: { deviceId: options.deviceId } }, options)
+  if (response.device === undefined) {
+    throw new AuvProtocolError('AUV response omitted GetDeviceResponse.device')
+  }
+  return device(response.device)
+}
+
+/** Gets one current OS login instance by its opaque selector. */
+export async function getUserSession(connection: AuvConnection, options: GetUserSessionOptions): Promise<UserSession> {
+  if (!options.sessionSelector) {
+    throw new AuvConfigurationError('sessionSelector must be non-empty')
+  }
+  const response = await connection.unary(getUserSessionRpc, { sessionSelector: options.sessionSelector }, options)
+  switch (response.result.case) {
+    case 'session':
+      return userSession(response.result.value)
+    case 'error':
+      throw deviceEntryError(response.result.value.reason)
+    default:
+      throw new AuvProtocolError('AUV response omitted GetUserSessionResponse.result')
+  }
+}
+
+/** Lists Devices visible to the connected caller. */
+export async function listDevices(connection: AuvConnection, options: OperationOptions = {}): Promise<readonly Device[]> {
+  const response = await connection.unary(listDevicesRpc, {}, options)
+  return response.devices.map(device)
+}
+
+/** Lists current OS login instances on the connected Device. */
+export async function listUserSessions(connection: AuvConnection, options: OperationOptions = {}): Promise<readonly UserSession[]> {
+  const response = await connection.unary(listUserSessionsRpc, {}, options)
+  switch (response.result.case) {
+    case 'list':
+      return response.result.value.sessions.map(userSession)
+    case 'error':
+      throw deviceEntryError(response.result.value.reason)
+    default:
+      throw new AuvProtocolError('AUV response omitted ListUserSessionsResponse.result')
   }
 }
 
@@ -227,6 +227,26 @@ function device(value: ProtoDevice): Device {
     local: value.local,
     name: value.name,
     platform: devicePlatform(value.platform),
+  }
+}
+
+function deviceEntryError(reason: ProtoDeviceEntryErrorReason): AuvDeviceEntryError {
+  switch (reason) {
+    case ProtoDeviceEntryErrorReason.AMBIGUOUS_USER: return new AuvDeviceEntryError('ambiguousUser')
+    case ProtoDeviceEntryErrorReason.AUDIT_UNAVAILABLE: return new AuvDeviceEntryError('auditUnavailable')
+    case ProtoDeviceEntryErrorReason.CREDENTIAL_REJECTED: return new AuvDeviceEntryError('credentialRejected')
+    case ProtoDeviceEntryErrorReason.DISABLED: return new AuvDeviceEntryError('disabled')
+    case ProtoDeviceEntryErrorReason.OCCUPIED_DESKTOP: return new AuvDeviceEntryError('occupiedDesktop')
+    case ProtoDeviceEntryErrorReason.OUTCOME_UNVERIFIED: return new AuvDeviceEntryError('outcomeUnverified')
+    case ProtoDeviceEntryErrorReason.SERVICE_UNAVAILABLE: return new AuvDeviceEntryError('serviceUnavailable')
+    case ProtoDeviceEntryErrorReason.STALE_SESSION: return new AuvDeviceEntryError('staleSession')
+    case ProtoDeviceEntryErrorReason.SUSPENDED: return new AuvDeviceEntryError('suspended')
+    case ProtoDeviceEntryErrorReason.UNENROLLED: return new AuvDeviceEntryError('unenrolled')
+    case ProtoDeviceEntryErrorReason.UNSPECIFIED:
+      throw new AuvProtocolError('AUV response omitted DeviceEntryError.reason')
+    case ProtoDeviceEntryErrorReason.UNAUTHORIZED: return new AuvDeviceEntryError('unauthorized')
+    case ProtoDeviceEntryErrorReason.UNSUPPORTED_OS_STATE: return new AuvDeviceEntryError('unsupportedOsState')
+    default: return unknownEnum('DeviceEntryError.reason', reason)
   }
 }
 
@@ -251,60 +271,40 @@ function userSession(value: ProtoUserSession): UserSession {
   }
   const lockState = userSessionLockState(value.lockState)
   return {
-    sessionSelector: value.sessionSelector,
-    user: value.user,
-    lockState,
     connectionKind: userSessionConnectionKind(value.connectionKind),
-    seat: value.seat || undefined,
     isLocked: lockState === 'locked',
     isUnlocked: lockState === 'usable',
-  }
-}
-
-function userSessionLockState(value: ProtoUserSessionLockState): UserSessionLockState {
-  switch (value) {
-    case ProtoUserSessionLockState.UNSPECIFIED:
-      throw new AuvProtocolError('AUV response omitted UserSession.lock_state')
-    case ProtoUserSessionLockState.UNKNOWN:
-      return 'unknown'
-    case ProtoUserSessionLockState.LOCKED:
-      return 'locked'
-    case ProtoUserSessionLockState.USABLE:
-      return 'usable'
-    default:
-      return unknownEnum('UserSession.lock_state', value)
+    lockState,
+    seat: value.seat || undefined,
+    sessionSelector: value.sessionSelector,
+    user: value.user,
   }
 }
 
 function userSessionConnectionKind(value: ProtoUserSessionConnectionKind): UserSessionConnectionKind {
   switch (value) {
-    case ProtoUserSessionConnectionKind.UNSPECIFIED:
-      return 'unspecified'
     case ProtoUserSessionConnectionKind.PHYSICAL:
       return 'physical'
     case ProtoUserSessionConnectionKind.REMOTE:
       return 'remote'
+    case ProtoUserSessionConnectionKind.UNSPECIFIED:
+      return 'unspecified'
     default:
       return unknownEnum('UserSession.connection_kind', value)
   }
 }
 
-function deviceEntryError(reason: ProtoDeviceEntryErrorReason): AuvDeviceEntryError {
-  switch (reason) {
-    case ProtoDeviceEntryErrorReason.UNSPECIFIED:
-      throw new AuvProtocolError('AUV response omitted DeviceEntryError.reason')
-    case ProtoDeviceEntryErrorReason.UNAUTHORIZED: return new AuvDeviceEntryError('unauthorized')
-    case ProtoDeviceEntryErrorReason.DISABLED: return new AuvDeviceEntryError('disabled')
-    case ProtoDeviceEntryErrorReason.UNENROLLED: return new AuvDeviceEntryError('unenrolled')
-    case ProtoDeviceEntryErrorReason.SUSPENDED: return new AuvDeviceEntryError('suspended')
-    case ProtoDeviceEntryErrorReason.AMBIGUOUS_USER: return new AuvDeviceEntryError('ambiguousUser')
-    case ProtoDeviceEntryErrorReason.STALE_SESSION: return new AuvDeviceEntryError('staleSession')
-    case ProtoDeviceEntryErrorReason.OCCUPIED_DESKTOP: return new AuvDeviceEntryError('occupiedDesktop')
-    case ProtoDeviceEntryErrorReason.UNSUPPORTED_OS_STATE: return new AuvDeviceEntryError('unsupportedOsState')
-    case ProtoDeviceEntryErrorReason.SERVICE_UNAVAILABLE: return new AuvDeviceEntryError('serviceUnavailable')
-    case ProtoDeviceEntryErrorReason.CREDENTIAL_REJECTED: return new AuvDeviceEntryError('credentialRejected')
-    case ProtoDeviceEntryErrorReason.OUTCOME_UNVERIFIED: return new AuvDeviceEntryError('outcomeUnverified')
-    case ProtoDeviceEntryErrorReason.AUDIT_UNAVAILABLE: return new AuvDeviceEntryError('auditUnavailable')
-    default: return unknownEnum('DeviceEntryError.reason', reason)
+function userSessionLockState(value: ProtoUserSessionLockState): UserSessionLockState {
+  switch (value) {
+    case ProtoUserSessionLockState.LOCKED:
+      return 'locked'
+    case ProtoUserSessionLockState.UNSPECIFIED:
+      throw new AuvProtocolError('AUV response omitted UserSession.lock_state')
+    case ProtoUserSessionLockState.UNKNOWN:
+      return 'unknown'
+    case ProtoUserSessionLockState.USABLE:
+      return 'usable'
+    default:
+      return unknownEnum('UserSession.lock_state', value)
   }
 }

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use rmcp::{
   ClientHandler, ServiceExt,
-  model::{CallToolRequestParam, ClientInfo},
+  model::{CallToolRequestParam, ClientInfo, ErrorCode},
 };
 
 #[derive(Debug, Clone, Default)]
