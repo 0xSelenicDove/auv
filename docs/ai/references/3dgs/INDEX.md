@@ -28,6 +28,7 @@
 
 ## 相关文档
 
+- [`2026-09-30-tier0-spike-findings.md`](2026-09-30-tier0-spike-findings.md) - Tier-0 Spike 遥测消融实测与真 Tier-0 差距量化报告（4 条件 12 Runs 严格实机对比、代码级物理隔离、C0/C2/C3 100% 成功、C1 对角盲算漂移致 DriftLost、实证航向为承重骨架与视觉伺服到站门禁、明确 GO/NO-GO 投资建议）
 - [`2026-09-30-step11-forget-persist.md`](2026-09-30-step11-forget-persist.md) - Step 11 遗忘与跨 Session 持久化实机验收报告（地标挖除多次扑空触发生产 prune 淘汰与 S2 网格清理、诚实拒绝幽灵导航、跨独立 OS 进程存盘重启 100% 字段无损恢复与 45m+ 远距记忆导航 0.82m 成功召回，双轨全部 GO 通过）
 - [`2026-09-29-step10-dynamic-chained.md`](2026-09-29-step10-dynamic-chained.md) - Step 10 更难的记忆任务验收报告（动态地标搬迁重捕获、S2 空间哈希单元迁移实测生效、SAHI 地平线切片与 3D 光学地平面投影、链式顺序召回 A -> B -> C 双条件 100% 达成，双轨全部 GO 通过）
 - [`2026-09-29-crafting-table-recall-gap.md`](2026-09-29-crafting-table-recall-gap.md) - crafting_table Live Recall Gap 调查报告（tolerance 灵敏度曲线 40-120px、60px 非悬崖点、分层实测近距 <5m Recall 100%、诊断 0.15 口径 FN 100% 为完全无框、verdict 定性主因为定义问题、建议关闭调查）
