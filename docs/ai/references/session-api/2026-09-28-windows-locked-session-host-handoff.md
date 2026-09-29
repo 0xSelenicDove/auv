@@ -11,6 +11,21 @@ original desktop with no PIN error. The PIN enrollment and temporary service
 were subsequently removed. This is configuration-specific live evidence, not
 a general Windows release or installer claim.
 
+## Record provenance
+
+Extracted from [PR #198](https://github.com/moeru-ai/auv/pull/198) at
+[`85f6385`](https://github.com/moeru-ai/auv/tree/85f638525c669e56aac3ce4792e39292563944c6).
+This is a research and experiment record; the candidate implementation and
+policy decisions remain in that separate PR. Code, API, packaging, and
+installation descriptions below refer to that candidate or to the dated
+experimental stage, not to functionality added by this document.
+
+The extraction revision is not the exact build used in every live gate.
+Keep the recorded source/binary hashes and stage labels as the experiment
+identifiers; where a gate gives no exact revision, that provenance remains
+unrecorded. No experiments were rerun for this extraction. Later successful
+gates supersede only the earlier limits they explicitly retested.
+
 ## Owned code and boundary
 
 - `auv-driver-windows::device_session` observes one physical-console login and
