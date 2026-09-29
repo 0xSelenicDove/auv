@@ -1,0 +1,35 @@
+//! Credential posting for an existing, locked macOS console session.
+//!
+//! NOTICE(device-entry-macos-host): This is a native input primitive, not an
+//! unlock result. It must be called only by an installed, signed graphical
+//! helper after target-local authority, enrollment, and same-session checks.
+//! The caller must verify the selected OS session became usable afterward.
+
+/// Submit one locally retrieved UTF-8 credential at the HID event tap.
+///
+/// The credential is never put in a process argument, environment variable,
+/// file, diagnostic message, or tracing field here. Native posting has no
+/// recipient acknowledgement and cannot itself establish an unlock effect.
+#[cfg(target_os = "macos")]
+pub fn submit(credential: &[u8], expected_uid: u32, selector: &str, posting_budget_seconds: f64) -> Result<(), String> {
+  // TODO(device-entry-macos-secret-memory): The Swift String and CGEvent copies
+  // cannot be reliably zeroized. Keep the helper short-lived; revisit when a
+  // secret-safe native event path is validated on the installed host.
+  let response = crate::native::binding::ffi::submit_locked_session_credential(
+    credential.to_vec(),
+    expected_uid,
+    selector.to_owned(),
+    posting_budget_seconds,
+  );
+  if response.ok {
+    Ok(())
+  } else {
+    // These static native errors must never contain credential material.
+    Err(response.error_message.unwrap_or_else(|| "lock-screen input unavailable".to_owned()))
+  }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn submit(_credential: &[u8], _expected_uid: u32, _selector: &str, _posting_budget_seconds: f64) -> Result<(), String> {
+  Err("macOS locked-session input is unavailable on this target".to_owned())
+}

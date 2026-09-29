@@ -2,6 +2,28 @@
 //! serving, and shutdown lifecycle.
 
 mod daemon;
+mod device_entry;
+
+/// Fixed ProgramData root for the LocalSystem-owned Windows Device entry store.
+#[cfg(target_os = "windows")]
+pub fn windows_device_entry_store_root() -> Result<std::path::PathBuf, String> {
+  device_entry::windows_store_root()
+}
+
+/// Issue one short-lived pairing token before starting the Windows service.
+/// The caller must run as LocalSystem in Session 0. The protected store's
+/// lifetime lock prevents concurrent mutation by a running daemon, and only
+/// the token digest is persisted. The plaintext must stay on the target host
+/// until a client consumes it once.
+#[cfg(target_os = "windows")]
+pub fn issue_windows_bootstrap_token() -> Result<String, String> {
+  let store = pairing::PairingStore::open_system(windows_device_entry_store_root()?.join("pairings.json"))
+    .map_err(|error| format!("failed to open protected pairing store: {error}"))?;
+  let token = store
+    .issue_token(Some(std::time::Duration::from_secs(20 * 60)))
+    .map_err(|error| format!("failed to issue bootstrap pairing token: {error}"))?;
+  Ok(token.expose_once())
+}
 mod discovery;
 mod pairing;
 mod resource_id;
@@ -31,6 +53,9 @@ pub struct Config {
   pub runner_providers: Vec<runner_provider::RunnerProviderConfig>,
   /// First-party Runner runtime definitions.
   pub first_party_runners: runner_provider::FirstPartyRunnerRuntimes,
+  /// Admit the privileged Windows Device entry host only from SCM mode.
+  #[cfg(windows)]
+  pub enable_device_entry: bool,
 }
 
 /// Returns the platform-default local listener URI.
@@ -78,6 +103,10 @@ pub fn parse_listener(listener: &str, paired_tcp: bool) -> Result<ListenEndpoint
 /// Bound daemon server with discovery publication and graceful shutdown.
 pub struct Server {
   inner: auv_api_server::server::Server,
+  #[cfg(any(target_os = "linux", target_os = "macos"))]
+  device_local: std::sync::Arc<device_entry::LocalState>,
+  #[cfg(windows)]
+  device_local: Option<std::sync::Arc<device_entry::LocalState>>,
   discovery_file: Option<PathBuf>,
   publish_discovery: bool,
 }
@@ -85,10 +114,15 @@ pub struct Server {
 impl Server {
   /// Binds all configured listeners and opens daemon-owned state.
   pub async fn bind(config: Config) -> Result<Self, String> {
-    let pairing = config
-      .pairing_store
-      .map(pairing::PairingStore::open)
-      .transpose()
+    #[cfg(windows)]
+    let pairing = if config.enable_device_entry {
+      config.pairing_store.map(pairing::PairingStore::open_system).transpose()
+    } else {
+      config.pairing_store.map(pairing::PairingStore::open).transpose()
+    };
+    #[cfg(not(windows))]
+    let pairing = config.pairing_store.map(pairing::PairingStore::open).transpose();
+    let pairing = pairing
       .map_err(|error| format!("failed to open pairing store: {error}"))?
       .map(|store| std::sync::Arc::new(store) as std::sync::Arc<dyn auv_api_server::control::Pairing>);
     let mut listeners = config.listeners.into_iter();
@@ -111,6 +145,18 @@ impl Server {
       }
     };
     let store_root = config.store_root;
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    let device_local = std::sync::Arc::new(device_entry::LocalState::open(&store_root, pairing.clone())?);
+    #[cfg(windows)]
+    let device_local = if config.enable_device_entry {
+      Some(std::sync::Arc::new(device_entry::LocalState::open(&store_root, pairing.clone())?))
+    } else {
+      None
+    };
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    let local_state_for_daemon = std::sync::Arc::clone(&device_local);
+    #[cfg(windows)]
+    let local_state_for_daemon = device_local.clone();
     let runner_providers = config.runner_providers;
     let first_party_runners = config.first_party_runners;
     let bound = auv_api_server::server::Server::bind_with(
@@ -128,12 +174,16 @@ impl Server {
           parent_endpoint,
           first_party_runners,
           runner_providers,
+          #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+          local_state_for_daemon,
         )?))
       },
     )
     .await?;
     Ok(Self {
       inner: bound,
+      #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+      device_local,
       discovery_file: config.discovery_file,
       publish_discovery: config.publish_discovery,
     })
@@ -160,6 +210,51 @@ impl Server {
     } else {
       None
     };
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    {
+      // These independent listeners share state but never share route tables.
+      // If either fails, stop the other and wait for its socket cleanup.
+      let mut paired = Box::pin(self.inner.serve(shutdown.clone()));
+      let mut local = Box::pin(self.device_local.serve(shutdown.clone()));
+      tokio::select! {
+        result = &mut paired => {
+          shutdown.cancel();
+          let local_result = local.await;
+          result?;
+          local_result
+        }
+        result = &mut local => {
+          shutdown.cancel();
+          let paired_result = paired.await;
+          result?;
+          paired_result
+        }
+      }
+    }
+    #[cfg(windows)]
+    {
+      if let Some(device_local) = self.device_local {
+        let mut paired = Box::pin(self.inner.serve(shutdown.clone()));
+        let mut local = Box::pin(device_local.serve(shutdown.clone()));
+        tokio::select! {
+          result = &mut paired => {
+            shutdown.cancel();
+            let local_result = local.await;
+            result?;
+            local_result
+          }
+          result = &mut local => {
+            shutdown.cancel();
+            let paired_result = paired.await;
+            result?;
+            paired_result
+          }
+        }
+      } else {
+        self.inner.serve(shutdown).await
+      }
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
     self.inner.serve(shutdown).await
   }
 }

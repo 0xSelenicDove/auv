@@ -82,3 +82,46 @@ fn automatic_existing_multi_device_run_defers_placement_to_the_runner_route() {
     Some("device_a".to_string())
   );
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn stale_local_discovery_does_not_block_a_single_paired_device() {
+  let directory = tempfile::tempdir().expect("temporary device selection directory");
+  let device_id = "018f1f00000070008000000000000001018f1f00000070008000000000000001";
+  let profiles = profile::ProfileStore::from_path(directory.path().join("profiles.json"));
+  profiles
+    .create(
+      "remote",
+      profile::DeviceProfileInput {
+        device_id: device_id.to_string(),
+        device_name: "remote".to_string(),
+        endpoint: "http://127.0.0.1:0".to_string(),
+        device_credential: "test-credential".to_string(),
+      },
+    )
+    .expect("store remote profile");
+  let missing_socket = directory.path().join("stale-local.sock");
+  let local_endpoint = Some(ConnectEndpoint::Unix(missing_socket));
+
+  let selected = Client::resolve_device_context(
+    AuvContext {
+      device_id: Some(device_id.to_string()),
+      ..Default::default()
+    },
+    &profiles,
+    local_endpoint.clone(),
+  )
+  .await;
+  assert!(matches!(selected, Err(ContextError::PairedConnect(_))), "expected the paired profile to be tried: {selected:?}");
+
+  let unmatched = Client::resolve_device_context(
+    AuvContext {
+      device_id: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()),
+      ..Default::default()
+    },
+    &profiles,
+    local_endpoint,
+  )
+  .await;
+  assert!(matches!(unmatched, Err(ContextError::Connect(_))), "an unmatched profile cannot hide local connection errors: {unmatched:?}");
+}
