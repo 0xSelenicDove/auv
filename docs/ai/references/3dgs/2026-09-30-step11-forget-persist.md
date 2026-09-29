@@ -23,34 +23,51 @@
 生产环境 `spatial_memory_store.rs` 中的淘汰策略由以下两段逻辑共同决定：
 
 ```rust
-// supported/games/auv-game-minecraft/src/spatial_memory_store.rs:364-370
-pub fn record_miss(&mut self, landmark_id: &str) -> bool {
-  if let Some(lm) = self.landmarks.get_mut(landmark_id) {
-    lm.consecutive_misses += 1;
-    lm.confidence = (lm.confidence - 0.1).max(0.0);
-    true
-  } else {
-    false
-  }
+// supported/games/auv-game-minecraft/src/spatial_memory_store.rs:365-371
+pub fn record_miss(&mut self, landmark_id: &str) -> Result<(), SpatialMemoryStoreError> {
+  let landmark = self.landmarks.get_mut(landmark_id).ok_or_else(|| SpatialMemoryStoreError::LandmarkNotFound(landmark_id.to_string()))?;
+
+  landmark.consecutive_misses += 1;
+  landmark.confidence = (landmark.confidence - 0.1).max(0.0);
+  Ok(())
 }
 ```
 
 ```rust
-// supported/games/auv-game-minecraft/src/spatial_memory_store.rs:395-412
-let is_low_confidence = min_confidence > 0.0 && lm.confidence < min_confidence;
-let is_too_many_misses = max_misses > 0 && lm.consecutive_misses >= max_misses;
-let is_expired = stale_timeout_ms > 0
-  && now_millis.saturating_sub(lm.last_observed_millis) >= stale_timeout_ms;
+// supported/games/auv-game-minecraft/src/spatial_memory_store.rs:380-413
+pub fn prune_stale(&mut self, now_millis: u64) -> usize {
+  let before_len = self.landmarks.len();
+  let stale_threshold = self.config.stale_threshold_millis;
+  let min_conf = self.config.min_confidence;
+  let max_misses = self.config.max_consecutive_misses;
 
-// For static landmarks: only evict if low confidence, too many misses, or expired
-let should_evict = match lm.kind {
-  LandmarkKind::Static => is_low_confidence || is_too_many_misses || is_expired,
-  LandmarkKind::Dynamic => true,
-};
+  let mut pruned = Vec::new();
+  self.landmarks.retain(|id, lm| {
+    let keep = match lm.kind {
+      LandmarkKind::Dynamic { ttl_millis, .. } => {
+        let is_expired = ttl_millis > 0 && lm.last_observed_millis > 0 && now_millis.saturating_sub(lm.last_observed_millis) > ttl_millis;
+        !is_expired
+      }
+      LandmarkKind::Static => {
+        let is_expired =
+          stale_threshold > 0 && lm.last_observed_millis > 0 && now_millis.saturating_sub(lm.last_observed_millis) > stale_threshold;
+        let is_low_confidence = lm.confidence < min_conf;
+        let is_too_many_misses = max_misses > 0 && lm.consecutive_misses >= max_misses;
 
-if should_evict {
-  evicted_ids.push(id.clone());
-  self.remove_from_index(&id, lm.position);
+        !is_expired && !is_low_confidence && !is_too_many_misses
+      }
+    };
+    if !keep {
+      pruned.push((id.clone(), lm.position));
+    }
+    keep
+  });
+
+  for (id, pos) in pruned {
+    self.remove_from_index(&id, pos);
+  }
+
+  before_len - self.landmarks.len()
 }
 ```
 
