@@ -3,10 +3,10 @@
 //! Only an OS account ID and exact login-session selector cross the daemon's
 //! helper IPC. Credential retrieval and locked-session input remain inside it.
 
-use auv::devices::{DeviceEntryErrorReason, UserSessionLockState};
+use auv::devices::{DeviceEntryErrorReason, UserSession, UserSessionConnectionKind, UserSessionLockState};
 use auv_device_helper_macos::HostError;
+use auv_driver_macos::device_session::{ObserveError, observe_console};
 
-use super::macos::current_console_session;
 use super::policy::{ObservedSession, SessionHost};
 use super::unix_account::{Account, resolve_uid};
 
@@ -130,10 +130,51 @@ fn map_host_error(error: HostError) -> DeviceEntryErrorReason {
   }
 }
 
+// Device policy mapping for the physical macOS console observation.
+
+/// One logged-in console identity and the public facts derived from it.
+/// The native observation retains UID and the exact session identity for
+/// target-local enrollment and same-session readback.
+#[derive(Debug)]
+struct ConsoleSession {
+  session: UserSession,
+  uid: u32,
+}
+
+/// Observe one physical, already logged-in user through the shared driver
+/// parser. This remains a fresh IORegistry read on each call.
+fn current_console_session() -> Result<Option<ConsoleSession>, DeviceEntryErrorReason> {
+  let observed = observe_console().map_err(map_observation)?;
+  Ok(observed.map(|native| {
+    let locked = native.is_locked();
+    let uid = native.uid();
+    let session = UserSession {
+      selector: native.selector().to_owned(),
+      user: native.user().to_owned(),
+      lock_state: if locked {
+        UserSessionLockState::Locked
+      } else {
+        UserSessionLockState::Usable
+      },
+      connection_kind: UserSessionConnectionKind::Physical,
+      seat: Some("console".to_owned()),
+    };
+
+    ConsoleSession { session, uid }
+  }))
+}
+
+fn map_observation(error: ObserveError) -> DeviceEntryErrorReason {
+  match error {
+    ObserveError::Unavailable => DeviceEntryErrorReason::ServiceUnavailable,
+    ObserveError::UnknownState => DeviceEntryErrorReason::UnsupportedOsState,
+    ObserveError::Ambiguous => DeviceEntryErrorReason::AmbiguousUser,
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
-  use auv::devices::{UserSession, UserSessionConnectionKind};
 
   fn observed(selector: &str, user: &str, id: &str, lock_state: UserSessionLockState) -> ObservedSession {
     ObservedSession {
@@ -233,5 +274,12 @@ mod tests {
       DeviceEntryErrorReason::OutcomeUnverified
     );
     assert_eq!(map_host_error(HostError::StaleSession), DeviceEntryErrorReason::StaleSession);
+  }
+
+  #[test]
+  fn maps_observer_ambiguity_and_unknown_state_to_device_errors() {
+    assert_eq!(map_observation(ObserveError::Ambiguous), DeviceEntryErrorReason::AmbiguousUser);
+    assert_eq!(map_observation(ObserveError::UnknownState), DeviceEntryErrorReason::UnsupportedOsState);
+    assert_eq!(map_observation(ObserveError::Unavailable), DeviceEntryErrorReason::ServiceUnavailable);
   }
 }

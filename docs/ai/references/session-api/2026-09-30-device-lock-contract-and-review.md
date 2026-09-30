@@ -118,18 +118,21 @@ is no evidence for deleting them by line count.
 3. **Addressed in policy tests, pending live first-use validation:** `PENDING`
    enrollment may remotely lock its usable session; only locked-host unlock
    probes and promotes the enrollment.
-4. **P2 shared policy:** `EnrollmentStore` has one production adapter,
-   `MetadataStore`. Consider removing the store type parameter while retaining
-   the real three-platform host seam. Keep this separate from lock behavior.
-5. **P2 module ownership:** macOS/Linux observation adapters are thin files
-   used only by their host adapters. Consolidating each with its host may
-   improve navigation. Windows account-name formatting belongs with the
-   console-session type rather than a sibling daemon module.
+4. **Addressed:** `Policy` now holds `Arc<MetadataStore>` directly; the
+   single-adapter `EnrollmentStore` trait is gone. The three-platform
+   `SessionHost` seam remains.
+5. **Addressed:** the macOS and Linux observation adapters live in their host
+   modules, Linux and macOS share `device_entry::unix_account`, and Windows
+   account-name formatting is `ConsoleSession::account_name`. The Windows
+   DPAPI vault and SYSTEM-only storage checks moved from
+   `auv-driver-windows` into `auv-daemon` `device_entry`; the driver exposes
+   `unlock_with_worker(target, credential)` and no longer reads storage.
 6. **P2 Mac helper lifecycle:** its current-thread timeout does not bound a
    synchronous Keychain or native input call. A future fix must retain
    authorization and account locks through input completion.
-7. **P3 localized cleanup:** consolidate macOS helper status encode/decode;
-   update stale Windows comments that call a bound host unbound. The earlier
+7. **P3 localized cleanup:** consolidate macOS helper status encode/decode.
+   The stale Windows "register only after" comment was removed with the
+   driver's vault-reading entry point. The earlier
    one-variant Windows `WorkerMode` concern is resolved by the new lock mode;
    it now selects two real worker operations.
 

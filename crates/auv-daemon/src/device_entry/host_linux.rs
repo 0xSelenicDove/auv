@@ -4,10 +4,9 @@
 //! DeviceService route passed one supervised gate on `neko-gpu-1`; this is a
 //! configuration-specific result, not generic Linux or release-install proof.
 
-use auv::devices::{DeviceEntryErrorReason, UserSessionLockState};
-use auv_driver_linux::device_unlock::{self, GnomeSession, UnlockOutcome};
+use auv::devices::{DeviceEntryErrorReason, UserSession, UserSessionConnectionKind, UserSessionLockState};
+use auv_driver_linux::device_unlock::{self, GnomeSession, LockState, UnlockError, UnlockOutcome};
 
-use super::linux::{LinuxSession, current_user_sessions, map_error};
 use super::pam_native;
 use super::policy::{ObservedSession, SessionHost};
 use super::vault_linux::{GnomeSecretVault, VaultError};
@@ -140,11 +139,49 @@ fn map_vault_error(error: VaultError) -> DeviceEntryErrorReason {
   }
 }
 
+// GNOME Wayland host facts for an existing logged-in user session. The driver
+// is scoped to the daemon's effective UID; a multi-account host needs an
+// authorized per-user worker before the Device policy can expose it.
+
+struct LinuxSession {
+  session: UserSession,
+  native: GnomeSession,
+}
+
+/// Takes one inventory snapshot under the installed host's OS identity.
+fn current_user_sessions() -> Result<Vec<LinuxSession>, DeviceEntryErrorReason> {
+  let sessions = device_unlock::list_user_sessions()
+    .map_err(map_error)?
+    .into_iter()
+    .map(|native| {
+      let session = UserSession {
+        selector: native.selector(),
+        user: native.user.clone(),
+        lock_state: match native.lock_state {
+          LockState::Locked => UserSessionLockState::Locked,
+          LockState::Usable => UserSessionLockState::Usable,
+          LockState::Unknown => UserSessionLockState::Unknown,
+        },
+        connection_kind: UserSessionConnectionKind::Physical,
+        seat: Some(native.seat.clone()),
+      };
+      LinuxSession { session, native }
+    })
+    .collect();
+  Ok(sessions)
+}
+
+fn map_error(error: UnlockError) -> DeviceEntryErrorReason {
+  match error {
+    UnlockError::ServiceUnavailable => DeviceEntryErrorReason::ServiceUnavailable,
+    UnlockError::StaleSession => DeviceEntryErrorReason::StaleSession,
+    UnlockError::UnsupportedOsState => DeviceEntryErrorReason::UnsupportedOsState,
+    UnlockError::OutcomeUnverified => DeviceEntryErrorReason::OutcomeUnverified,
+  }
+}
+
 #[cfg(test)]
 mod tests {
-  use auv::devices::{UserSession, UserSessionConnectionKind};
-  use auv_driver_linux::device_unlock::LockState;
-
   use super::*;
 
   fn session(id: &str, started_at_micros: u64, seat: &str, lock_state: UserSessionLockState) -> LinuxSession {

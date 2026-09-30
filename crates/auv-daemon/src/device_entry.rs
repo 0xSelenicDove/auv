@@ -4,9 +4,6 @@
 //! switch, enrollment, account locks, and audit as DeviceLocalService.
 
 #[cfg(target_os = "macos")]
-mod macos;
-
-#[cfg(target_os = "macos")]
 mod enrollment_macos;
 
 #[cfg(target_os = "macos")]
@@ -18,9 +15,6 @@ mod enrollment_windows;
 mod host_windows;
 #[cfg(target_os = "windows")]
 mod vault_windows;
-
-#[cfg(target_os = "linux")]
-mod linux;
 
 #[cfg(target_os = "linux")]
 mod host_linux;
