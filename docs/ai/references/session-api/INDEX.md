@@ -18,8 +18,12 @@ the canonical local/remote operation interface and `auv-daemon` as the long-live
 `auv-api-client` and `auv-api-server` become protocol boundaries. MCP remains in
 `auv-cli`.
 
-Count: **31**
+Count: **35**
 
+- [`2026-09-28-remote-device-entry-implementation-design.md`](2026-09-28-remote-device-entry-implementation-design.md) — approved locked-existing-session-first Device unlock contract and three-platform implementation order; signed-out entry deferred.
+- [`2026-09-27-device-entry-credential-decision.md`](2026-09-27-device-entry-credential-decision.md) — accepted target-local persistent credential enrollment and deletion policy; this slice requires protected storage.
+- [`2026-09-27-device-login-host-lifecycle-decision.md`](2026-09-27-device-login-host-lifecycle-decision.md) — historical machine-level daemon lifecycle decision for the deferred signed-out phase.
+- [`2026-09-27-device-unlock-authority-decision.md`](2026-09-27-device-unlock-authority-decision.md) — accepted paired-bearer authority for existing-session unlock; earlier sign-in scope deferred.
 - [`2026-09-27-remote-device-unlock-research.md`](2026-09-27-remote-device-unlock-research.md) — historical policy interview, three native existing-session unlock proofs, and failed macOS signed-out input gates; candidate implementation remains in PR #198.
 - [`2026-09-28-macos-remote-desktop-loginwindow-research.md`](2026-09-28-macos-remote-desktop-loginwindow-research.md) — primary-source comparison of Apple remote desktop services and third-party login-window mechanisms; no AUV support claim.
 - [`2026-09-28-macos-locked-session-host-gate.md`](2026-09-28-macos-locked-session-host-gate.md) — signed Aqua helper and two supervised black-display unlocks through local Unix DeviceService; paired network authentication was not exercised.
