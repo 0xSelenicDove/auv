@@ -324,7 +324,13 @@ activation and clearing order. It passes the selected `macos:<UUID>` into
 Swift, checks the same locked physical console and exact focused loginwindow
 field before each credential character and before its single final Return,
 and stops posting if its seven-second budget expires. The helper reserves ten
-seconds for independent same-session readback under its request timeout.
+seconds for independent same-session readback under its 18-second request
+deadline. Keychain and HID work runs off the helper's async runtime so that
+deadline actually fires; if it does, the helper exits without replying,
+because synchronous native calls cannot be canceled, and launchd restarts it.
+The daemon client waits 25 seconds and reports an unanswered unlock as
+`OUTCOME_UNVERIFIED`, never as a clean `SERVICE_UNAVAILABLE`, so it does not
+release the account lock while helper input may still be in flight.
 Compilation and focused tests are implementation evidence only. One read-only
 lookup probe timed out while the target remained unlocked. A second signed,
 read-only probe launched in the existing locked session and found exactly one

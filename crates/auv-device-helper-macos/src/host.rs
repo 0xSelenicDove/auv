@@ -40,12 +40,49 @@ pub async fn serve() -> Result<(), HostError> {
   // The daemon still serializes at the Device policy boundary.
   loop {
     let (mut stream, _) = listener.accept().await.map_err(|_| HostError::Unavailable)?;
-    let status = match tokio::time::timeout(Duration::from_secs(18), handle(&mut stream, &home, uid)).await {
-      Ok(Ok(())) => 0,
-      Ok(Err(error)) => status(error),
-      Err(_) => status(HostError::Unavailable),
+    let started = Instant::now();
+    let deadline = started + REQUEST_DEADLINE;
+    let result = match tokio::time::timeout_at(deadline.into(), read_request(&mut stream, uid)).await {
+      Ok(Ok((operation, payload))) => {
+        let home = home.clone();
+
+        match run_before(deadline, move || execute(operation, &payload, &home, uid, started)).await {
+          Some(result) => result,
+          // NOTICE(device-entry-macos-deadline): Keychain and HID calls are
+          // synchronous and cannot be canceled. Exiting is the only way to
+          // guarantee no input lands after the daemon stops waiting. The
+          // daemon reads EOF as an unverified outcome, and launchd KeepAlive
+          // restarts this helper. Remove only if the native calls become
+          // cancelable.
+          None => std::process::exit(2),
+        }
+      }
+      Ok(Err(error)) => Err(error),
+      Err(_) => Err(HostError::Unavailable),
+    };
+    let status = match result {
+      Ok(()) => 0,
+      Err(error) => status(error),
     };
     let _ = stream.write_all(&[status]).await;
+  }
+}
+
+// Covers socket reads, the unlock posting budget, and same-session readback
+// in `session::unlock`. The daemon client's read timeout must stay longer.
+const REQUEST_DEADLINE: Duration = Duration::from_secs(18);
+
+/// Runs blocking helper work off the current-thread runtime so the deadline
+/// can fire while that work is still executing. `None` means the work is
+/// still running and the caller must not report any result for it.
+async fn run_before<F>(deadline: Instant, work: F) -> Option<Result<(), HostError>>
+where
+  F: FnOnce() -> Result<(), HostError> + Send + 'static,
+{
+  match tokio::time::timeout_at(deadline.into(), tokio::task::spawn_blocking(work)).await {
+    Ok(Ok(result)) => Some(result),
+    Ok(Err(_)) => Some(Err(HostError::Unavailable)),
+    Err(_) => None,
   }
 }
 
@@ -76,8 +113,7 @@ fn prepare_socket_dir(home: &Path, uid: u32) -> Result<(), HostError> {
   fs::set_permissions(entry, fs::Permissions::from_mode(0o700)).map_err(|_| HostError::Unavailable)
 }
 
-async fn handle(stream: &mut UnixStream, home: &Path, uid: u32) -> Result<(), HostError> {
-  let started = Instant::now();
+async fn read_request(stream: &mut UnixStream, uid: u32) -> Result<(Operation, Zeroizing<Vec<u8>>), HostError> {
   let peer = stream.peer_cred().map_err(|_| HostError::Unauthorized)?.uid();
   // Every operation must pass through the root daemon's local principal
   // check, metadata generation, account lock, and audit boundary. A user
@@ -92,19 +128,22 @@ async fn handle(stream: &mut UnixStream, home: &Path, uid: u32) -> Result<(), Ho
   let (operation, length) = decode_header(&header, uid)?;
   let mut payload = Zeroizing::new(vec![0_u8; length]);
   stream.read_exact(&mut payload).await.map_err(|_| HostError::InvalidRequest)?;
+  Ok((operation, payload))
+}
 
+fn execute(operation: Operation, payload: &[u8], home: &Path, uid: u32, started: Instant) -> Result<(), HostError> {
   match operation {
     Operation::Enroll if !payload.is_empty() => {
-      let secret = std::str::from_utf8(&payload).map_err(|_| HostError::InvalidRequest)?;
+      let secret = std::str::from_utf8(payload).map_err(|_| HostError::InvalidRequest)?;
 
       if secret.chars().any(char::is_control) {
         return Err(HostError::InvalidRequest);
       }
 
-      vault::enroll(home, uid, &payload)
+      vault::enroll(home, uid, payload)
     }
     Operation::Probe | Operation::Unlock if !payload.is_empty() => {
-      let selector = std::str::from_utf8(&payload).map_err(|_| HostError::InvalidRequest)?;
+      let selector = std::str::from_utf8(payload).map_err(|_| HostError::InvalidRequest)?;
 
       if operation == Operation::Probe {
         session::probe_locked(home, uid, selector)
@@ -207,6 +246,39 @@ mod tests {
     assert_eq!(crate::decode_status(6), Err(HostError::InputUnavailable));
   }
 
+  // ROOT CAUSE:
+  //
+  // If a Keychain read or HID post blocked, the 18-second request timeout
+  // never fired because the helper ran that synchronous work inline on its
+  // current-thread runtime.
+  //
+  // Before the fix, the daemon gave up at its own read timeout and released
+  // its account lock while the helper could still type the credential.
+  // The fix runs the work off the runtime so the deadline fires, and the
+  // helper then exits instead of reporting a result for unfinished input.
+  #[tokio::test]
+  async fn deadline_fires_while_blocking_work_is_still_running() {
+    let (release, blocked) = std::sync::mpsc::channel::<()>();
+    let started = Instant::now();
+    let result = run_before(started + Duration::from_millis(50), move || {
+      let _ = blocked.recv_timeout(Duration::from_secs(10));
+      Ok(())
+    })
+    .await;
+
+    assert!(result.is_none());
+    assert!(started.elapsed() < Duration::from_secs(5));
+
+    drop(release);
+  }
+
+  #[tokio::test]
+  async fn completed_blocking_work_reports_its_result() {
+    let result = run_before(Instant::now() + Duration::from_secs(5), || Err(HostError::NotLocked)).await;
+
+    assert_eq!(result, Some(Err(HostError::NotLocked)));
+  }
+
   #[tokio::test]
   async fn same_uid_cannot_bypass_daemon_policy_for_any_operation() {
     let uid = getuid().as_raw();
@@ -229,7 +301,7 @@ mod tests {
       header[6..10].copy_from_slice(&uid.to_be_bytes());
       client.write_all(&header).await.unwrap();
 
-      assert_eq!(handle(&mut server, Path::new("/missing"), uid).await, Err(HostError::Unauthorized));
+      assert_eq!(read_request(&mut server, uid).await.map(|(operation, _)| operation), Err(HostError::Unauthorized));
     }
   }
 }

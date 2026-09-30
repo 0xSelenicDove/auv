@@ -114,7 +114,10 @@ pub fn unlock(home: &Path, uid: u32, selector: &str) -> Result<(), HostError> {
 fn call(home: &Path, operation: Operation, uid: u32, payload: &[u8]) -> Result<(), HostError> {
   let mut stream = UnixStream::connect(socket_path(home)).map_err(|_| HostError::Unavailable)?;
   verify_installed_helper(&stream)?;
-  stream.set_read_timeout(Some(Duration::from_secs(20))).map_err(|_| HostError::Unavailable)?;
+  // NOTICE(device-entry-macos-deadline): The helper exits at its 18-second
+  // request deadline instead of replying for unfinished input. This longer
+  // read timeout is only a backstop for a stopped helper process.
+  stream.set_read_timeout(Some(Duration::from_secs(25))).map_err(|_| HostError::Unavailable)?;
   stream.set_write_timeout(Some(Duration::from_secs(20))).map_err(|_| HostError::Unavailable)?;
   let length = u16::try_from(payload.len()).map_err(|_| HostError::InvalidRequest)?;
   let mut header = [0_u8; 12];
@@ -126,8 +129,18 @@ fn call(home: &Path, operation: Operation, uid: u32, payload: &[u8]) -> Result<(
   stream.write_all(&header).map_err(|_| HostError::Unavailable)?;
   stream.write_all(payload).map_err(|_| HostError::Unavailable)?;
   let mut response = [0_u8; 1];
-  stream.read_exact(&mut response).map_err(|_| HostError::Unavailable)?;
+  stream.read_exact(&mut response).map_err(|_| unanswered(operation))?;
   decode_status(response[0])
+}
+
+/// A sent request without a status may already have posted unlock input, so
+/// the caller must not treat it as a clean failure. Other operations have no
+/// OS input effect.
+fn unanswered(operation: Operation) -> HostError {
+  match operation {
+    Operation::Unlock => HostError::OutcomeUnverified,
+    Operation::Enroll | Operation::Probe | Operation::Remove => HostError::Unavailable,
+  }
 }
 
 fn decode_status(status: u8) -> Result<(), HostError> {
@@ -253,6 +266,14 @@ mod tests {
     let path = code.path(Flags::NONE).unwrap().to_path().unwrap();
 
     assert_eq!(std::fs::canonicalize(path).unwrap(), std::fs::canonicalize(std::env::current_exe().unwrap()).unwrap());
+  }
+
+  #[test]
+  fn unanswered_unlock_is_unverified_not_a_clean_failure() {
+    // The helper exits at its deadline without replying; any unlock input it
+    // posted before that point may still have taken effect.
+    assert_eq!(unanswered(Operation::Unlock), HostError::OutcomeUnverified);
+    assert_eq!(unanswered(Operation::Probe), HostError::Unavailable);
   }
 }
 
