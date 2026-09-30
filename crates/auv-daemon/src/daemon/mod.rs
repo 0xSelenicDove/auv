@@ -20,6 +20,10 @@ const LOCAL_DEVICE_ID_FILE: &str = "device-id";
 /// Process-local view of durable control-plane identity and live resources.
 pub(crate) struct Daemon {
   local_device: proto::Device,
+  #[cfg(any(target_os = "linux", target_os = "macos"))]
+  device_entry: std::sync::Arc<crate::device_entry::LocalState>,
+  #[cfg(windows)]
+  device_entry: Option<std::sync::Arc<crate::device_entry::LocalState>>,
   // TODO(distributed-run-authority): Runs are daemon-memory resources until a
   // coordinator/storage slice defines cross-daemon ownership, recovery, and
   // terminal append semantics in the accepted architecture document.
@@ -55,6 +59,8 @@ impl Daemon {
     parent_endpoint: Option<String>,
     first_party_runners: runner_provider::FirstPartyRunnerRuntimes,
     runner_providers: Vec<runner_provider::RunnerProviderConfig>,
+    #[cfg(any(target_os = "linux", target_os = "macos"))] device_entry: std::sync::Arc<crate::device_entry::LocalState>,
+    #[cfg(windows)] device_entry: Option<std::sync::Arc<crate::device_entry::LocalState>>,
   ) -> Result<Self, String> {
     let control_root = store_root.join("control");
     fs::create_dir_all(&control_root)
@@ -79,6 +85,8 @@ impl Daemon {
     )?;
     Ok(Self {
       local_device,
+      #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+      device_entry,
       runs: Mutex::new(HashMap::new()),
       runner_affinities: Mutex::new(HashMap::new()),
       runner_affinity_locks: tokio::sync::Mutex::new(HashMap::new()),
@@ -442,6 +450,99 @@ impl Control for Daemon {
   }
   fn get_device(&self, device_id: &str) -> Result<Option<auv::devices::Device>, ControlError> {
     Daemon::get_device(self, device_id).map(domain_device).transpose()
+  }
+  fn list_user_sessions(&self, _caller: &CallerId) -> Result<Vec<auv::devices::UserSession>, auv::devices::DeviceEntryErrorReason> {
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+    {
+      #[cfg(windows)]
+      {
+        self.device_entry.as_ref().ok_or(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)?.list_user_sessions()
+      }
+      #[cfg(not(windows))]
+      {
+        self.device_entry.list_user_sessions()
+      }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+      Err(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)
+    }
+  }
+  fn get_user_session(
+    &self,
+    _caller: &CallerId,
+    session_selector: &str,
+  ) -> Result<auv::devices::UserSession, auv::devices::DeviceEntryErrorReason> {
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+    {
+      #[cfg(windows)]
+      {
+        self.device_entry.as_ref().ok_or(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)?.get_user_session(session_selector)
+      }
+      #[cfg(not(windows))]
+      {
+        self.device_entry.get_user_session(session_selector)
+      }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+      let _ = session_selector;
+      Err(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)
+    }
+  }
+  async fn ensure_user_session_unlocked(
+    &self,
+    caller: &CallerId,
+    target: auv::devices::UserSessionTarget,
+  ) -> Result<auv::devices::EnsureUserSessionUnlockedEffect, auv::devices::DeviceEntryErrorReason> {
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+    {
+      #[cfg(windows)]
+      {
+        self
+          .device_entry
+          .as_ref()
+          .ok_or(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)?
+          .ensure_user_session_unlocked(caller, target)
+          .await
+      }
+      #[cfg(not(windows))]
+      {
+        self.device_entry.ensure_user_session_unlocked(caller, target).await
+      }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+      let _ = (caller, target);
+      Err(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)
+    }
+  }
+  async fn ensure_user_session_locked(
+    &self,
+    caller: &CallerId,
+    target: auv::devices::UserSessionTarget,
+  ) -> Result<auv::devices::EnsureUserSessionLockedEffect, auv::devices::DeviceEntryErrorReason> {
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+    {
+      #[cfg(windows)]
+      {
+        self
+          .device_entry
+          .as_ref()
+          .ok_or(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)?
+          .ensure_user_session_locked(caller, target)
+          .await
+      }
+      #[cfg(not(windows))]
+      {
+        self.device_entry.ensure_user_session_locked(caller, target).await
+      }
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+      let _ = (caller, target);
+      Err(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)
+    }
   }
   fn create_run(&self, caller: &CallerId, request: auv::runs::CreateRun) -> Result<auv::runs::Run, ControlError> {
     let response = Daemon::create_run(

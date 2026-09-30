@@ -10,6 +10,9 @@ mod background_input;
 pub mod capture;
 pub mod clipboard;
 mod descriptor;
+pub mod device_session;
+pub mod device_unlock_host;
+pub mod device_unlock_vault;
 mod driver;
 mod error;
 pub mod input;
@@ -18,6 +21,8 @@ pub mod ocr;
 pub mod permission;
 mod readiness;
 mod session;
+#[cfg(target_os = "windows")]
+pub mod system_only_storage;
 pub mod vision;
 pub mod window;
 
