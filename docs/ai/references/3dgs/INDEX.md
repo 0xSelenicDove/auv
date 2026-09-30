@@ -28,6 +28,7 @@
 
 ## 相关文档
 
+- [`2026-09-30-traj-geo-spike.md`](2026-09-30-traj-geo-spike.md) - 轨迹累积后台 3D 几何 Spike 结项报告（正常游玩单视角前向徘徊 3-pass 轨迹累积、Brush 1000 步实测、中位数距离 2.041m / 表面覆盖率 4.1%、单目深度反投影基线对比、实证前向光流退化与不适定性、明确 NO-GO 裁决关闭 3DGS 几何抽取路线）
 - [`2026-09-30-line-closeout.md`](2026-09-30-line-closeout.md) - 3DGS / 结构化空间记忆线 Closeout（事实/分析/推测三层口径、全阶段交付与裁决总表、9 条诚实边界、冻结政策与未来方向）
 - [`2026-09-30-tier0-spike-findings.md`](2026-09-30-tier0-spike-findings.md) - Tier-0 Spike 遥测消融实测与真 Tier-0 差距量化报告（4 条件 12 Runs 严格实机对比、代码级物理隔离、Option A 终末视觉到达门禁校准、C3 3/3 纯 Agent 决策到站、实证航向为承重骨架与视觉伺服到站门禁、明确 GO/NO-GO 投资建议）
 - [`2026-09-30-step11-forget-persist.md`](2026-09-30-step11-forget-persist.md) - Step 11 遗忘与跨 Session 持久化实机验收报告（地标挖除多次扑空触发生产 prune 淘汰与 S2 网格清理、诚实拒绝幽灵导航、跨独立 OS 进程存盘重启 100% 字段无损恢复与 45m+ 远距记忆导航 0.82m 成功召回，双轨全部 GO 通过）
