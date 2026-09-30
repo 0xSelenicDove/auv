@@ -2,6 +2,21 @@
 
 Date: 2026-09-28. Status: research, not a native AUV support claim. Scope: Apple Screen Sharing / Apple Remote Desktop (ARD) and the signed-out login-window boundary. No new target experiment was performed for this note.
 
+## Record provenance
+
+Extracted from [PR #198](https://github.com/moeru-ai/auv/pull/198) at
+[`85f6385`](https://github.com/moeru-ai/auv/tree/85f638525c669e56aac3ce4792e39292563944c6).
+This is a research and experiment record; the candidate implementation and
+policy decisions remain in that separate PR. Code, API, packaging, and
+installation descriptions below refer to that candidate or to the dated
+experimental stage, not to functionality added by this document.
+
+Findings and policy interviews retain their original dates. No new target
+experiment was performed for this extraction. Later installed-host results are
+recorded separately in the [macOS](2026-09-28-macos-locked-session-host-gate.md),
+[Linux](2026-09-28-linux-gnome-locked-session-host-handoff.md), and
+[Windows](2026-09-28-windows-locked-session-host-handoff.md) evidence notes.
+
 ## What Apple documents
 
 | Finding | Evidence level | Primary source |

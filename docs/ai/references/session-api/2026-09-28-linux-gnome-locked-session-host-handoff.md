@@ -1,13 +1,35 @@
 # Linux GNOME locked-session Device host handoff
 
-Status: implementation candidate, not paired Device unlock support. The daemon's
-paired `DeviceService` still returns `UNSUPPORTED_OS_STATE`. A supervised
-same-UID host test passed locked retrieval and one visible unlock on
-`neko-gpu-1`, but the paired daemon route and credential rotation policy
-remain ungated. The private
-Linux host is constructed with the same policy metadata, audit, account
-locks, and switch gate as target-local enrollment, but is not exposed through
-the paired route.
+Status: configuration-specific paired DeviceService proof on 2026-09-29.
+The final retest on one Debian 13 GNOME Wayland host passed two
+Mac-originated paired unlocks of the same existing session, with target-local
+PAM revalidation, independent logind readback, audit, and owner confirmation.
+Both `PENDING` and `READY` enrollment were exercised. Automatic display wake,
+rotated-password rejection, other desktop configurations, and release
+installation remain unproved. See the [final retest](#2026-09-29-final-review-fix-retest).
+
+## Record provenance
+
+Extracted from [PR #198](https://github.com/moeru-ai/auv/pull/198) at
+[`85f6385`](https://github.com/moeru-ai/auv/tree/85f638525c669e56aac3ce4792e39292563944c6).
+This is a research and experiment record; the candidate implementation and
+policy decisions remain in that separate PR. Code, API, packaging, and
+installation descriptions below refer to that candidate or to the dated
+experimental stage, not to functionality added by this document.
+
+The extraction revision is not the exact build used in every live gate.
+Keep the recorded source/binary hashes and stage labels as the experiment
+identifiers; where a gate gives no exact revision, that provenance remains
+unrecorded. No experiments were rerun for this extraction. Later successful
+gates supersede only the earlier limits they explicitly retested.
+
+## Initial candidate and subsequent revisions
+
+The initial candidate kept the paired `DeviceService` route disabled with
+`UNSUPPORTED_OS_STATE` while the same-UID host and credential rotation gates
+were incomplete. The implementation descriptions and dated gates below
+record that progression; the final retest supersedes those earlier disabled
+route statements. They do not describe capabilities shipped by this docs PR.
 
 `auv-driver-linux::device_unlock` inventories physical, active, local GNOME
 Wayland sessions owned by its effective UID. An opaque selector includes the
@@ -179,7 +201,7 @@ After the gate, the target-local CLI removed the enrollment. Independent
 Secret Service search returned no AUV item paths, metadata lookup returned
 not found, and the transient service was stopped (`ActiveState=inactive`,
 `MainPID=0`). The unique stage, socket, and transfer archive were removed.
-The owner subsequently chose [PAM revalidation on every Linux remote unlock](2026-09-27-device-entry-credential-decision.md#linux-locked-session-rotation-rule-accepted-2026-09-29).
+The owner subsequently chose [PAM revalidation on every Linux remote unlock](https://github.com/moeru-ai/auv/blob/85f638525c669e56aac3ce4792e39292563944c6/docs/ai/references/session-api/2026-09-27-device-entry-credential-decision.md#linux-locked-session-rotation-rule-accepted-2026-09-29).
 The candidate now checks the stored password after protected retrieval and
 before logind `Unlock`, including for a `READY` enrollment. A confirmed PAM
 rejection suspends that generation; service failure does not. The earlier

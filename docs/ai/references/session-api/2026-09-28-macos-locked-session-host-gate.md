@@ -1,6 +1,31 @@
 # macOS locked-session Device host: package and live gate
 
-Status: supervised installed-host and local Unix DeviceService proof on
+Status: configuration-specific installed-host and local Unix DeviceService
+proof on macOS 26.3, recorded on 2026-09-29. Two supervised black-display
+DeviceService unlocks passed with same-session OS readback and owner-visible
+desktop confirmation. The client used an owner-verified local root Unix
+socket; paired authentication over a network endpoint was not exercised.
+System sleep, closed-lid wake, signed-out login, and other configurations
+remain unproved.
+
+## Record provenance
+
+Extracted from [PR #198](https://github.com/moeru-ai/auv/pull/198) at
+[`85f6385`](https://github.com/moeru-ai/auv/tree/85f638525c669e56aac3ce4792e39292563944c6).
+This is a research and experiment record; the candidate implementation and
+policy decisions remain in that separate PR. Code, API, packaging, and
+installation descriptions below refer to that candidate or to the dated
+experimental stage, not to functionality added by this document.
+
+The extraction revision is not the exact build used in every live gate.
+Keep the recorded source/binary hashes and stage labels as the experiment
+identifiers; where a gate gives no exact revision, that provenance remains
+unrecorded. No experiments were rerun for this extraction. Later successful
+gates supersede only the earlier limits they explicitly retested.
+
+## Experiment chronology
+
+The original installed-host and local Unix DeviceService record began on
 2026-09-29 for one existing, logged-in locked physical console session on
 `neko-mbp-m1` (macOS 26.3).
 The helper has compiled, passed narrow tests, and produced a signed review

@@ -18,18 +18,19 @@ the canonical local/remote operation interface and `auv-daemon` as the long-live
 `auv-api-client` and `auv-api-server` become protocol boundaries. MCP remains in
 `auv-cli`.
 
-Count: **35**
+Count: **37**
 
 - [`2026-09-28-remote-device-entry-implementation-design.md`](2026-09-28-remote-device-entry-implementation-design.md) — current locked-existing-session-first Device unlock contract and three-platform implementation plan; signed-out entry deferred.
 - [`2026-09-30-device-lock-contract-and-review.md`](2026-09-30-device-lock-contract-and-review.md) — experimental lock API/CLI/MCP contract, configuration-specific gate evidence, pairing experience, and prioritized architecture review.
-- [`2026-09-28-macos-locked-session-host-gate.md`](2026-09-28-macos-locked-session-host-gate.md) — signed Aqua helper, private Keychain and IPC, two supervised black-display DeviceService unlocks on the spare Mac, and cleanup; configuration-specific evidence, not a production support claim.
-- [`2026-09-28-linux-gnome-locked-session-host-handoff.md`](2026-09-28-linux-gnome-locked-session-host-handoff.md) — same-UID GNOME/logind adapter and two supervised Mac-originated paired unlocks of PENDING and READY enrollment with target-local PAM revalidation; rotated-password rejection, display wake, and release installation remain open gates.
-- [`2026-09-28-windows-locked-session-host-handoff.md`](2026-09-28-windows-locked-session-host-handoff.md) — LocalSystem worker and protected vault candidate; one owner-observed paired locked-console unlock passed with same-session readback, followed by removal and cleanup. Release installation and broader configurations remain open.
-- [`2026-09-28-macos-remote-desktop-loginwindow-research.md`](2026-09-28-macos-remote-desktop-loginwindow-research.md) — primary-source comparison of Apple Remote Desktop, Chromium, RustDesk, Deskflow, and a Screen Sharing route at the macOS login window; no AUV support claim.
 - [`2026-09-27-device-entry-credential-decision.md`](2026-09-27-device-entry-credential-decision.md) — accepted target-local persistent credential enrollment and deletion; pre-login storage requirements now deferred.
 - [`2026-09-27-device-login-host-lifecycle-decision.md`](2026-09-27-device-login-host-lifecycle-decision.md) — historical machine-level daemon lifecycle decision for the deferred signed-out phase.
 - [`2026-09-27-device-unlock-authority-decision.md`](2026-09-27-device-unlock-authority-decision.md) — accepted paired-bearer authority for existing-session unlock; earlier sign-in scope deferred.
+- [`2026-09-29-windows-scm-host.md`](2026-09-29-windows-scm-host.md) — candidate Windows service lifecycle, restricted storage, and temporary installation procedure; final locked-console evidence is recorded in the Windows host handoff.
 - [`2026-09-27-remote-device-unlock-research.md`](2026-09-27-remote-device-unlock-research.md) — historical policy interview, three existing-session unlock proofs, and failed macOS signed-out delivery gates.
+- [`2026-09-28-macos-remote-desktop-loginwindow-research.md`](2026-09-28-macos-remote-desktop-loginwindow-research.md) — primary-source comparison of Apple remote desktop services and third-party login-window mechanisms; no AUV support claim.
+- [`2026-09-28-macos-locked-session-host-gate.md`](2026-09-28-macos-locked-session-host-gate.md) — signed Aqua helper, private Keychain and IPC, and supervised same-session unlock evidence; configuration-specific evidence, not a production support claim.
+- [`2026-09-28-linux-gnome-locked-session-host-handoff.md`](2026-09-28-linux-gnome-locked-session-host-handoff.md) — paired GNOME existing-session unlocks with target-local PAM revalidation; display wake, rotated-password rejection, and release installation remain open gates.
+- [`2026-09-28-windows-locked-session-host-handoff.md`](2026-09-28-windows-locked-session-host-handoff.md) — paired locked-console unlock with same-session readback and owner confirmation; release installation and broader configurations remain open.
 - [`2026-09-08-protobuf-source-distribution-reference.md`](2026-09-08-protobuf-source-distribution-reference.md) — checked-in BSR exports, dependency updates, and clean-checkout Cargo installation checks.
 - [`2026-08-17-protobuf-json-schema-library-research.md`](2026-08-17-protobuf-json-schema-library-research.md) — primary-source evaluation of runtime and build-time Protobuf-to-JSON-Schema libraries; no browser-compatible `DescMessage` drop-in exists, with two viable future paths documented.
 - [`2026-08-16-windows-local-runner-ipc-handoff.md`](2026-08-16-windows-local-runner-ipc-handoff.md) - Windows local API and daemon-to-Runner named-pipe transports, paired use, tests, and current limits.
