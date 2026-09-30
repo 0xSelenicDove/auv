@@ -171,10 +171,10 @@ pub enum DeviceEntryEffectKind {
   AlreadyUsable,
   /// An existing locked session became usable.
   UnlockedExistingSession,
-  /// NOTICE(device-entry-signed-out): Reserved by the landed wire contract;
-  /// no first-release adapter may emit it. A later owner-approved signed-out
-  /// slice must prove login-window delivery and new-session readback.
-  SignedInNewSession,
+  // NOTICE(device-entry-signed-out): The wire keeps SIGNED_IN_NEW_SESSION
+  // reserved, but no locked-session adapter can produce it, so this domain
+  // type omits it and the client rejects it. A later owner-approved signed-out
+  // slice must prove login-window delivery and new-session readback first.
 }
 
 impl DeviceEntryEffectKind {
@@ -183,7 +183,6 @@ impl DeviceEntryEffectKind {
     match self {
       Self::AlreadyUsable => "ALREADY_USABLE",
       Self::UnlockedExistingSession => "UNLOCKED_EXISTING_SESSION",
-      Self::SignedInNewSession => "SIGNED_IN_NEW_SESSION",
     }
   }
 }

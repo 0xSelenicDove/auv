@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use auv_api_server::device_local::{
   AuditPage as LocalAuditPage, CredentialKind, DeviceLocalControl, EnrollAccount, Enrollment as LocalEnrollment, LocalControlError,
-  LocalOsPrincipal, StorageKind,
+  LocalOsPrincipal,
 };
 
 use super::audit::Audit;
@@ -70,12 +70,6 @@ impl DeviceLocalControl for LinuxLocalEnrollment {
   async fn enroll(&self, principal: &LocalOsPrincipal, request: EnrollAccount) -> Result<LocalEnrollment, LocalControlError> {
     if request.credential_kind != CredentialKind::OsPassword {
       return Err(LocalControlError::UnsupportedCredentialKind);
-    }
-
-    if request.storage_kind != StorageKind::Protected {
-      // TODO(device-entry-linux-plaintext): explicit administrator-selected
-      // plaintext fallback needs its own restricted store and removal gate.
-      return Err(LocalControlError::UnsupportedStorageKind);
     }
 
     let account = resolve_user(&request.user)?;

@@ -21,9 +21,6 @@ pub enum DeviceLocalCommand {
     user: String,
     #[arg(long, value_enum)]
     kind: CredentialKind,
-    /// Plaintext files require explicit administrator selection.
-    #[arg(long, value_enum, default_value_t = StorageKind::Protected)]
-    storage: StorageKind,
   },
   /// Inspect one account's enrollment metadata.
   Get {
@@ -53,13 +50,6 @@ pub enum DeviceLocalCommand {
 pub enum CredentialKind {
   OsPassword,
   WindowsPin,
-}
-
-#[derive(Clone, Copy, Debug, Default, ValueEnum)]
-pub enum StorageKind {
-  #[default]
-  Protected,
-  PlaintextFile,
 }
 
 #[derive(Clone, Debug, Subcommand)]
@@ -123,11 +113,7 @@ pub async fn run(args: DeviceLocalArgs, project_root: &Path) -> Result<i32, Stri
   let service = client.service();
 
   match args.command {
-    DeviceLocalCommand::Enroll {
-      user,
-      kind,
-      storage,
-    } => {
+    DeviceLocalCommand::Enroll { user, kind } => {
       #[cfg(windows)]
       if !matches!(kind, CredentialKind::WindowsPin) {
         // TODO(device-entry-windows-password): The installed worker currently
@@ -146,10 +132,9 @@ pub async fn run(args: DeviceLocalArgs, project_root: &Path) -> Result<i32, Stri
           CredentialKind::OsPassword => proto::EnrollmentCredentialKind::OsPassword as i32,
           CredentialKind::WindowsPin => proto::EnrollmentCredentialKind::WindowsPin as i32,
         },
-        storage_kind: match storage {
-          StorageKind::Protected => proto::EnrollmentStorageKind::Protected as i32,
-          StorageKind::PlaintextFile => proto::EnrollmentStorageKind::PlaintextFile as i32,
-        },
+        // TODO(device-entry-plaintext): No backend offers the plaintext
+        // fallback yet; expose a storage choice only when one does.
+        storage_kind: proto::EnrollmentStorageKind::Protected as i32,
       };
       let enrollment = service
         .enroll(request)

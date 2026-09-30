@@ -33,21 +33,13 @@ pub enum CredentialKind {
   WindowsPin,
 }
 
-/// Target-local credential persistence choice. Plaintext requires a separate
-/// OS administrator authorization decision in the backend.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum StorageKind {
-  Protected,
-  PlaintextFile,
-}
-
-/// Non-secret local enrollment metadata.
+/// Non-secret local enrollment metadata. Every current backend stores the
+/// credential in its protected OS store, so the wire storage kind is fixed.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Enrollment {
   pub user: String,
   pub os_account_id: String,
   pub state: EnrollmentState,
-  pub storage_kind: StorageKind,
 }
 
 /// Non-secret, allowlisted record read from the target-local audit.
@@ -86,7 +78,6 @@ pub struct EnrollAccount {
   pub user: String,
   pub credential: SecretBytes,
   pub credential_kind: CredentialKind,
-  pub storage_kind: StorageKind,
 }
 
 /// Safe errors exposed by the local enrollment boundary. Implementations
@@ -98,7 +89,6 @@ pub enum LocalControlError {
   PermissionDenied,
   NotFound,
   UnsupportedCredentialKind,
-  UnsupportedStorageKind,
   HostUnavailable,
   Persistence,
 }
@@ -162,11 +152,17 @@ impl DeviceLocalService for DeviceLocalGrpc {
       Ok(proto::EnrollmentCredentialKind::WindowsPin) => CredentialKind::WindowsPin,
       _ => return Err(Status::invalid_argument("unsupported credential_kind")),
     };
-    let storage_kind = match proto::EnrollmentStorageKind::try_from(input.storage_kind) {
-      Ok(proto::EnrollmentStorageKind::Protected) => StorageKind::Protected,
-      Ok(proto::EnrollmentStorageKind::PlaintextFile) => StorageKind::PlaintextFile,
+    match proto::EnrollmentStorageKind::try_from(input.storage_kind) {
+      Ok(proto::EnrollmentStorageKind::Protected) => {}
+      // TODO(device-entry-plaintext): The wire keeps the administrator-only
+      // plaintext fallback from the credential decision, but no platform has
+      // a restricted plaintext store. Add a backend storage choice only with
+      // an owner-approved store and removal gate.
+      Ok(proto::EnrollmentStorageKind::PlaintextFile) => {
+        return Err(Status::failed_precondition("storage kind is unavailable on this host"));
+      }
       _ => return Err(Status::invalid_argument("storage_kind must be explicit")),
-    };
+    }
     let enrollment = self
       .control
       .enroll(
@@ -175,7 +171,6 @@ impl DeviceLocalService for DeviceLocalGrpc {
           user,
           credential,
           credential_kind,
-          storage_kind,
         },
       )
       .await
@@ -256,10 +251,7 @@ fn wire_enrollment(value: Enrollment) -> proto::Enrollment {
       EnrollmentState::Ready => proto::EnrollmentState::Ready as i32,
       EnrollmentState::Suspended => proto::EnrollmentState::Suspended as i32,
     },
-    storage_kind: match value.storage_kind {
-      StorageKind::Protected => proto::EnrollmentStorageKind::Protected as i32,
-      StorageKind::PlaintextFile => proto::EnrollmentStorageKind::PlaintextFile as i32,
-    },
+    storage_kind: proto::EnrollmentStorageKind::Protected as i32,
   }
 }
 
@@ -270,7 +262,6 @@ fn status(error: LocalControlError) -> Status {
     LocalControlError::PermissionDenied => Status::permission_denied("local OS caller cannot manage this account"),
     LocalControlError::NotFound => Status::not_found("enrollment not found"),
     LocalControlError::UnsupportedCredentialKind => Status::failed_precondition("credential kind is unavailable on this host"),
-    LocalControlError::UnsupportedStorageKind => Status::failed_precondition("storage kind is unavailable on this host"),
     LocalControlError::HostUnavailable => Status::unavailable("installed unlock host cannot retrieve this credential"),
     LocalControlError::Persistence => Status::internal("local enrollment store failed"),
   }
@@ -467,7 +458,6 @@ mod tests {
         user: user.to_owned(),
         os_account_id: uid.to_string(),
         state: EnrollmentState::Ready,
-        storage_kind: StorageKind::Protected,
       })
     }
 
@@ -603,6 +593,20 @@ mod tests {
       .unwrap_err();
 
     assert_eq!(invalid.code(), tonic::Code::InvalidArgument);
+
+    // The plaintext fallback stays on the wire but has no backend store, so
+    // the protocol boundary rejects it before the local control port runs.
+    let plaintext = client
+      .enroll(proto::EnrollRequest {
+        user: "neko".into(),
+        credential: b"fixture-only".to_vec(),
+        credential_kind: proto::EnrollmentCredentialKind::OsPassword as i32,
+        storage_kind: proto::EnrollmentStorageKind::PlaintextFile as i32,
+      })
+      .await
+      .unwrap_err();
+
+    assert_eq!(plaintext.code(), tonic::Code::FailedPrecondition);
 
     let unavailable = client
       .enroll(proto::EnrollRequest {

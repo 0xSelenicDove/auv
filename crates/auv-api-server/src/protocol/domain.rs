@@ -104,7 +104,6 @@ pub(crate) fn ensure_user_session_unlocked_effect(
     kind: match value.kind {
       auv::devices::DeviceEntryEffectKind::AlreadyUsable => proto::DeviceEntryEffectKind::AlreadyUsable,
       auv::devices::DeviceEntryEffectKind::UnlockedExistingSession => proto::DeviceEntryEffectKind::UnlockedExistingSession,
-      auv::devices::DeviceEntryEffectKind::SignedInNewSession => proto::DeviceEntryEffectKind::SignedInNewSession,
     } as i32,
     user: value.user,
     session_selector: value.session_selector.unwrap_or_default(),

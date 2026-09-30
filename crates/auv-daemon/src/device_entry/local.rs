@@ -26,7 +26,7 @@ use auv_api_server::control::CallerId;
 use auv_api_server::control::Pairing;
 use auv_api_server::device_local::{
   self, AuditEntry as LocalAuditEntry, AuditPage as LocalAuditPage, DeviceLocalControl, Enrollment as LocalEnrollment, LocalControlError,
-  LocalOsPrincipal, StorageKind,
+  LocalOsPrincipal,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -49,7 +49,6 @@ pub(super) fn local_enrollment(value: StoredEnrollment) -> LocalEnrollment {
     user: value.user,
     os_account_id: value.os_account_id,
     state: value.state,
-    storage_kind: StorageKind::Protected,
   }
 }
 

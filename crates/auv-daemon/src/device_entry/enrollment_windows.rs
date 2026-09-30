@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use auv_api_server::device_local::{
   AuditPage as LocalAuditPage, CredentialKind, DeviceLocalControl, EnrollAccount, Enrollment as LocalEnrollment, LocalControlError,
-  LocalOsPrincipal, StorageKind,
+  LocalOsPrincipal,
 };
 use auv_driver_windows::device_session::observe_console;
 
@@ -116,12 +116,6 @@ impl DeviceLocalControl for WindowsLocalEnrollment {
       // TODO(device-entry-windows-password): OS-password provider delivery
       // needs its own locked Winlogon gate before it can be enrolled here.
       return Err(LocalControlError::UnsupportedCredentialKind);
-    }
-
-    if request.storage_kind != StorageKind::Protected {
-      // TODO(device-entry-windows-plaintext): No plaintext fallback has a
-      // restricted Windows store or owner approval for this host.
-      return Err(LocalControlError::UnsupportedStorageKind);
     }
 
     let credential = request.credential;
