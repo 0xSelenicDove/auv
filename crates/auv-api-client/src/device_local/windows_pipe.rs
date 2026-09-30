@@ -29,9 +29,11 @@ pub(super) async fn open_verified(name: &str) -> io::Result<NamedPipeClient> {
   if !valid_name(name) {
     return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid Device-local pipe name"));
   }
+
   let path = format!(r"\\.\pipe\{name}");
   let wide = std::ffi::OsStr::new(&path).encode_wide().chain(Some(0)).collect::<Vec<_>>();
   let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+
   loop {
     match open_once(&wide) {
       Ok(client) => return Ok(client),
@@ -81,9 +83,11 @@ fn verify_server(pipe: HANDLE) -> io::Result<()> {
   // SAFETY: Both calls write one live u32 for this connected pipe handle.
   unsafe { GetNamedPipeServerProcessId(pipe, &mut server_pid) }.map_err(|_| identity_error())?;
   unsafe { GetNamedPipeServerSessionId(pipe, &mut server_session) }.map_err(|_| identity_error())?;
+
   if server_pid == 0 || server_session != 0 {
     return Err(identity_error());
   }
+
   // SAFETY: The kernel supplied this PID for the connected pipe. The process
   // handle pins that process while its primary token is inspected.
   let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, server_pid) }.map_err(|_| identity_error())?;
@@ -97,29 +101,37 @@ fn verify_server(pipe: HANDLE) -> io::Result<()> {
   let mut bytes = 0u32;
   // SAFETY: A null output buffer requests the required TOKEN_USER size.
   let _ = unsafe { GetTokenInformation(HANDLE(token.as_raw_handle()), TokenUser, None, 0, &mut bytes) };
+
   if bytes < size_of::<TOKEN_USER>() as u32 || bytes > 64 * 1024 || align_of::<TOKEN_USER>() > align_of::<usize>() {
     return Err(identity_error());
   }
+
   let mut data = vec![0usize; (bytes as usize).div_ceil(size_of::<usize>())];
   // SAFETY: The word buffer is aligned and large enough for TOKEN_USER and
   // its SID; both stay live through IsWellKnownSid.
   unsafe { GetTokenInformation(HANDLE(token.as_raw_handle()), TokenUser, Some(data.as_mut_ptr().cast()), bytes, &mut bytes) }
     .map_err(|_| identity_error())?;
+
   if (bytes as usize) < size_of::<TOKEN_USER>() {
     return Err(identity_error());
   }
+
   // SAFETY: Windows initialized an aligned TOKEN_USER in the buffer.
   let user = unsafe { data.as_ptr().cast::<TOKEN_USER>().read() };
+
   if user.User.Sid.0.is_null() || !unsafe { IsWellKnownSid(user.User.Sid, WinLocalSystemSid) }.as_bool() {
     return Err(identity_error());
   }
+
   // A service that exits while checked cannot consume credentials. Re-read
   // the pipe association before transferring it into the gRPC transport.
   let mut current_pid = 0u32;
   unsafe { GetNamedPipeServerProcessId(pipe, &mut current_pid) }.map_err(|_| identity_error())?;
+
   if current_pid != server_pid {
     return Err(identity_error());
   }
+
   Ok(())
 }
 
@@ -154,7 +166,9 @@ mod tests {
     let path = format!(r"\\.\pipe\{name}");
     let server = ServerOptions::new().first_pipe_instance(true).reject_remote_clients(true).create(&path).unwrap();
     let error = open_verified(&name).await.unwrap_err();
+
     assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+
     drop(server);
   }
 }

@@ -142,12 +142,14 @@ async fn run_os(arguments: Vec<OsString>) -> Result<i32, String> {
       if selection.device_name.is_some() || selection.device_id.is_some() || selection.run_id.is_some() {
         return Err("windows-bootstrap-pairing-token cannot use --device, --device-id, or --run".to_string());
       }
+
       crate::commands::windows_service::issue_bootstrap_token()
     }
     Some(RootCommand::DeviceLocal(args)) => {
       if selection.device_name.is_some() || selection.device_id.is_some() || selection.run_id.is_some() {
         return Err("device-local cannot use --device, --device-id, or --run".to_string());
       }
+
       crate::commands::device_local::run(args, &project_root).await
     }
     Some(RootCommand::Devices(args)) => crate::commands::devices::run(args, &selection).await,
@@ -264,6 +266,7 @@ mod tests {
     let Some(RootCommand::DeviceLocal(args)) = parsed.command else {
       panic!("device-local command")
     };
+
     assert_eq!(args.store_root.as_deref(), Some(std::path::Path::new("state")));
     assert!(matches!(args.command, crate::commands::device_local::DeviceLocalCommand::Enroll { .. }));
     assert!(
@@ -288,6 +291,7 @@ mod tests {
     let Some(RootCommand::DeviceLocal(args)) = parsed.command else {
       panic!("device-local command")
     };
+
     assert!(matches!(
       args.command,
       crate::commands::device_local::DeviceLocalCommand::Policy {

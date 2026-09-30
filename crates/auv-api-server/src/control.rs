@@ -41,6 +41,7 @@ impl CallerId {
       credential_sha256: None,
     }
   }
+
   /// Returns a stable paired Device identity without bearer proof. Device
   /// entry requires the credential-bearing constructor below.
   pub fn paired_device(pair_id: &str) -> Self {
@@ -49,6 +50,7 @@ impl CallerId {
       credential_sha256: None,
     }
   }
+
   /// Carries an authenticated bearer's opaque digest to later policy checks.
   /// The stable paired Device ID remains the Run and audit identity.
   /// Call only after the pairing store has authenticated the bearer.
@@ -58,10 +60,12 @@ impl CallerId {
       credential_sha256: Some(credential_sha256),
     }
   }
+
   /// Returns the stable paired Device ID, if this caller used pairing.
   pub fn paired_device_id(&self) -> Option<&str> {
     self.identity.strip_prefix("paired-device:")
   }
+
   /// Returns only the private authentication proof for live reauthorization.
   pub fn credential_sha256(&self) -> Option<&str> {
     self.credential_sha256.as_deref()
@@ -188,6 +192,7 @@ mod caller_tests {
     let digest = "private-digest".to_string();
     let authenticated = CallerId::authenticated_paired_device("tablet", digest.clone());
     let stable = CallerId::paired_device("tablet");
+
     assert_eq!(authenticated, stable);
     assert_eq!(authenticated.as_str(), "paired-device:tablet");
     assert!(!format!("{authenticated:?}").contains(&digest));

@@ -58,6 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   ] {
     builder = builder.type_attribute(oneof, "#[derive(serde::Serialize, serde::Deserialize)]");
   }
+
   // TODO(protojson-default-omission): non-Pairing daemon messages currently
   // emit some empty scalar/container fields through serde. Add descriptor-
   // driven skip attributes when the JSON contract requires byte-for-byte

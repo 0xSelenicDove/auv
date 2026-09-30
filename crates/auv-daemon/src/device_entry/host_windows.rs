@@ -43,14 +43,17 @@ impl SessionHost for WindowsSessionHost {
   fn unlock_locked(&self, selected: &ObservedSession) -> Result<(), DeviceEntryErrorReason> {
     let session = selected_locked_console(selected)?;
     let after = unlock_enrolled_with_worker(&session).map_err(host_error)?;
+
     if !session.same_login(&after) || after.lock_state != ConsoleLockState::Usable {
       return Err(DeviceEntryErrorReason::OutcomeUnverified);
     }
+
     Ok(())
   }
 
   fn lock_usable(&self, selected: &ObservedSession) -> Result<(), DeviceEntryErrorReason> {
     let current = observe_console().map_err(session_error)?.ok_or(DeviceEntryErrorReason::StaleSession)?;
+
     if selected.public.selector != current.selector()
       || selected.public.user != account_name(&current)
       || selected.os_account_id != current.account_sid
@@ -59,16 +62,20 @@ impl SessionHost for WindowsSessionHost {
     {
       return Err(DeviceEntryErrorReason::StaleSession);
     }
+
     let after = lock_with_worker(&current).map_err(host_error)?;
+
     if !current.same_login(&after) || after.lock_state != ConsoleLockState::Locked {
       return Err(DeviceEntryErrorReason::OutcomeUnverified);
     }
+
     Ok(())
   }
 }
 
 fn selected_locked_console(selected: &ObservedSession) -> Result<ConsoleSession, DeviceEntryErrorReason> {
   let current = observe_console().map_err(session_error)?.ok_or(DeviceEntryErrorReason::StaleSession)?;
+
   if selected_matches_locked_console(selected, &current) {
     Ok(current)
   } else {
@@ -154,13 +161,18 @@ mod tests {
   fn selected_login_requires_exact_session_sid_name_and_lock() {
     let current = session(ConsoleLockState::Locked);
     let selected = observed(&current);
+
     assert_eq!(selected.public.user, r"DESKTOP\neko");
     assert!(selected_matches_locked_console(&selected, &current));
+
     let mut different = current.clone();
     different.logon_time += 1;
+
     assert!(!selected_matches_locked_console(&selected, &different));
+
     different = current.clone();
     different.account_sid = "S-1-5-21-123-456-789-1002".into();
+
     assert!(!selected_matches_locked_console(&selected, &different));
     assert!(!selected_matches_locked_console(&selected, &session(ConsoleLockState::Usable)));
   }

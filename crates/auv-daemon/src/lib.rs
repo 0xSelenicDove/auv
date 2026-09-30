@@ -19,11 +19,13 @@ pub fn windows_device_entry_store_root() -> Result<std::path::PathBuf, String> {
 pub fn issue_windows_bootstrap_token() -> Result<String, String> {
   let store = pairing::PairingStore::open_system(windows_device_entry_store_root()?.join("pairings.json"))
     .map_err(|error| format!("failed to open protected pairing store: {error}"))?;
+
   let token = store
     .issue_token(Some(std::time::Duration::from_secs(20 * 60)))
     .map_err(|error| format!("failed to issue bootstrap pairing token: {error}"))?;
   Ok(token.expose_once())
 }
+
 mod discovery;
 mod pairing;
 mod resource_id;
@@ -120,6 +122,7 @@ impl Server {
     } else {
       config.pairing_store.map(pairing::PairingStore::open).transpose()
     };
+
     #[cfg(not(windows))]
     let pairing = config.pairing_store.map(pairing::PairingStore::open).transpose();
     let pairing = pairing
@@ -153,6 +156,7 @@ impl Server {
     } else {
       None
     };
+
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     let local_state_for_daemon = std::sync::Arc::clone(&device_local);
     #[cfg(windows)]
@@ -210,6 +214,7 @@ impl Server {
     } else {
       None
     };
+
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
       // These independent listeners share state but never share route tables.
@@ -231,6 +236,7 @@ impl Server {
         }
       }
     }
+
     #[cfg(windows)]
     {
       if let Some(device_local) = self.device_local {
@@ -254,6 +260,7 @@ impl Server {
         self.inner.serve(shutdown).await
       }
     }
+
     #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
     self.inner.serve(shutdown).await
   }

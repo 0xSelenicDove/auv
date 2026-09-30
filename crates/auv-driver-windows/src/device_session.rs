@@ -103,9 +103,11 @@ fn require_same_usable_login(target: &ConsoleSession, current: &ConsoleSession) 
   if !target.same_login(current) {
     return Err(ConsoleLockError::StaleSession);
   }
+
   if target.lock_state != ConsoleLockState::Usable {
     return Err(ConsoleLockError::StaleSession);
   }
+
   match current.lock_state {
     ConsoleLockState::Usable => Ok(()),
     ConsoleLockState::Locked => Err(ConsoleLockError::AlreadyLocked),
@@ -223,6 +225,7 @@ mod native {
     // after that transition belongs to the Device host, not this snapshot.
     // SAFETY: This Win32 call takes no pointers and returns a value snapshot.
     let session_id = unsafe { WTSGetActiveConsoleSessionId() };
+
     if session_id == u32::MAX {
       return Err(ConsoleSessionError::ConsoleTransition);
     }
@@ -233,6 +236,7 @@ mod native {
     // owned by QueryBuffer, including on subsequent validation failures.
     unsafe { WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, session_id, WTSSessionInfoEx, &mut buffer.0, &mut bytes) }
       .map_err(|error| ConsoleSessionError::QueryFailed(error.to_string()))?;
+
     if buffer.0.is_null() || (bytes as usize) < size_of::<WTSINFOEXW>() {
       return Err(ConsoleSessionError::InconsistentRecord);
     }
@@ -242,27 +246,34 @@ mod native {
     // SAFETY: The non-null buffer has at least size_of::<WTSINFOEXW>() bytes.
     // read_unaligned avoids assuming the WTS allocator's alignment here.
     let info = unsafe { buffer.0.0.cast::<WTSINFOEXW>().read_unaligned() };
+
     if info.Level != 1 {
       return Err(ConsoleSessionError::InconsistentRecord);
     }
+
     // SAFETY: WTSINFOEXW.Level == 1 selects WTSInfoExLevel1 in the union.
     let level = unsafe { info.Data.WTSInfoExLevel1 };
+
     if level.SessionId != session_id || level.SessionState != WTSActive {
       return Err(ConsoleSessionError::InconsistentRecord);
     }
 
     let user = query_text(session_id, WTSUserName)?;
+
     if user.is_empty() {
       return Ok(None);
     }
+
     if level.LogonTime == 0 {
       return Err(ConsoleSessionError::InconsistentRecord);
     }
+
     let lock_state = match level.SessionFlags as u32 {
       WTS_SESSIONSTATE_LOCK => ConsoleLockState::Locked,
       WTS_SESSIONSTATE_UNLOCK => ConsoleLockState::Usable,
       _ => ConsoleLockState::Unknown,
     };
+
     Ok(Some(ConsoleSession {
       session_id,
       logon_time: level.LogonTime,
@@ -280,24 +291,29 @@ mod native {
     // WTS allocation after decoding.
     unsafe { WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, session_id, class, &mut buffer.0, &mut bytes) }
       .map_err(|error| ConsoleSessionError::QueryFailed(error.to_string()))?;
+
     if buffer.0.is_null() || bytes == 0 || bytes % 2 != 0 {
       return Err(ConsoleSessionError::InconsistentRecord);
     }
+
     // SAFETY: WTS returned `bytes` initialized bytes. u16 alignment is not
     // assumed, so each code unit is read unaligned within the allocation.
     let units = (0..bytes as usize / 2).map(|index| unsafe { buffer.0.0.add(index).read_unaligned() }).collect::<Vec<_>>();
     let Some(end) = units.iter().position(|unit| *unit == 0) else {
       return Err(ConsoleSessionError::InconsistentRecord);
     };
+
     String::from_utf16(&units[..end]).map_err(|_| ConsoleSessionError::InconsistentRecord)
   }
 
   pub(super) fn unlock_existing_session(target: &ConsoleSession, credential: &str) -> Result<ConsoleSession, ConsoleUnlockError> {
     verify_worker(target)?;
     require_locked_target(target)?;
+
     if credential.is_empty() || credential.chars().any(char::is_control) {
       return Err(ConsoleUnlockError::InvalidCredential);
     }
+
     let units = Zeroizing::new(credential.encode_utf16().collect::<Vec<_>>());
     // NOTICE: Cap one-shot SendInput to a small credential batch. Longer
     // credentials need a separately validated chunking and partial-failure
@@ -310,14 +326,18 @@ mod native {
       "Default" => {
         with_bound_desktop(target, "Default", send_return)?;
         let deadline = Instant::now() + Duration::from_secs(4);
+
         loop {
           require_locked_target(target)?;
+
           if input_desktop_name()?.eq_ignore_ascii_case("Winlogon") {
             break;
           }
+
           if Instant::now() >= deadline {
             return Err(ConsoleUnlockError::DesktopUnavailable);
           }
+
           thread::sleep(Duration::from_millis(100));
         }
       }
@@ -331,17 +351,22 @@ mod native {
     with_bound_desktop(target, "Winlogon", || send_credential(&units))?;
 
     let deadline = Instant::now() + Duration::from_secs(5);
+
     loop {
       let current = observe_console().map_err(|_| ConsoleUnlockError::Unverified)?.ok_or(ConsoleUnlockError::StaleSession)?;
+
       if !target.same_login(&current) {
         return Err(ConsoleUnlockError::StaleSession);
       }
+
       if current.lock_state == ConsoleLockState::Usable {
         return Ok(current);
       }
+
       if Instant::now() >= deadline {
         return Err(ConsoleUnlockError::Unverified);
       }
+
       thread::sleep(Duration::from_millis(100));
     }
   }
@@ -356,11 +381,14 @@ mod native {
     if input_desktop_name().map_err(|_| ConsoleLockError::DesktopUnavailable)? != "Default" {
       return Err(ConsoleLockError::DesktopUnavailable);
     }
+
     // SAFETY: GetThreadDesktop only reads the desktop bound to this thread.
     let thread_desktop = unsafe { GetThreadDesktop(GetCurrentThreadId()) }.map_err(|_| ConsoleLockError::DesktopUnavailable)?;
+
     if desktop_name(thread_desktop).map_err(|_| ConsoleLockError::DesktopUnavailable)? != "Default" {
       return Err(ConsoleLockError::DesktopUnavailable);
     }
+
     let current = observe_console().map_err(|_| ConsoleLockError::Unverified)?.ok_or(ConsoleLockError::StaleSession)?;
     require_same_usable_login(target, &current)?;
     // NOTICE(device-lock-windows-receipt): Microsoft documents this as an
@@ -370,17 +398,22 @@ mod native {
     // session and Default desktop.
     unsafe { LockWorkStation() }.map_err(|_| ConsoleLockError::LockRejected)?;
     let deadline = Instant::now() + Duration::from_secs(5);
+
     loop {
       let current = observe_console().map_err(|_| ConsoleLockError::Unverified)?.ok_or(ConsoleLockError::StaleSession)?;
+
       if !target.same_login(&current) {
         return Err(ConsoleLockError::StaleSession);
       }
+
       if current.lock_state == ConsoleLockState::Locked {
         return Ok(current);
       }
+
       if Instant::now() >= deadline {
         return Err(ConsoleLockError::Unverified);
       }
+
       thread::sleep(Duration::from_millis(100));
     }
   }
@@ -389,6 +422,7 @@ mod native {
     if target.session_id == 0 {
       return Err(ConsoleUnlockError::WorkerIdentity);
     }
+
     verify_local_system_process_in_session(target.session_id)
   }
 
@@ -396,6 +430,7 @@ mod native {
     let mut process_session = 0u32;
     // SAFETY: The out-pointer remains valid for this call.
     unsafe { ProcessIdToSessionId(GetCurrentProcessId(), &mut process_session) }.map_err(|_| ConsoleUnlockError::WorkerIdentity)?;
+
     if process_session != session_id {
       return Err(ConsoleUnlockError::WorkerIdentity);
     }
@@ -410,17 +445,21 @@ mod native {
       Ok(unsafe { IsWellKnownSid(sid, WinLocalSystemSid) }.as_bool())
     })
     .map_err(|_| ConsoleUnlockError::WorkerIdentity)?;
+
     if !is_system {
       return Err(ConsoleUnlockError::WorkerIdentity);
     }
+
     Ok(())
   }
 
   fn require_locked_target(target: &ConsoleSession) -> Result<(), ConsoleUnlockError> {
     let current = observe_console().map_err(|_| ConsoleUnlockError::Unverified)?.ok_or(ConsoleUnlockError::StaleSession)?;
+
     if !target.same_login(&current) {
       return Err(ConsoleUnlockError::StaleSession);
     }
+
     match current.lock_state {
       ConsoleLockState::Locked => Ok(()),
       ConsoleLockState::Usable => Err(ConsoleUnlockError::NotLocked),
@@ -447,9 +486,11 @@ mod native {
       GetUserObjectInformationW(HANDLE(desktop.0), UOI_NAME, Some(units.as_mut_ptr().cast()), size_of_val(&units) as u32, Some(&mut needed))
     }
     .map_err(|_| ConsoleUnlockError::DesktopUnavailable)?;
+
     if needed == 0 || needed as usize > size_of_val(&units) || needed % 2 != 0 {
       return Err(ConsoleUnlockError::DesktopUnavailable);
     }
+
     let end = units.iter().position(|unit| *unit == 0).ok_or(ConsoleUnlockError::DesktopUnavailable)?;
     String::from_utf16(&units[..end]).map_err(|_| ConsoleUnlockError::DesktopUnavailable)
   }
@@ -488,9 +529,11 @@ mod native {
             }
             .map_err(|_| ConsoleUnlockError::DesktopUnavailable)?,
           );
+
           if !desktop_name(desktop.0)?.eq_ignore_ascii_case(expected) {
             return Err(ConsoleUnlockError::DesktopUnavailable);
           }
+
           // SAFETY: GetThreadDesktop reads this new thread's current desktop.
           let original = unsafe { GetThreadDesktop(GetCurrentThreadId()) }.map_err(|_| ConsoleUnlockError::DesktopUnavailable)?;
           // SAFETY: This thread has not created windows or hooks. The opened
@@ -534,6 +577,7 @@ mod native {
 
   fn send_credential(units: &[u16]) -> Result<(), ConsoleUnlockError> {
     let mut events = Vec::with_capacity(units.len() * 2 + 2);
+
     for unit in units {
       let event = |up| INPUT {
         r#type: INPUT_KEYBOARD,
@@ -552,9 +596,11 @@ mod native {
           },
         },
       };
+
       events.push(event(false));
       events.push(event(true));
     }
+
     events.push(INPUT {
       r#type: INPUT_KEYBOARD,
       Anonymous: INPUT_0 {
@@ -593,9 +639,11 @@ mod native {
     // padding bytes, and cannot be optimized out as a dead store.
     let bytes = size_of_val(events.as_slice());
     let pointer = events.as_mut_ptr().cast::<u8>();
+
     for offset in 0..bytes {
       unsafe { pointer.add(offset).write_volatile(0) };
     }
+
     if sent == events.len() {
       Ok(())
     } else {
@@ -615,9 +663,11 @@ mod native {
       // SAFETY: The SID pointer is valid while with_token_user_sid holds its
       // GetTokenInformation buffer; this call allocates raw_sid with LocalAlloc.
       unsafe { ConvertSidToStringSidW(sid, &mut raw_sid) }.map_err(|_| ConsoleSessionError::IdentityUnverified)?;
+
       if raw_sid.is_null() {
         return Err(ConsoleSessionError::IdentityUnverified);
       }
+
       // SAFETY: ConvertSidToStringSidW returned a null-terminated UTF-16 string.
       let sid = unsafe { raw_sid.to_string() }.map_err(|_| ConsoleSessionError::IdentityUnverified);
       // SAFETY: LocalFree consumes the returned allocation exactly once.
@@ -633,28 +683,35 @@ mod native {
     let mut bytes = 0u32;
     // SAFETY: A null output buffer requests the required TOKEN_USER size.
     let _ = unsafe { GetTokenInformation(token, TokenUser, None, 0, &mut bytes) };
+
     if bytes < size_of::<TOKEN_USER>() as u32 {
       return Err(ConsoleSessionError::IdentityUnverified);
     }
+
     // GetTokenInformation writes a TOKEN_USER header before the variable SID.
     // A byte Vec only promises alignment 1, so allocate pointer-sized words.
     if align_of::<TOKEN_USER>() > align_of::<usize>() {
       return Err(ConsoleSessionError::IdentityUnverified);
     }
+
     let mut data = vec![0usize; (bytes as usize).div_ceil(size_of::<usize>())];
     // SAFETY: The word buffer is aligned for TOKEN_USER and has at least the
     // queried byte capacity. Its embedded SID pointer remains live until drop.
     unsafe { GetTokenInformation(token, TokenUser, Some(data.as_mut_ptr().cast()), bytes, &mut bytes) }
       .map_err(|_| ConsoleSessionError::IdentityUnverified)?;
+
     if (bytes as usize) < size_of::<TOKEN_USER>() {
       return Err(ConsoleSessionError::IdentityUnverified);
     }
+
     // SAFETY: The buffer contains a complete, aligned TOKEN_USER and the SID
     // pointer is only used while this allocation is alive.
     let token_user = unsafe { data.as_ptr().cast::<TOKEN_USER>().read() };
+
     if token_user.User.Sid.0.is_null() {
       return Err(ConsoleSessionError::IdentityUnverified);
     }
+
     use_sid(token_user.User.Sid)
   }
 }
@@ -690,6 +747,7 @@ mod tests {
       user: "owner".into(),
       lock_state: ConsoleLockState::Usable,
     };
+
     assert_eq!(require_same_usable_login(&target, &target), Ok(()));
     assert_eq!(
       require_same_usable_login(
@@ -733,14 +791,21 @@ mod tests {
       user: "alice".into(),
       lock_state: ConsoleLockState::Locked,
     };
+
     assert_eq!(session.selector(), "windows-console:1:42");
+
     let mut current = session.clone();
     current.lock_state = ConsoleLockState::Usable;
+
     assert!(session.same_login(&current));
+
     current.logon_time += 1;
+
     assert!(!session.same_login(&current));
+
     current.logon_time -= 1;
     current.account_sid = "S-1-5-21-2".into();
+
     assert!(!session.same_login(&current));
   }
 }

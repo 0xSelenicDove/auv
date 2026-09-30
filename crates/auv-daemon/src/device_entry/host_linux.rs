@@ -84,6 +84,7 @@ impl SessionHost for LinuxSessionHost {
 
   fn unlock_locked(&self, selected: &ObservedSession) -> Result<(), DeviceEntryErrorReason> {
     let session = self.selected_locked(selected)?;
+
     match device_unlock::unlock_user_session(&session).map_err(map_error)? {
       UnlockOutcome::UnlockedExistingSession => Ok(()),
       // The selected session changed after our locked read. Policy must not
@@ -107,6 +108,7 @@ fn unique_sessions(sessions: Vec<LinuxSession>) -> Result<Vec<LinuxSession>, Dev
   if sessions.len() > 1 {
     return Err(DeviceEntryErrorReason::AmbiguousUser);
   }
+
   Ok(sessions)
 }
 
@@ -117,12 +119,14 @@ fn selected_in_state_from(
 ) -> Result<GnomeSession, DeviceEntryErrorReason> {
   let current =
     sessions.into_iter().find(|current| current.session.selector == selected.public.selector).ok_or(DeviceEntryErrorReason::StaleSession)?;
+
   if selected.public.lock_state != expected_state
     || current.session != selected.public
     || selected.os_account_id != format!("uid:{}", current.native.uid)
   {
     return Err(DeviceEntryErrorReason::StaleSession);
   }
+
   Ok(current.native)
 }
 
@@ -179,6 +183,7 @@ mod tests {
   fn rejects_multiple_same_uid_sessions_even_for_an_explicit_selector() {
     let one = session("52", 1000, "seat0", UserSessionLockState::Locked);
     let two = session("53", 2000, "seat1", UserSessionLockState::Locked);
+
     assert!(matches!(unique_sessions(vec![one, two]), Err(DeviceEntryErrorReason::AmbiguousUser)));
   }
 
@@ -187,19 +192,23 @@ mod tests {
     let current = session("52", 1000, "seat0", UserSessionLockState::Locked);
     let selected = selected(&current);
     let native = current.native.clone();
+
     assert_eq!(selected_in_state_from(&selected, vec![current], UserSessionLockState::Locked), Ok(native));
     assert!(matches!(
       selected_in_state_from(&selected, vec![session("52", 2000, "seat0", UserSessionLockState::Locked)], UserSessionLockState::Locked),
       Err(DeviceEntryErrorReason::StaleSession)
     ));
+
     assert!(matches!(
       selected_in_state_from(&selected, vec![session("52", 1000, "seat1", UserSessionLockState::Locked)], UserSessionLockState::Locked),
       Err(DeviceEntryErrorReason::StaleSession)
     ));
+
     assert!(matches!(
       selected_in_state_from(&selected, vec![session("52", 1000, "seat0", UserSessionLockState::Usable)], UserSessionLockState::Locked),
       Err(DeviceEntryErrorReason::StaleSession)
     ));
+
     assert!(matches!(
       selected_in_state_from(
         &ObservedSession {
@@ -218,6 +227,7 @@ mod tests {
     let current = session("52", 1000, "seat0", UserSessionLockState::Usable);
     let selected = selected(&current);
     let expected = current.native.clone();
+
     assert_eq!(selected_in_state_from(&selected, vec![current], UserSessionLockState::Usable), Ok(expected));
     assert_eq!(
       selected_in_state_from(&selected, vec![session("52", 2000, "seat0", UserSessionLockState::Usable)], UserSessionLockState::Usable),
@@ -249,16 +259,22 @@ mod tests {
     let expected = std::env::var("AUV_LINUX_LOCKED_GATE_SELECTOR").expect("set the exact non-secret locked session selector");
     let host = LinuxSessionHost::new();
     let mut before = host.sessions().unwrap();
+
     assert_eq!(before.len(), 1);
+
     let selected = before.remove(0);
+
     assert_eq!(selected.public.selector, expected);
     assert_eq!(selected.public.lock_state, UserSessionLockState::Locked);
 
     host.verify_pending_credential(&selected, &|| Ok(())).await.unwrap();
 
     let mut after = host.sessions().unwrap();
+
     assert_eq!(after.len(), 1);
+
     let current = after.remove(0);
+
     assert_eq!(current.public, selected.public);
     assert_eq!(current.os_account_id, selected.os_account_id);
   }
@@ -272,8 +288,11 @@ mod tests {
     let expected = std::env::var("AUV_LINUX_UNLOCK_GATE_SELECTOR").expect("set the exact non-secret locked session selector");
     let host = LinuxSessionHost::new();
     let mut before = host.sessions().unwrap();
+
     assert_eq!(before.len(), 1);
+
     let selected = before.remove(0);
+
     assert_eq!(selected.public.selector, expected);
     assert_eq!(selected.public.lock_state, UserSessionLockState::Locked);
 
@@ -281,8 +300,11 @@ mod tests {
     host.unlock_locked(&selected).unwrap();
 
     let mut after = host.sessions().unwrap();
+
     assert_eq!(after.len(), 1);
+
     let current = after.remove(0);
+
     assert_eq!(current.public.selector, selected.public.selector);
     assert_eq!(current.public.lock_state, UserSessionLockState::Usable);
     assert_eq!(current.os_account_id, selected.os_account_id);

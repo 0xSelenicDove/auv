@@ -385,6 +385,7 @@ impl Devices {
       .list_user_sessions()
       .await
       .map_err(|status| ClientError::from_status("ListUserSessions", status))?;
+
     match response.result.ok_or(DeviceError::InvalidEntryResponse)? {
       proto::list_user_sessions_response::Result::List(list) => list.sessions.into_iter().map(UserSession::try_from).collect(),
       proto::list_user_sessions_response::Result::Error(error) => Err(entry_error(error)?.into()),
@@ -400,6 +401,7 @@ impl Devices {
       .get_user_session(session_selector)
       .await
       .map_err(|status| ClientError::from_status("GetUserSession", status))?;
+
     match response.result.ok_or(DeviceError::InvalidEntryResponse)? {
       proto::get_user_session_response::Result::Session(session) => UserSession::try_from(session),
       proto::get_user_session_response::Result::Error(error) => Err(entry_error(error)?.into()),
@@ -422,6 +424,7 @@ impl Devices {
       })
       .await
       .map_err(|status| ClientError::from_status("EnsureUserSessionUnlocked", status))?;
+
     match response.result.ok_or(DeviceError::InvalidEntryResponse)? {
       proto::ensure_user_session_unlocked_response::Result::Effect(effect) => effect.try_into(),
       proto::ensure_user_session_unlocked_response::Result::Error(error) => Err(entry_error(error)?.into()),
@@ -444,6 +447,7 @@ impl Devices {
       })
       .await
       .map_err(|status| ClientError::from_status("EnsureUserSessionLocked", status))?;
+
     match response.result.ok_or(DeviceError::InvalidEntryResponse)? {
       proto::ensure_user_session_locked_response::Result::Effect(effect) => effect.try_into(),
       proto::ensure_user_session_locked_response::Result::Error(error) => Err(entry_error(error)?.into()),
@@ -544,6 +548,7 @@ impl TryFrom<proto::UserSession> for UserSession {
     if session.session_selector.is_empty() || session.user.is_empty() {
       return Err(DeviceError::InvalidEntryResponse);
     }
+
     let lock_state = match proto::UserSessionLockState::try_from(session.lock_state).map_err(|_| DeviceError::InvalidEntryResponse)? {
       proto::UserSessionLockState::Unspecified => return Err(DeviceError::InvalidEntryResponse),
       proto::UserSessionLockState::Locked => UserSessionLockState::Locked,
@@ -573,6 +578,7 @@ impl TryFrom<proto::EnsureUserSessionUnlockedEffect> for EnsureUserSessionUnlock
     if effect.user.is_empty() {
       return Err(DeviceError::InvalidEntryResponse);
     }
+
     let kind = match proto::DeviceEntryEffectKind::try_from(effect.kind).map_err(|_| DeviceError::InvalidEntryResponse)? {
       proto::DeviceEntryEffectKind::Unspecified => return Err(DeviceError::InvalidEntryResponse),
       proto::DeviceEntryEffectKind::AlreadyUsable => DeviceEntryEffectKind::AlreadyUsable,
@@ -581,6 +587,7 @@ impl TryFrom<proto::EnsureUserSessionUnlockedEffect> for EnsureUserSessionUnlock
       // this locked-session facade must never report it as a verified effect.
       proto::DeviceEntryEffectKind::SignedInNewSession => return Err(DeviceError::InvalidEntryResponse),
     };
+
     Ok(Self {
       kind,
       user: effect.user,
@@ -596,11 +603,13 @@ impl TryFrom<proto::EnsureUserSessionLockedEffect> for EnsureUserSessionLockedEf
     if effect.user.is_empty() || effect.session_selector.is_empty() {
       return Err(DeviceError::InvalidEntryResponse);
     }
+
     let kind = match proto::DeviceLockEffectKind::try_from(effect.kind).map_err(|_| DeviceError::InvalidEntryResponse)? {
       proto::DeviceLockEffectKind::Unspecified => return Err(DeviceError::InvalidEntryResponse),
       proto::DeviceLockEffectKind::AlreadyLocked => DeviceLockEffectKind::AlreadyLocked,
       proto::DeviceLockEffectKind::LockedExistingSession => DeviceLockEffectKind::LockedExistingSession,
     };
+
     Ok(Self {
       kind,
       user: effect.user,
@@ -641,6 +650,7 @@ mod tests {
       seat: "seat0".into(),
     })
     .unwrap();
+
     assert_eq!(session.selector, "seat0:42");
     assert_eq!(session.user, "neko");
     assert_eq!(session.lock_state, UserSessionLockState::Locked);
@@ -648,10 +658,12 @@ mod tests {
     assert!(!session.is_unlocked());
     assert_eq!(session.connection_kind, UserSessionConnectionKind::Physical);
     assert_eq!(session.seat.as_deref(), Some("seat0"));
+
     let usable = UserSession {
       lock_state: UserSessionLockState::Usable,
       ..session
     };
+
     assert!(!usable.is_locked());
     assert!(usable.is_unlocked());
   }
@@ -666,6 +678,7 @@ mod tests {
       seat: "seat0".into(),
     })
     .unwrap();
+
     assert_eq!(session.lock_state.as_str(), "UNKNOWN");
     assert!(!session.is_locked());
     assert!(!session.is_unlocked());
@@ -686,6 +699,7 @@ mod tests {
       user: "neko".into(),
       session_selector: "seat0:42".into(),
     };
+
     assert_eq!(
       EnsureUserSessionUnlockedEffect::try_from(effect.clone()).unwrap(),
       EnsureUserSessionUnlockedEffect {
@@ -701,6 +715,7 @@ mod tests {
       }),
       Err(DeviceError::InvalidEntryResponse)
     ));
+
     assert!(matches!(
       EnsureUserSessionUnlockedEffect::try_from(proto::EnsureUserSessionUnlockedEffect {
         kind: proto::DeviceEntryEffectKind::SignedInNewSession as i32,
@@ -709,6 +724,7 @@ mod tests {
       }),
       Err(DeviceError::InvalidEntryResponse)
     ));
+
     assert!(matches!(
       EnsureUserSessionUnlockedEffect::try_from(proto::EnsureUserSessionUnlockedEffect {
         user: String::new(),
@@ -725,6 +741,7 @@ mod tests {
       user: "neko".into(),
       session_selector: "macos:login".into(),
     };
+
     assert_eq!(
       EnsureUserSessionLockedEffect::try_from(effect.clone()).unwrap(),
       EnsureUserSessionLockedEffect {
@@ -755,6 +772,7 @@ mod tests {
       reason: proto::DeviceEntryErrorReason::Suspended as i32,
     })
     .unwrap();
+
     assert_eq!(reason, DeviceEntryErrorReason::Suspended);
     assert_eq!(
       entry_error(proto::DeviceEntryError {

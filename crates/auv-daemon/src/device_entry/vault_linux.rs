@@ -59,9 +59,11 @@ impl GnomeSecretVault {
   /// still PENDING until the locked-session retrieval gate passes.
   pub async fn store(&self, account_uid: u32, secret: &[u8]) -> Result<(), VaultError> {
     self.check_identity(account_uid)?;
+
     if secret.is_empty() || secret.len() > 1024 {
       return Err(VaultError::InvalidSecret);
     }
+
     bounded(async {
       let context = Context::open().await?;
       let collection = context.collection_proxy().await?;
@@ -70,9 +72,11 @@ impl GnomeSecretVault {
       let attributes = attributes(&account);
       let existing: Vec<OwnedObjectPath> =
         collection.call("SearchItems", &(attributes.clone(),)).await.map_err(|_| VaultError::Unavailable)?;
+
       if existing.len() > 1 {
         return Err(VaultError::Ambiguous);
       }
+
       let mut properties = HashMap::new();
       properties.insert("org.freedesktop.Secret.Item.Label", Value::from(LABEL));
       let dict: Dict<'_, '_> = attributes.into();
@@ -86,9 +90,11 @@ impl GnomeSecretVault {
       // `https://specifications.freedesktop.org/secret-service/latest/org.freedesktop.Secret.Collection.html`.
       let (item, prompt): (OwnedObjectPath, OwnedObjectPath) =
         collection.call("CreateItem", &(&properties, &wire_secret, true)).await.map_err(|_| VaultError::Unavailable)?;
+
       if !no_prompt(&prompt) || item.as_str() == "/" {
         return Err(VaultError::PromptRequired);
       }
+
       Ok(())
     })
     .await
@@ -104,9 +110,11 @@ impl GnomeSecretVault {
       let item = context.item_proxy(&item_path).await?;
       ensure_unlocked(&item).await?;
       let mut secret: SecretValue = item.call("GetSecret", &(context.session.clone(),)).await.map_err(|_| VaultError::Unavailable)?;
+
       if secret.content_type != "text/plain" || secret.value.is_empty() {
         return Err(VaultError::InvalidSecret);
       }
+
       Ok(Zeroizing::new(std::mem::take(&mut secret.value)))
     })
     .await
@@ -121,9 +129,11 @@ impl GnomeSecretVault {
       let item = context.item_proxy(&item_path).await?;
       ensure_unlocked(&item).await?;
       let prompt: OwnedObjectPath = item.call("Delete", &()).await.map_err(|_| VaultError::Unavailable)?;
+
       if !no_prompt(&prompt) {
         return Err(VaultError::PromptRequired);
       }
+
       Ok(())
     })
     .await
@@ -133,6 +143,7 @@ impl GnomeSecretVault {
     if self.uid != account_uid || current_euid() != self.uid {
       return Err(VaultError::WrongIdentity);
     }
+
     Ok(())
   }
 }
@@ -149,10 +160,13 @@ impl Context {
     let service = zbus::Proxy::new(&connection, SERVICE, SERVICE_PATH, SERVICE_IFACE).await.map_err(|_| VaultError::Unavailable)?;
     let (_, session): (OwnedValue, OwnedObjectPath) =
       service.call("OpenSession", &("plain", Value::from(""))).await.map_err(|_| VaultError::Unavailable)?;
+
     let collection: OwnedObjectPath = service.call("ReadAlias", &("default",)).await.map_err(|_| VaultError::Unavailable)?;
+
     if collection.as_str() == "/" || collection.as_str().ends_with("/session") {
       return Err(VaultError::Unavailable);
     }
+
     let context = Self {
       connection,
       session,
@@ -176,6 +190,7 @@ impl Context {
     ensure_unlocked(&collection).await?;
     let account = account_id(account_uid);
     let found: Vec<OwnedObjectPath> = collection.call("SearchItems", &(attributes(&account),)).await.map_err(|_| VaultError::Unavailable)?;
+
     match found.as_slice() {
       [] => Err(VaultError::Missing),
       [path] => Ok(path.clone()),
@@ -213,6 +228,7 @@ async fn ensure_unlocked(proxy: &zbus::Proxy<'_>) -> Result<(), VaultError> {
   if proxy.get_property::<bool>("Locked").await.map_err(|_| VaultError::Unavailable)? {
     return Err(VaultError::Locked);
   }
+
   Ok(())
 }
 
@@ -248,6 +264,7 @@ mod tests {
   fn attributes_bind_only_auv_and_stable_uid() {
     let account = account_id(1000);
     let fields = attributes(&account);
+
     assert_eq!(fields.get(ATTRIBUTE_APPLICATION), Some(&APPLICATION_VALUE));
     assert_eq!(fields.get(ATTRIBUTE_ACCOUNT), Some(&"uid:1000"));
   }
@@ -257,6 +274,7 @@ mod tests {
     let vault = GnomeSecretVault {
       uid: current_euid(),
     };
+
     assert_eq!(vault.check_identity(current_euid().saturating_add(1)), Err(VaultError::WrongIdentity));
   }
 
@@ -264,6 +282,7 @@ mod tests {
   fn prompt_path_is_never_accepted_as_completion() {
     let no_prompt_path = OwnedObjectPath::try_from("/").unwrap();
     let prompt_path = OwnedObjectPath::try_from("/org/freedesktop/secrets/prompt/p1").unwrap();
+
     assert!(no_prompt(&no_prompt_path));
     assert!(!no_prompt(&prompt_path));
   }

@@ -32,12 +32,14 @@ impl DeviceLocalClient {
         let path = path.clone();
         async move {
           let stream = tokio::net::UnixStream::connect(path).await?;
+
           if stream.peer_cred()?.uid() != current_euid() {
             return Err(std::io::Error::new(
               std::io::ErrorKind::PermissionDenied,
               "Device-local service peer UID differs from this process",
             ));
           }
+
           Ok(hyper_util::rt::TokioIo::new(stream))
         }
       }))
@@ -84,9 +86,11 @@ pub fn unix_socket_path(store_root: &Path) -> std::io::Result<PathBuf> {
 
   let temporary_root = std::fs::canonicalize("/tmp")?;
   let temporary_metadata = std::fs::metadata(&temporary_root)?;
+
   if !temporary_metadata.is_dir() || temporary_metadata.uid() != 0 || temporary_metadata.permissions().mode() & 0o1000 == 0 {
     return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "system temporary directory must be root-owned and sticky"));
   }
+
   let canonical_store = std::fs::canonicalize(store_root)?;
   let owner = current_euid();
   let digest = Sha256::digest(canonical_store.as_os_str().as_bytes());
@@ -104,12 +108,14 @@ pub fn verify_unix_socket_directory(socket_path: &Path) -> std::io::Result<()> {
   let owner = current_euid();
   let parent = socket_path.parent().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "socket has no parent"))?;
   let metadata = std::fs::symlink_metadata(parent)?;
+
   if !metadata.file_type().is_dir() || metadata.uid() != owner || metadata.permissions().mode() & 0o777 != 0o700 {
     return Err(std::io::Error::new(
       std::io::ErrorKind::PermissionDenied,
       "Device-local socket directory must be owned by this process with mode 0700",
     ));
   }
+
   Ok(())
 }
 
@@ -128,9 +134,11 @@ pub fn named_pipe_name(store_root: &Path) -> String {
   use sha2::{Digest as _, Sha256};
 
   let mut hash = Sha256::new();
+
   for unit in store_root.as_os_str().encode_wide() {
     hash.update(unit.to_le_bytes());
   }
+
   let digest = hash.finalize();
   let suffix = digest[..12].iter().map(|byte| format!("{byte:02x}")).collect::<String>();
   format!("auv-device-local-{suffix}")

@@ -24,6 +24,7 @@ fn account(uid: u32) -> String {
 pub(super) fn enroll(home: &Path, uid: u32, credential: &[u8]) -> Result<(), HostError> {
   let keychain = keychain(home)?;
   let account = account(uid);
+
   match keychain.find_generic_password(SERVICE, &account) {
     Ok((_, mut item)) => item.set_password(credential).map_err(|_| HostError::VaultUnavailable)?,
     Err(error) if error.code() == errSecItemNotFound => {
@@ -31,10 +32,13 @@ pub(super) fn enroll(home: &Path, uid: u32, credential: &[u8]) -> Result<(), Hos
     }
     Err(_) => return Err(HostError::VaultUnavailable),
   }
+
   let readback = read(home, uid)?;
+
   if readback.as_slice() != credential {
     return Err(HostError::VaultUnavailable);
   }
+
   Ok(())
 }
 
@@ -50,11 +54,13 @@ pub(super) fn read(home: &Path, uid: u32) -> Result<Zeroizing<Vec<u8>>, HostErro
 pub(super) fn remove(home: &Path, uid: u32) -> Result<(), HostError> {
   let _no_ui = SecKeychain::disable_user_interaction().map_err(|_| HostError::VaultUnavailable)?;
   let keychain = keychain(home)?;
+
   match keychain.find_generic_password(SERVICE, &account(uid)) {
     Ok((_, item)) => item.delete(),
     Err(error) if error.code() == errSecItemNotFound => return Ok(()),
     Err(_) => return Err(HostError::VaultUnavailable),
   }
+
   match keychain.find_generic_password(SERVICE, &account(uid)) {
     Err(error) if error.code() == errSecItemNotFound => Ok(()),
     _ => Err(HostError::VaultUnavailable),

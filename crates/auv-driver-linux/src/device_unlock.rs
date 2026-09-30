@@ -96,30 +96,37 @@ pub fn list_user_sessions() -> Result<Vec<GnomeSession>, UnlockError> {
     if uid != effective_uid {
       continue;
     }
+
     let session = Proxy::new(&system, LOGIN_DEST, path.as_str(), LOGIN_SESSION).map_err(|_| UnlockError::ServiceUnavailable)?;
     let current_id: String = session.get_property("Id").map_err(|_| UnlockError::ServiceUnavailable)?;
     let (current_uid, _): (u32, OwnedObjectPath) = session.get_property("User").map_err(|_| UnlockError::ServiceUnavailable)?;
     let current_user: String = session.get_property("Name").map_err(|_| UnlockError::ServiceUnavailable)?;
+
     if current_id != id || current_uid != uid || current_user != user {
       return Err(UnlockError::StaleSession);
     }
+
     let kind: String = session.get_property("Type").map_err(|_| UnlockError::ServiceUnavailable)?;
     let class: String = session.get_property("Class").map_err(|_| UnlockError::ServiceUnavailable)?;
     let remote: bool = session.get_property("Remote").map_err(|_| UnlockError::ServiceUnavailable)?;
     let active: bool = session.get_property("Active").map_err(|_| UnlockError::ServiceUnavailable)?;
     let (seat, _): (String, OwnedObjectPath) = session.get_property("Seat").map_err(|_| UnlockError::ServiceUnavailable)?;
+
     if !eligible_session(&kind, &class, remote, active) || seat.is_empty() {
       continue;
     }
+
     // LockedHint is logind's requested lock state. It does not prove that
     // GNOME rendered or dismissed its lock UI; that requires an installed gate.
     let locked_hint: bool = session.get_property("LockedHint").map_err(|_| UnlockError::ServiceUnavailable)?;
     // `Timestamp` is the creation time of this session (org.freedesktop.login1(5)).
     // It disambiguates a reused logind ID after logout and a fresh login.
     let started_at_micros: u64 = session.get_property("Timestamp").map_err(|_| UnlockError::ServiceUnavailable)?;
+
     if started_at_micros == 0 {
       return Err(UnlockError::ServiceUnavailable);
     }
+
     eligible.push(GnomeSession {
       id,
       started_at_micros,
@@ -129,6 +136,7 @@ pub fn list_user_sessions() -> Result<Vec<GnomeSession>, UnlockError> {
       lock_state: observed_lock_state(locked_hint),
     });
   }
+
   Ok(eligible)
 }
 
@@ -137,6 +145,7 @@ pub fn list_user_sessions() -> Result<Vec<GnomeSession>, UnlockError> {
 /// does not itself prove that GNOME dismissed the lock UI.
 pub fn unlock_user_session(session: &GnomeSession) -> Result<UnlockOutcome, UnlockError> {
   let before = selected_session(session)?;
+
   match before.lock_state {
     LockState::Usable => return Ok(UnlockOutcome::AlreadyUsable),
     LockState::Unknown => return Err(UnlockError::OutcomeUnverified),
@@ -152,12 +161,15 @@ pub fn unlock_user_session(session: &GnomeSession) -> Result<UnlockOutcome, Unlo
   // while we resolved the delivery object. Recheck logind's lock state on
   // that exact object before invoking logind Unlock.
   let locked_hint: bool = selected.get_property("LockedHint").map_err(|_| UnlockError::ServiceUnavailable)?;
+
   if !locked_hint {
     return Ok(UnlockOutcome::AlreadyUsable);
   }
+
   selected.call::<_, _, ()>("Unlock", &()).map_err(|_| UnlockError::ServiceUnavailable)?;
 
   let deadline = Instant::now() + Duration::from_secs(5);
+
   loop {
     match selected_session(session) {
       Ok(current) if current.lock_state == LockState::Usable => return Ok(UnlockOutcome::UnlockedExistingSession),
@@ -174,6 +186,7 @@ pub fn unlock_user_session(session: &GnomeSession) -> Result<UnlockOutcome, Unlo
 /// GNOME rendered its lock screen; an installed host gate must check the UI.
 pub fn lock_existing_session(session: &GnomeSession) -> Result<(), UnlockError> {
   let before = selected_session(session)?;
+
   if before.lock_state != LockState::Usable {
     return Err(UnlockError::StaleSession);
   }
@@ -185,12 +198,15 @@ pub fn lock_existing_session(session: &GnomeSession) -> Result<(), UnlockError> 
   require_exact_active_session(&selected, session)?;
   // Do not relock a session the user already locked during object resolution.
   let locked_hint: bool = selected.get_property("LockedHint").map_err(|_| UnlockError::ServiceUnavailable)?;
+
   if locked_hint {
     return Err(UnlockError::StaleSession);
   }
+
   selected.call::<_, _, ()>("Lock", &()).map_err(|_| UnlockError::ServiceUnavailable)?;
 
   let deadline = Instant::now() + Duration::from_secs(5);
+
   loop {
     match selected_session(session) {
       Ok(current) if current.lock_state == LockState::Locked => return Ok(()),
@@ -215,6 +231,7 @@ fn require_exact_active_session(selected: &Proxy<'_>, session: &GnomeSession) ->
   let class: String = selected.get_property("Class").map_err(|_| UnlockError::StaleSession)?;
   let remote: bool = selected.get_property("Remote").map_err(|_| UnlockError::StaleSession)?;
   let active: bool = selected.get_property("Active").map_err(|_| UnlockError::StaleSession)?;
+
   if current_id != session.id
     || started_at_micros != session.started_at_micros
     || uid != session.uid
@@ -224,14 +241,17 @@ fn require_exact_active_session(selected: &Proxy<'_>, session: &GnomeSession) ->
   {
     return Err(UnlockError::StaleSession);
   }
+
   Ok(())
 }
 
 fn selected_session(selected: &GnomeSession) -> Result<GnomeSession, UnlockError> {
   let current = list_user_sessions()?.into_iter().find(|current| current.id == selected.id).ok_or(UnlockError::StaleSession)?;
+
   if !selected.same_login(&current) {
     return Err(UnlockError::StaleSession);
   }
+
   Ok(current)
 }
 
@@ -279,6 +299,7 @@ mod tests {
       started_at_micros: 2_000,
       ..old.clone()
     };
+
     assert_eq!(old.selector(), "linux-logind:52:1000:1000");
     assert!(!old.same_login(&renewed));
   }

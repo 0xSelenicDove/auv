@@ -30,6 +30,7 @@ pub(super) fn current_console_session() -> Result<Option<ConsoleSession>, Device
       connection_kind: UserSessionConnectionKind::Physical,
       seat: Some("console".to_owned()),
     };
+
     ConsoleSession { session, uid }
   }))
 }

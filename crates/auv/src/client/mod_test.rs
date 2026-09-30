@@ -100,6 +100,7 @@ async fn stale_local_discovery_does_not_block_a_single_paired_device() {
       },
     )
     .expect("store remote profile");
+
   let missing_socket = directory.path().join("stale-local.sock");
   let local_endpoint = Some(ConnectEndpoint::Unix(missing_socket));
 
@@ -112,6 +113,7 @@ async fn stale_local_discovery_does_not_block_a_single_paired_device() {
     local_endpoint.clone(),
   )
   .await;
+
   assert!(matches!(selected, Err(ContextError::PairedConnect(_))), "expected the paired profile to be tried: {selected:?}");
 
   // ROOT CAUSE:
@@ -128,6 +130,7 @@ async fn stale_local_discovery_does_not_block_a_single_paired_device() {
     local_endpoint.clone(),
   )
   .await;
+
   assert!(
     matches!(selected_prefix, Err(ContextError::PairedConnect(_))),
     "expected the ID prefix to route to the paired profile: {selected_prefix:?}"
@@ -142,5 +145,6 @@ async fn stale_local_discovery_does_not_block_a_single_paired_device() {
     local_endpoint,
   )
   .await;
+
   assert!(matches!(unmatched, Err(ContextError::Connect(_))), "an unmatched profile cannot hide local connection errors: {unmatched:?}");
 }

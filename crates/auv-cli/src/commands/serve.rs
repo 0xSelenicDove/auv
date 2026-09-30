@@ -48,6 +48,7 @@ pub async fn run(args: ServeArgs, project_root: &std::path::Path) -> Result<i32,
   if args.windows_service {
     return super::windows_service::run(args, project_root.to_path_buf());
   }
+
   run_listeners(host_options(args)?, project_root).await
 }
 
@@ -137,12 +138,15 @@ pub(super) async fn run_listeners_with_shutdown(
     enable_device_entry: options.enable_device_entry,
   })
   .await?;
+
   if options.emit_bound_endpoints {
     for endpoint in server.endpoints() {
       println!("auv serve: {endpoint}");
     }
+
     std::io::stdout().flush().map_err(|error| format!("failed to flush daemon listener log: {error}"))?;
   }
+
   on_bound()?;
   server.serve(shutdown).await?;
   Ok(0)

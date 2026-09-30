@@ -130,7 +130,9 @@ fn newly_written_profile_keeps_bearer_private() {
       },
     )
     .unwrap();
+
   assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+
   std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
   store
     .update(
@@ -143,6 +145,7 @@ fn newly_written_profile_keeps_bearer_private() {
       },
     )
     .unwrap();
+
   assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
 }
 

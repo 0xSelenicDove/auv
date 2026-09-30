@@ -74,20 +74,25 @@ impl DeviceLocalControl for MacosLocalEnrollment {
     if request.credential_kind != CredentialKind::OsPassword {
       return Err(LocalControlError::UnsupportedCredentialKind);
     }
+
     if request.storage_kind != StorageKind::Protected {
       // TODO(device-entry-macos-plaintext): This release accepts only the
       // signed helper's Keychain. Revisit only with an approved secure store.
       return Err(LocalControlError::UnsupportedStorageKind);
     }
+
     if request.credential.as_bytes().is_empty() || request.credential.as_bytes().len() > 1024 {
       return Err(LocalControlError::InvalidCredential);
     }
+
     let account = resolve_user(&request.user)?;
     authorize(principal, account.uid)?;
+
     if account.uid == 0 {
       // The signed Aqua host is a per-user LaunchAgent, not a root login host.
       return Err(LocalControlError::InvalidAccount);
     }
+
     let guard = self.account_locks.lock(&account.id).await.map_err(|_| LocalControlError::Persistence)?;
     let metadata = Arc::clone(&self.metadata);
     complete_account_mutation(guard, move || {
@@ -149,6 +154,7 @@ mod tests {
   #[test]
   fn resolves_root_from_os_database_and_stable_uid() {
     let account = resolve_user("root").unwrap();
+
     assert_eq!(account.uid, 0);
     assert_eq!(account.id, "uid:0");
     assert_eq!(resolve_uid(account.uid).unwrap(), account);
@@ -172,13 +178,16 @@ mod tests {
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     let metadata = Arc::new(MetadataStore::open(root.path()).unwrap());
     let audit = Arc::new(Audit::open(root.path()).unwrap());
+
     for uid in [501_u32, 502] {
       let id = account_id(uid);
       metadata.invalidate_for_enroll("test", &id).unwrap();
       metadata.publish_pending("test", &id).unwrap();
     }
+
     let backend = MacosLocalEnrollment::new(metadata, Arc::new(AccountLocks::new()), audit, Arc::new(tokio::sync::RwLock::new(())));
     let own = backend.list_enrollments(&LocalOsPrincipal::UnixUid(501)).await.unwrap();
+
     assert_eq!(own.len(), 1);
     assert_eq!(own[0].os_account_id, "uid:501");
     assert_eq!(own[0].state, auv::devices::EnrollmentState::Pending);

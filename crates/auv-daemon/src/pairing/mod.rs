@@ -268,6 +268,7 @@ impl PairingStore {
       if !record.enabled || credential.state != CredentialState::Active {
         return Err(PairingError::Unauthenticated);
       }
+
       Ok(CallerId::authenticated_paired_device(&record.pair_id, digest))
     })
   }
@@ -278,6 +279,7 @@ impl PairingStore {
     let (Some(pair_id), Some(digest)) = (caller.paired_device_id(), caller.credential_sha256()) else {
       return false;
     };
+
     self.inner.with_snapshot(|snapshot| {
       snapshot.devices.iter().any(|record| {
         record.pair_id == pair_id

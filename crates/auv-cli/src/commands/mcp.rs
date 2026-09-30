@@ -406,11 +406,13 @@ mod frontend {
       if req.session_selector.trim().is_empty() {
         return Err(invalid_params("session_selector must be nonempty"));
       }
+
       let selection = device_selection(req.device_name, req.device_id)?;
       let (client, _) = auv::Client::selected(None, &selection)
         .await
         .map_err(device_selection_error)?
         .ok_or_else(|| McpError::internal_error("no AUV daemon was discovered", None))?;
+
       match client.devices().get_user_session(&req.session_selector).await {
         Ok(session) => Ok(CallToolResult::structured(serde_json::json!({
           "session_selector": session.selector,
@@ -472,6 +474,7 @@ mod frontend {
         .await
         .map_err(device_selection_error)?
         .ok_or_else(|| McpError::internal_error("no AUV daemon was discovered", None))?;
+
       match client.devices().ensure_user_session_locked(target).await {
         Ok(effect) => Ok(CallToolResult::structured(serde_json::json!({
           "effect": effect.kind.as_str(),
@@ -669,6 +672,7 @@ mod frontend {
     if device_name.as_ref().is_some_and(|value| value.trim().is_empty()) || device_id.as_ref().is_some_and(|value| value.trim().is_empty()) {
       return Err(invalid_params("device_name and device_id must be nonempty when set"));
     }
+
     Ok(auv::selection::RootSelection {
       device_name,
       device_id,
@@ -697,6 +701,7 @@ mod frontend {
       ),
       _ => false,
     };
+
     if caller_selection {
       invalid_params(error)
     } else {

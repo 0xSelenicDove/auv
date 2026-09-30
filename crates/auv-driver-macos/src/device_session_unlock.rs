@@ -39,6 +39,7 @@ pub fn submit(credential: &[u8], expected_uid: u32, selector: &str, posting_budg
     selector.to_owned(),
     posting_budget_seconds,
   );
+
   match outcome {
     Outcome::Submitted => Ok(()),
     Outcome::InvalidRequest => Err(InputFailure::InvalidRequest),

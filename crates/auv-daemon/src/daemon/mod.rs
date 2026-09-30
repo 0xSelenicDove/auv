@@ -451,6 +451,7 @@ impl Control for Daemon {
   fn get_device(&self, device_id: &str) -> Result<Option<auv::devices::Device>, ControlError> {
     Daemon::get_device(self, device_id).map(domain_device).transpose()
   }
+
   fn list_user_sessions(&self, _caller: &CallerId) -> Result<Vec<auv::devices::UserSession>, auv::devices::DeviceEntryErrorReason> {
     #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
     {
@@ -458,16 +459,19 @@ impl Control for Daemon {
       {
         self.device_entry.as_ref().ok_or(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)?.list_user_sessions()
       }
+
       #[cfg(not(windows))]
       {
         self.device_entry.list_user_sessions()
       }
     }
+
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     {
       Err(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)
     }
   }
+
   fn get_user_session(
     &self,
     _caller: &CallerId,
@@ -479,17 +483,20 @@ impl Control for Daemon {
       {
         self.device_entry.as_ref().ok_or(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)?.get_user_session(session_selector)
       }
+
       #[cfg(not(windows))]
       {
         self.device_entry.get_user_session(session_selector)
       }
     }
+
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     {
       let _ = session_selector;
       Err(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)
     }
   }
+
   async fn ensure_user_session_unlocked(
     &self,
     caller: &CallerId,
@@ -506,17 +513,20 @@ impl Control for Daemon {
           .ensure_user_session_unlocked(caller, target)
           .await
       }
+
       #[cfg(not(windows))]
       {
         self.device_entry.ensure_user_session_unlocked(caller, target).await
       }
     }
+
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     {
       let _ = (caller, target);
       Err(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)
     }
   }
+
   async fn ensure_user_session_locked(
     &self,
     caller: &CallerId,
@@ -533,17 +543,20 @@ impl Control for Daemon {
           .ensure_user_session_locked(caller, target)
           .await
       }
+
       #[cfg(not(windows))]
       {
         self.device_entry.ensure_user_session_locked(caller, target).await
       }
     }
+
     #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
     {
       let _ = (caller, target);
       Err(auv::devices::DeviceEntryErrorReason::UnsupportedOsState)
     }
   }
+
   fn create_run(&self, caller: &CallerId, request: auv::runs::CreateRun) -> Result<auv::runs::Run, ControlError> {
     let response = Daemon::create_run(
       self,

@@ -80,12 +80,14 @@ struct VerifiedPipe {
 impl AsyncRead for VerifiedPipe {
   fn poll_read(mut self: Pin<&mut Self>, context: &mut Context<'_>, buffer: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
     let filled_before = buffer.filled().len();
+
     match Pin::new(&mut self.pipe).poll_read(context, buffer) {
       Poll::Ready(Ok(())) if buffer.filled().len() > filled_before => {
         // NOTICE(named-pipe-peer-sid): Microsoft documents that this API uses
         // the security context of the last message read from this pipe. Check
         // every successful read before forwarding those bytes to HTTP/2.
         let handle = HANDLE(self.pipe.as_raw_handle());
+
         match client_identity(handle).and_then(|identity| self.identity.accept_read(identity)) {
           Ok(()) => Poll::Ready(Ok(())),
           Err(error) => {
@@ -155,6 +157,7 @@ fn create_pipe(name: &str, first: bool) -> io::Result<NamedPipeServer> {
   if !name.starts_with("auv-device-local-") || !name.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')) {
     return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid DeviceLocalService pipe name"));
   }
+
   // Authenticated local users may connect so an ordinary account can later
   // self-enroll. Grant READ_CONTROL, SYNCHRONIZE, FILE_READ_ATTRIBUTES,
   // FILE_READ_DATA, and FILE_WRITE_DATA (0x00120083). GENERIC_WRITE includes
@@ -176,6 +179,7 @@ fn create_pipe(name: &str, first: bool) -> io::Result<NamedPipeServer> {
   // descriptor is a live output. Its allocation outlives pipe creation.
   unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(PCWSTR(sddl.as_ptr()), SDDL_REVISION_1, &mut descriptor, None) }
     .map_err(|_| identity_error())?;
+
   let descriptor = SecurityDescriptor(descriptor);
   let mut attributes = SECURITY_ATTRIBUTES {
     nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
@@ -203,39 +207,50 @@ fn client_identity(pipe: HANDLE) -> io::Result<ClientIdentity> {
   let mut bytes = 0u32;
   // SAFETY: A null output buffer asks Windows for the required TOKEN_USER size.
   let _ = unsafe { GetTokenInformation(token.0, TokenUser, None, 0, &mut bytes) };
+
   if bytes < size_of::<TOKEN_USER>() as u32 || align_of::<TOKEN_USER>() > align_of::<usize>() {
     return Err(identity_error());
   }
+
   let mut data = vec![0usize; (bytes as usize).div_ceil(size_of::<usize>())];
   // SAFETY: The word buffer is aligned and large enough for TOKEN_USER and its
   // embedded SID; it stays live through SID conversion below.
   unsafe { GetTokenInformation(token.0, TokenUser, Some(data.as_mut_ptr().cast()), bytes, &mut bytes) }.map_err(|_| identity_error())?;
+
   if (bytes as usize) < size_of::<TOKEN_USER>() {
     return Err(identity_error());
   }
+
   // SAFETY: Windows initialized an aligned TOKEN_USER in `data`.
   let token_user = unsafe { data.as_ptr().cast::<TOKEN_USER>().read() };
+
   if token_user.User.Sid.0.is_null() {
     return Err(identity_error());
   }
+
   // SAFETY: The SID remains valid in `data`; anonymous identity cannot own an
   // enrollment even if a client changed its token after opening the pipe.
   if unsafe { IsWellKnownSid(token_user.User.Sid, WinAnonymousSid) }.as_bool() {
     return Err(identity_error());
   }
+
   let mut raw_sid = PWSTR::null();
   // SAFETY: The SID remains live in `data`; Windows returns one LocalAlloc
   // UTF-16 string, which the guard frees after conversion.
   unsafe { ConvertSidToStringSidW(token_user.User.Sid, &mut raw_sid) }.map_err(|_| identity_error())?;
+
   if raw_sid.is_null() {
     return Err(identity_error());
   }
+
   let sid = LocalString(raw_sid);
   // SAFETY: ConvertSidToStringSidW returned a NUL-terminated UTF-16 string.
   let value = unsafe { sid.0.to_string() }.map_err(|_| identity_error())?;
+
   if !value.starts_with("S-1-") {
     return Err(identity_error());
   }
+
   let administrator = enabled_administrator(token.0)?;
   Ok(ClientIdentity {
     sid: value,
@@ -248,29 +263,38 @@ fn enabled_administrator(token: HANDLE) -> io::Result<bool> {
   // SAFETY: A null output buffer queries the required TokenGroups size.
   let _ = unsafe { GetTokenInformation(token, TokenGroups, None, 0, &mut bytes) };
   let header = offset_of!(TOKEN_GROUPS, Groups);
+
   if (bytes as usize) < header || bytes > 64 * 1024 || align_of::<SID_AND_ATTRIBUTES>() > align_of::<usize>() {
     return Err(identity_error());
   }
+
   let mut data = vec![0usize; (bytes as usize).div_ceil(size_of::<usize>())];
   // SAFETY: This aligned buffer has the queried capacity and stays live while
   // Windows writes TokenGroups and group SIDs are inspected below.
   unsafe { GetTokenInformation(token, TokenGroups, Some(data.as_mut_ptr().cast()), bytes, &mut bytes) }.map_err(|_| identity_error())?;
+
   if (bytes as usize) < header {
     return Err(identity_error());
   }
+
   // SAFETY: The successful query initialized GroupCount at the buffer start.
   let count = unsafe { data.as_ptr().cast::<u32>().read() as usize };
+
   if count > (bytes as usize - header) / size_of::<SID_AND_ATTRIBUTES>() {
     return Err(identity_error());
   }
+
   // SAFETY: The checked count fits the initialized TokenGroups buffer.
   let groups = unsafe { data.as_ptr().cast::<u8>().add(header).cast::<SID_AND_ATTRIBUTES>() };
+
   for index in 0..count {
     // SAFETY: Each SID_AND_ATTRIBUTES lies inside the checked live buffer.
     let group = unsafe { groups.add(index).read() };
+
     if group.Sid.0.is_null() {
       return Err(identity_error());
     }
+
     // SAFETY: Windows returned this SID in the live TokenGroups allocation.
     if group.Attributes & SE_GROUP_ENABLED as u32 != 0
       && group.Attributes & SE_GROUP_USE_FOR_DENY_ONLY as u32 == 0
@@ -279,6 +303,7 @@ fn enabled_administrator(token: HANDLE) -> io::Result<bool> {
       return Ok(true);
     }
   }
+
   Ok(false)
 }
 
@@ -348,6 +373,7 @@ mod tests {
       sid: "S-1-5-21-1001".into(),
       administrator: false,
     };
+
     assert!(peer.accept_read(ordinary.clone()).is_ok());
     assert!(peer.accept_read(ordinary.clone()).is_ok());
     assert!(matches!(peer.principal(), Some(LocalOsPrincipal::WindowsSid(sid)) if sid == ordinary.sid));
@@ -367,6 +393,7 @@ mod tests {
         })
         .is_err()
     );
+
     let administrator = PeerIdentity::default();
     administrator
       .accept_read(ClientIdentity {
@@ -374,6 +401,7 @@ mod tests {
         administrator: true,
       })
       .unwrap();
+
     assert!(matches!(administrator.principal(), Some(LocalOsPrincipal::WindowsAdministratorSid(sid)) if sid == "S-1-5-21-2000"));
   }
 
@@ -385,6 +413,7 @@ mod tests {
     // SAFETY: This opens the current process token only for a read-only test.
     unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut raw_token) }.unwrap();
     let token = Token(raw_token);
+
     assert!(enabled_administrator(token.0).is_ok());
   }
 
@@ -407,7 +436,9 @@ mod tests {
     let mut byte = [0];
     verified.read_exact(&mut byte).await.unwrap();
     writer.await.unwrap();
+
     assert_eq!(byte, *b"x");
+
     let principal = verified.identity.principal().unwrap();
     let mut raw_token = HANDLE::default();
     // SAFETY: This opens the current process token only for a read-only
@@ -415,6 +446,7 @@ mod tests {
     unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut raw_token) }.unwrap();
     let token = Token(raw_token);
     let expected_admin = enabled_administrator(token.0).unwrap();
+
     assert_eq!(matches!(principal, LocalOsPrincipal::WindowsAdministratorSid(_)), expected_admin);
   }
 
@@ -426,15 +458,19 @@ mod tests {
     async fn get_enrollment(&self, _: &LocalOsPrincipal, _: &str) -> Result<Enrollment, LocalControlError> {
       Err(LocalControlError::HostUnavailable)
     }
+
     async fn list_enrollments(&self, _: &LocalOsPrincipal) -> Result<Vec<Enrollment>, LocalControlError> {
       Err(LocalControlError::HostUnavailable)
     }
+
     async fn enroll(&self, _: &LocalOsPrincipal, _: EnrollAccount) -> Result<Enrollment, LocalControlError> {
       Err(LocalControlError::HostUnavailable)
     }
+
     async fn remove_enrollment(&self, _: &LocalOsPrincipal, _: &str) -> Result<(), LocalControlError> {
       Err(LocalControlError::HostUnavailable)
     }
+
     async fn get_policy(&self, principal: &LocalOsPrincipal) -> Result<bool, LocalControlError> {
       let sid = match principal {
         LocalOsPrincipal::WindowsSid(sid) | LocalOsPrincipal::WindowsAdministratorSid(sid) => sid,
@@ -443,9 +479,11 @@ mod tests {
       *self.0.lock().unwrap() = Some(sid.clone());
       Ok(true)
     }
+
     async fn set_policy(&self, _: &LocalOsPrincipal, _: bool) -> Result<bool, LocalControlError> {
       Err(LocalControlError::HostUnavailable)
     }
+
     async fn list_audit(&self, _: &LocalOsPrincipal, _: u64, _: usize) -> Result<AuditPage, LocalControlError> {
       Err(LocalControlError::HostUnavailable)
     }
@@ -458,6 +496,7 @@ mod tests {
       control: probe.clone(),
     };
     let missing = direct.get_policy(tonic::Request::new(proto::GetPolicyRequest {})).await.unwrap_err();
+
     assert_eq!(missing.code(), tonic::Code::PermissionDenied);
     assert!(probe.0.lock().unwrap().is_none());
   }

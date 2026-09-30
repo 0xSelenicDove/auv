@@ -85,9 +85,12 @@ async fn mcp_device_entry_uses_selected_daemon_and_does_not_create_a_run() -> Re
     .env("HOSTNAME", "mcp-entry-device")
     .kill_on_drop(true)
     .spawn()?;
+
   let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+
   while !discovery.exists() {
     assert!(tokio::time::Instant::now() < deadline, "daemon did not publish its discovery descriptor");
+
     tokio::time::sleep(std::time::Duration::from_millis(25)).await;
   }
 
@@ -100,6 +103,7 @@ async fn mcp_device_entry_uses_selected_daemon_and_does_not_create_a_run() -> Re
     .stderr(std::process::Stdio::null())
     .kill_on_drop(true)
     .spawn()?;
+
   let transport = tokio::io::join(mcp.stdout.take().expect("MCP stdout"), mcp.stdin.take().expect("MCP stdin"));
   let client = TestClient.serve(transport).await?;
 
@@ -118,6 +122,7 @@ async fn mcp_device_entry_uses_selected_daemon_and_does_not_create_a_run() -> Re
         })
         .await
         .expect_err("MCP must reject missing or conflicting OS targets");
+
       assert!(error.to_string().contains("set exactly one nonempty user or session_selector"), "unexpected MCP validation error: {error}");
     }
   }
@@ -135,16 +140,20 @@ async fn mcp_device_entry_uses_selected_daemon_and_does_not_create_a_run() -> Re
   // requiring a particular console login on the runner.
   let inventory_error = if list.is_error == Some(false) {
     assert!(list.structured_content.as_ref().unwrap()["sessions"].is_array(), "invalid Device session inventory: {list:?}");
+
     None
   } else {
     let reason = list.structured_content.as_ref().and_then(|value| value["reason"].as_str()).expect("typed inventory error");
+
     if cfg!(target_os = "macos") {
       panic!("macOS read-only inventory failed: {reason}");
     }
+
     assert!(
       matches!(reason, "UNSUPPORTED_OS_STATE" | "SERVICE_UNAVAILABLE" | "AMBIGUOUS_USER"),
       "unexpected Linux inventory error: {reason}"
     );
+
     Some(reason.to_owned())
   };
 
@@ -171,6 +180,7 @@ async fn mcp_device_entry_uses_selected_daemon_and_does_not_create_a_run() -> Re
         arguments: Some(arguments.as_object().unwrap().clone()),
       })
       .await?;
+
     assert_eq!(result.is_error, Some(true), "{name} unexpectedly claimed success: {result:?}");
     assert_eq!(result.structured_content.as_ref().unwrap()["reason"], expected_reason);
   }
@@ -188,6 +198,7 @@ async fn mcp_device_entry_uses_selected_daemon_and_does_not_create_a_run() -> Re
       })
       .await
       .expect_err("mismatching Device selector must fail before entry RPC");
+
     match error {
       rmcp::service::ServiceError::McpError(error) => {
         assert_eq!(error.code, ErrorCode::INVALID_PARAMS, "{name} mapped caller selection as an infrastructure failure");
@@ -199,6 +210,7 @@ async fn mcp_device_entry_uses_selected_daemon_and_does_not_create_a_run() -> Re
 
   let runs =
     tokio::process::Command::new(env!("CARGO_BIN_EXE_auv")).args(["run", "list", "--endpoint", &endpoint, "--json"]).output().await?;
+
   assert!(runs.status.success(), "run list failed: {}", String::from_utf8_lossy(&runs.stderr));
   assert_eq!(serde_json::from_slice::<serde_json::Value>(&runs.stdout)?, serde_json::json!([]));
 
@@ -210,6 +222,7 @@ async fn mcp_device_entry_uses_selected_daemon_and_does_not_create_a_run() -> Re
     })
     .await
     .expect_err("an unavailable selected daemon must fail");
+
   match unavailable {
     rmcp::service::ServiceError::McpError(error) => assert_eq!(error.code, ErrorCode::INTERNAL_ERROR),
     other => panic!("unexpected unavailable daemon failure: {other}"),

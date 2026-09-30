@@ -77,6 +77,7 @@ pub(super) fn audit_page(
   if !(1..=100).contains(&limit) {
     return Err(LocalControlError::InvalidAccount);
   }
+
   let page = audit.read_for_principal(principal, cursor, limit).map_err(|_| LocalControlError::Persistence)?;
   Ok(LocalAuditPage {
     entries: page
@@ -108,6 +109,7 @@ pub(super) fn unix_uid(principal: &LocalOsPrincipal) -> Result<u32, LocalControl
 #[cfg(unix)]
 pub(super) fn authorize_unix(principal: &LocalOsPrincipal, account_uid: u32) -> Result<(), LocalControlError> {
   let caller_uid = unix_uid(principal)?;
+
   if caller_uid == 0 || caller_uid == account_uid {
     Ok(())
   } else {
@@ -235,6 +237,7 @@ impl LocalState {
       let _directory = SocketDirectory::create(&self.socket)?;
       device_local::serve_unix(&self.socket, Arc::clone(&self.control), shutdown).await
     }
+
     #[cfg(windows)]
     {
       device_local::serve_named_pipe(&self.pipe_name, Arc::clone(&self.control), shutdown).await
@@ -258,16 +261,19 @@ impl SocketDirectory {
 
     let path = socket.parent().ok_or_else(|| "Device-local socket requires a parent directory".to_string())?;
     let mut builder = fs::DirBuilder::new();
+
     match builder.mode(0o700).create(path) {
       Ok(()) => {}
       Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
       Err(error) => return Err(format!("failed to create Device-local socket directory: {error}")),
     }
+
     let metadata = fs::symlink_metadata(path).map_err(|error| format!("failed to inspect Device-local socket directory: {error}"))?;
     // SAFETY: geteuid has no arguments or pointers.
     if !metadata.file_type().is_dir() || metadata.uid() != unsafe { libc::geteuid() } || metadata.permissions().mode() & 0o777 != 0o700 {
       return Err("Device-local socket directory must be owned by this daemon with mode 0700".into());
     }
+
     Ok(Self {
       path: path.to_owned(),
       device: metadata.dev(),
@@ -300,6 +306,7 @@ fn private_directory(path: &Path) -> Result<(), String> {
   if !metadata.file_type().is_dir() || metadata.uid() != unsafe { libc::geteuid() } {
     return Err("Device local directory must be owned by this daemon".into());
   }
+
   fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(|error| format!("failed to restrict Device local directory: {error}"))
 }
 
@@ -338,7 +345,9 @@ mod tests {
     let _ = request.await;
     let concurrent = tokio::time::timeout(Duration::from_millis(100), account_locks.lock("uid:501")).await;
     release_tx.send(()).unwrap();
+
     assert!(concurrent.is_err(), "the blocking vault mutation must retain the account lock after request cancellation");
+
     tokio::time::timeout(Duration::from_secs(2), account_locks.lock("uid:501")).await.unwrap().unwrap();
   }
 
@@ -350,10 +359,13 @@ mod tests {
     let socket = root.path().join("socket-parent/socket");
     let parent = socket.parent().unwrap();
     symlink(root.path(), parent).unwrap();
+
     assert!(SocketDirectory::create(&socket).is_err());
+
     fs::remove_file(parent).unwrap();
     fs::create_dir(parent).unwrap();
     fs::set_permissions(parent, fs::Permissions::from_mode(0o777)).unwrap();
+
     assert!(SocketDirectory::create(&socket).is_err());
   }
 }

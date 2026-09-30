@@ -300,6 +300,7 @@ fn local_serve_and_devices_list_use_the_unix_daemon() {
   // host as unsupported. Keep this CLI routing test independent of login state.
   if sessions.status.success() {
     let inventory: serde_json::Value = serde_json::from_slice(&sessions.stdout).expect("session JSON");
+
     assert!(inventory.is_array(), "session inventory must be a JSON array: {inventory}");
   } else {
     assert!(
@@ -331,6 +332,7 @@ fn local_serve_and_devices_list_use_the_unix_daemon() {
     ])
     .output()
     .expect("request Device entry");
+
   assert!(!unlock.status.success(), "absent OS account unexpectedly unlocked");
   assert!(
     [

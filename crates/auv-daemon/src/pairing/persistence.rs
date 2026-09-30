@@ -47,6 +47,7 @@ impl FileStore {
     {
       return Self::open_windows(path, WindowsMode::Ordinary);
     }
+
     #[cfg(unix)]
     {
       let parent = path.parent().ok_or_else(|| update_error(&path, "pairing store path has no parent"))?;
@@ -88,9 +89,11 @@ impl FileStore {
       WindowsMode::System => {
         let expected =
           storage_windows::root_path().map_err(|error| update_error(&path, format!("failed to locate protected root: {error}")))?;
+
         if path != expected.join("pairings.json") {
           return Err(update_error(&path, "Windows system pairing store must use the fixed ProgramData Device entry path"));
         }
+
         Some(storage_windows::directory(parent).map_err(|error| update_error(&path, format!("failed to open protected root: {error}")))?)
       }
     };
@@ -135,6 +138,7 @@ impl FileStore {
     let persistence = write_store(&self.path, &next);
     #[cfg(windows)]
     let persistence = write_store(&self.path, &next, self.mode);
+
     if persistence.is_ok() || matches!(persistence, Err(PairingError::CommittedButDurabilityUnknown { .. })) {
       *self.snapshot.write().expect("pairing snapshot lock poisoned") = next;
     }
@@ -246,9 +250,11 @@ fn read_store_bytes(path: &Path, mode: WindowsMode) -> std::io::Result<Vec<u8>> 
       let file = storage_windows::file(root, "pairings.json", Creation::Existing)?;
       let mut bytes = Vec::new();
       file.take(1024 * 1024 + 1).read_to_end(&mut bytes)?;
+
       if bytes.len() > 1024 * 1024 {
         return Err(std::io::Error::from(ErrorKind::InvalidData));
       }
+
       Ok(bytes)
     }
   }
@@ -315,6 +321,7 @@ fn write_store(path: &Path, store: &StoreFile, #[cfg(windows)] mode: WindowsMode
       message: error.to_string(),
     })
   }
+
   #[cfg(windows)]
   Ok(())
 }
@@ -371,7 +378,9 @@ mod windows_tests {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("pairings.json");
     let store = FileStore::open(path.clone()).unwrap();
+
     assert!(matches!(store.mode, WindowsMode::Ordinary));
+
     let result = store.update(|snapshot| {
       snapshot.tokens.push(PairingTokenRecord {
         digest: "a".repeat(64),
@@ -393,6 +402,7 @@ mod windows_tests {
   fn system_pairing_open_rejects_foreground_path_without_creating_files() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("pairings.json");
+
     assert!(FileStore::open_system(path).is_err());
     assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 0);
   }
@@ -402,6 +412,7 @@ mod windows_tests {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("pairings.json");
     fs::write(&path, b"{}\n").unwrap();
+
     assert!(read_store_bytes(&path, WindowsMode::System).is_err());
     assert!(write_store(&path, &StoreFile::default(), WindowsMode::System).is_err());
     assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);

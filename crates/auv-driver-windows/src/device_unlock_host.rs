@@ -164,23 +164,29 @@ mod native {
 
   pub(super) fn checked_target(target: &ConsoleSession) -> Result<(), HostError> {
     let current = observe_console().map_err(|_| HostError::Unverified)?.ok_or(HostError::StaleSession)?;
+
     if !target.same_login(&current) {
       return Err(HostError::StaleSession);
     }
+
     if current.lock_state != ConsoleLockState::Locked {
       return Err(HostError::NotLocked);
     }
+
     Ok(())
   }
 
   fn checked_usable_target(target: &ConsoleSession) -> Result<(), HostError> {
     let current = observe_console().map_err(|_| HostError::Unverified)?.ok_or(HostError::StaleSession)?;
+
     if !target.same_login(&current) || target.lock_state != ConsoleLockState::Usable {
       return Err(HostError::StaleSession);
     }
+
     if current.lock_state != ConsoleLockState::Usable {
       return Err(HostError::StaleSession);
     }
+
     Ok(())
   }
 
@@ -188,42 +194,53 @@ mod native {
     verify_local_system_process_in_session(0).map_err(|_| HostError::WorkerIdentity)?;
     checked_usable_target(target)?;
     let worker_executable = std::env::current_exe().map_err(|_| HostError::Unavailable)?.with_file_name("auv-device-unlock-worker.exe");
+
     if !worker_executable.is_absolute() {
       return Err(HostError::Unavailable);
     }
+
     let mut worker = launch_worker(&worker_executable, WorkerMode::Lock, target)?;
     // SAFETY: This is the exact selected-session worker process just created.
     if unsafe { WaitForSingleObject(worker.process.0, 8_000) } != WAIT_OBJECT_0 {
       return Err(HostError::WorkerUnavailable);
     }
+
     worker.completed = true;
     let mut exit = 1u32;
     // SAFETY: The exit-code pointer and owned process handle remain live.
     unsafe { GetExitCodeProcess(worker.process.0, &mut exit) }.map_err(|_| HostError::Unverified)?;
+
     if exit != 0 {
       return Err(HostError::Unverified);
     }
+
     let current = observe_console().map_err(|_| HostError::Unverified)?.ok_or(HostError::StaleSession)?;
+
     if !target.same_login(&current) {
       return Err(HostError::StaleSession);
     }
+
     if current.lock_state != ConsoleLockState::Locked {
       return Err(HostError::Unverified);
     }
+
     Ok(current)
   }
 
   pub(super) fn unlock_with_worker(target: &ConsoleSession, credential: &str) -> Result<ConsoleSession, HostError> {
     checked_target(target)?;
     let worker_executable = std::env::current_exe().map_err(|_| HostError::Unavailable)?.with_file_name("auv-device-unlock-worker.exe");
+
     if !worker_executable.is_absolute() || credential.is_empty() || credential.encode_utf16().count() > 128 {
       return Err(HostError::Unavailable);
     }
+
     let mut nonce = [0u8; 16];
     // SAFETY: The system RNG writes only to this initialized, live nonce.
     if unsafe { BCryptGenRandom(None, &mut nonce, BCRYPT_USE_SYSTEM_PREFERRED_RNG) }.is_err() {
       return Err(HostError::Unavailable);
     }
+
     let pipe_name = format!("\\\\.\\pipe\\auv-device-unlock-{}-{}", std::process::id(), hex(&nonce));
     let pipe = restricted_pipe(&pipe_name)?;
     let mut worker = launch_worker(&worker_executable, WorkerMode::Unlock(&pipe_name), target)?;
@@ -233,9 +250,11 @@ mod native {
     let mut payload = Zeroizing::new(vec![0u8; PIPE_PAYLOAD_BYTES]);
     let units = Zeroizing::new(credential.encode_utf16().collect::<Vec<_>>());
     payload[..2].copy_from_slice(&(units.len() as u16).to_le_bytes());
+
     for (index, unit) in units.iter().enumerate() {
       payload[2 + index * 2..4 + index * 2].copy_from_slice(&unit.to_le_bytes());
     }
+
     write_payload(&pipe, &payload)?;
     // The worker performs its own WTS readback. The host independently checks
     // the same login after the worker exits; neither an input count nor an exit
@@ -244,20 +263,26 @@ mod native {
     if unsafe { WaitForSingleObject(worker.process.0, Duration::from_secs(15).as_millis() as u32) } != WAIT_OBJECT_0 {
       return Err(HostError::WorkerUnavailable);
     }
+
     worker.completed = true;
     let mut exit = 1u32;
     // SAFETY: The exit-code pointer is live and the process handle is valid.
     unsafe { GetExitCodeProcess(worker.process.0, &mut exit) }.map_err(|_| HostError::Unverified)?;
+
     if exit != 0 {
       return Err(HostError::Unverified);
     }
+
     let current = observe_console().map_err(|_| HostError::Unverified)?.ok_or(HostError::StaleSession)?;
+
     if !target.same_login(&current) {
       return Err(HostError::StaleSession);
     }
+
     if current.lock_state != ConsoleLockState::Usable {
       return Err(HostError::Unverified);
     }
+
     Ok(current)
   }
 
@@ -281,6 +306,7 @@ mod native {
     // descriptor remains live while CreateNamedPipeW copies its security data.
     unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(PCWSTR(sddl.as_ptr()), SDDL_REVISION_1, &mut descriptor, None) }
       .map_err(|_| HostError::Unavailable)?;
+
     let descriptor = SecurityDescriptor(descriptor);
     let attributes = SECURITY_ATTRIBUTES {
       nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
@@ -302,6 +328,7 @@ mod native {
         Some(&attributes),
       )
     };
+
     if handle.is_invalid() {
       Err(HostError::Unavailable)
     } else {
@@ -315,6 +342,7 @@ mod native {
     if !target.account_sid.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-') {
       return Err(HostError::WorkerUnavailable);
     }
+
     let exe_wide = wide(exe.as_os_str());
     let arguments = match mode {
       WorkerMode::Unlock(pipe_name) => format!("{} {} {} {}", pipe_name, target.session_id, target.logon_time, target.account_sid),
@@ -326,16 +354,19 @@ mod native {
     // SAFETY: This call opens the current process token into one owned handle.
     unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY, &mut raw_token) }
       .map_err(|_| HostError::WorkerIdentity)?;
+
     let token = OwnedHandle(raw_token);
     let mut primary = HANDLE::default();
     // SAFETY: The LocalSystem service token is live. The duplicated primary
     // token is owned here and modified only for the selected console session.
     unsafe { DuplicateTokenEx(token.0, TOKEN_ALL_ACCESS, None, SecurityImpersonation, TokenPrimary, &mut primary) }
       .map_err(|_| HostError::WorkerIdentity)?;
+
     let primary = OwnedHandle(primary);
     // SAFETY: SetTokenInformation reads one live u32 session ID.
     unsafe { SetTokenInformation(primary.0, TokenSessionId, (&target.session_id as *const u32).cast::<c_void>(), size_of::<u32>() as u32) }
       .map_err(|_| HostError::WorkerIdentity)?;
+
     let mut desktop = wide(std::ffi::OsStr::new("winsta0\\default"));
     let startup = STARTUPINFOW {
       cb: size_of::<STARTUPINFOW>() as u32,
@@ -386,6 +417,7 @@ mod native {
       Err(error) if error.code() == ERROR_IO_PENDING.to_hresult() => true,
       Err(_) => return Err(HostError::WorkerUnavailable),
     };
+
     if pending {
       // SAFETY: The event remains live for the wait.
       if unsafe { WaitForSingleObject(event.0, 10_000) } != WAIT_OBJECT_0 {
@@ -394,18 +426,23 @@ mod native {
         let _ = unsafe { CancelIoEx(pipe.0, Some(&overlapped)) };
         let mut ignored = 0;
         let _ = unsafe { GetOverlappedResult(pipe.0, &overlapped, &mut ignored, true) };
+
         return Err(HostError::WorkerUnavailable);
       }
+
       let mut ignored = 0;
       // SAFETY: Completed event and live OVERLAPPED identify this connect.
       unsafe { GetOverlappedResult(pipe.0, &overlapped, &mut ignored, false) }.map_err(|_| HostError::WorkerUnavailable)?;
     }
+
     let mut pid = 0u32;
     // SAFETY: GetNamedPipeClientProcessId writes one u32 for the connected peer.
     unsafe { GetNamedPipeClientProcessId(pipe.0, &mut pid) }.map_err(|_| HostError::WorkerIdentity)?;
+
     if pid != worker.pid {
       return Err(HostError::WorkerIdentity);
     }
+
     Ok(())
   }
 
@@ -423,18 +460,23 @@ mod native {
       Err(error) if error.code() == ERROR_IO_PENDING.to_hresult() => true,
       Err(_) => return Err(HostError::TransferFailed),
     };
+
     if pending {
       // SAFETY: The event remains live until the operation has completed.
       if unsafe { WaitForSingleObject(event.0, 5_000) } != WAIT_OBJECT_0 {
         let _ = unsafe { CancelIoEx(pipe.0, Some(&overlapped)) };
         let _ = unsafe { GetOverlappedResult(pipe.0, &overlapped, &mut written, true) };
+
         return Err(HostError::TransferFailed);
       }
+
       unsafe { GetOverlappedResult(pipe.0, &overlapped, &mut written, false) }.map_err(|_| HostError::TransferFailed)?;
     }
+
     if written as usize != payload.len() {
       return Err(HostError::TransferFailed);
     }
+
     Ok(())
   }
 
@@ -458,15 +500,19 @@ mod native {
     );
     let mut payload = Zeroizing::new(vec![0u8; PIPE_PAYLOAD_BYTES]);
     let mut offset = 0usize;
+
     while offset < payload.len() {
       let mut read = 0u32;
       // SAFETY: ReadFile writes only to the remaining initialized slice.
       unsafe { ReadFile(pipe.0, Some(&mut payload[offset..]), Some(&mut read), None) }.map_err(|_| HostError::TransferFailed)?;
+
       if read == 0 {
         return Err(HostError::TransferFailed);
       }
+
       offset += read as usize;
     }
+
     Ok((pipe, payload))
   }
 
@@ -474,6 +520,7 @@ mod native {
     if !pipe_name.starts_with("\\\\.\\pipe\\auv-device-unlock-") || pipe_name.len() > 128 {
       return Err(HostError::WorkerUnavailable);
     }
+
     let target = ConsoleSession {
       session_id,
       logon_time,
@@ -485,13 +532,17 @@ mod native {
     checked_target(&target)?;
     let (_pipe, payload) = read_payload(pipe_name)?;
     let length = u16::from_le_bytes([payload[0], payload[1]]) as usize;
+
     if length == 0 || length > 128 {
       return Err(HostError::TransferFailed);
     }
+
     let mut units = Zeroizing::new(Vec::with_capacity(length));
+
     for index in 0..length {
       units.push(u16::from_le_bytes([payload[2 + index * 2], payload[3 + index * 2]]));
     }
+
     let credential = Zeroizing::new(String::from_utf16(&units).map_err(|_| HostError::TransferFailed)?);
     checked_target(&target)?;
     unlock_existing_session(&target, &credential).map_err(|_| HostError::Unverified)?;

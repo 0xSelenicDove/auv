@@ -66,6 +66,7 @@ fn local_enrollment_credential_is_excluded_from_daemon_json() {
     ..Default::default()
   };
   let json = serde_json::to_value(&request).unwrap();
+
   assert_eq!(json["user"], "neko");
   assert!(json.get("credential").is_none());
   assert!(!json.to_string().contains("probe-secret"));

@@ -156,6 +156,7 @@ impl DeviceLocalService for DeviceLocalGrpc {
     if credential.as_bytes().is_empty() || credential.as_bytes().len() > 1024 || std::str::from_utf8(credential.as_bytes()).is_err() {
       return Err(Status::invalid_argument("credential must be 1..=1024 UTF-8 bytes"));
     }
+
     let credential_kind = match proto::EnrollmentCredentialKind::try_from(input.credential_kind) {
       Ok(proto::EnrollmentCredentialKind::OsPassword) => CredentialKind::OsPassword,
       Ok(proto::EnrollmentCredentialKind::WindowsPin) => CredentialKind::WindowsPin,
@@ -209,9 +210,11 @@ impl DeviceLocalService for DeviceLocalGrpc {
   async fn list_audit(&self, request: Request<proto::ListAuditRequest>) -> Result<Response<proto::ListAuditResponse>, Status> {
     let principal = peer_principal(&request)?;
     let input = request.get_ref();
+
     if !(1..=100).contains(&input.limit) {
       return Err(Status::invalid_argument("limit must be 1..=100"));
     }
+
     let page = self.control.list_audit(&principal, input.cursor, input.limit as usize).await.map_err(status)?;
     let entries = page
       .entries
@@ -240,6 +243,7 @@ fn required_user(user: &str) -> Result<&str, Status> {
   if user.is_empty() || user.trim() != user || user.contains('\0') {
     return Err(Status::invalid_argument("user must be a nonempty OS account name"));
   }
+
   Ok(user)
 }
 
@@ -316,14 +320,17 @@ pub async fn serve_unix(
   use std::os::unix::fs::{MetadataExt, PermissionsExt};
   let parent = path.parent().ok_or_else(|| "DeviceLocalService socket requires a parent directory".to_string())?;
   let metadata = std::fs::symlink_metadata(parent).map_err(|error| format!("cannot inspect DeviceLocalService socket parent: {error}"))?;
+
   if !metadata.file_type().is_dir() || metadata.uid() != current_euid() || metadata.permissions().mode() & 0o022 != 0 {
     return Err("DeviceLocalService socket parent must be an owned directory without group/other write permission".into());
   }
+
   clear_stale_socket(path).await?;
   let listener = tokio::net::UnixListener::bind(path).map_err(|error| format!("cannot bind DeviceLocalService Unix socket: {error}"))?;
   let cleanup = SocketCleanup::new(path)?;
   std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o666))
     .map_err(|error| format!("cannot set DeviceLocalService socket permissions: {error}"))?;
+
   let service = DeviceLocalServiceServer::new(DeviceLocalGrpc { control }).max_decoding_message_size(16 * 1024);
   let result = tonic::transport::Server::builder()
     .add_service(service)
@@ -342,19 +349,23 @@ async fn clear_stale_socket(path: &std::path::Path) -> Result<(), String> {
     Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
     Err(error) => return Err(format!("cannot inspect DeviceLocalService socket path: {error}")),
   };
+
   if !existing.file_type().is_socket() || existing.uid() != current_euid() {
     return Err("DeviceLocalService socket path is not an owned socket".into());
   }
+
   match tokio::time::timeout(std::time::Duration::from_millis(250), tokio::net::UnixStream::connect(path)).await {
     Ok(Ok(_)) => return Err("DeviceLocalService socket already has a live listener".into()),
     Ok(Err(error)) if error.kind() == std::io::ErrorKind::ConnectionRefused => {}
     Ok(Err(_)) | Err(_) => return Err("DeviceLocalService socket liveness could not be established".into()),
   }
+
   // NOTICE(device-local-stale-socket): A process killed without Drop leaves a
   // socket inode. The owned parent is not group/other writable, and the
   // metadata store's process lock excludes another daemon using this root.
   // Recheck the inode before removing the refused listener's pathname.
   let current = std::fs::symlink_metadata(path).map_err(|_| "DeviceLocalService socket changed during stale recovery".to_string())?;
+
   if !current.file_type().is_socket()
     || current.uid() != existing.uid()
     || current.dev() != existing.dev()
@@ -362,6 +373,7 @@ async fn clear_stale_socket(path: &std::path::Path) -> Result<(), String> {
   {
     return Err("DeviceLocalService socket changed during stale recovery".into());
   }
+
   std::fs::remove_file(path).map_err(|error| format!("cannot remove stale DeviceLocalService socket: {error}"))
 }
 
@@ -395,6 +407,7 @@ impl SocketCleanup {
 impl Drop for SocketCleanup {
   fn drop(&mut self) {
     use std::os::unix::fs::MetadataExt;
+
     if let Ok(metadata) = std::fs::symlink_metadata(&self.path)
       && metadata.dev() == self.device
       && metadata.ino() == self.inode
@@ -419,12 +432,14 @@ mod tests {
   #[test]
   fn local_service_requires_connection_identity() {
     let request = Request::new(proto::ListEnrollmentsRequest {});
+
     assert_eq!(peer_principal(&request).unwrap_err().code(), tonic::Code::PermissionDenied);
   }
 
   #[test]
   fn credential_error_never_exposes_native_detail() {
     let error = status(LocalControlError::InvalidCredential);
+
     assert_eq!(error.code(), tonic::Code::InvalidArgument);
     assert_eq!(error.message(), "invalid credential input");
   }
@@ -442,10 +457,12 @@ mod tests {
       let LocalOsPrincipal::UnixUid(uid) = principal else {
         return Err(LocalControlError::PermissionDenied);
       };
+
       *self.observed_uid.lock().unwrap() = Some(*uid);
       if user != "neko" {
         return Err(LocalControlError::PermissionDenied);
       }
+
       Ok(Enrollment {
         user: user.to_owned(),
         os_account_id: uid.to_string(),
@@ -474,6 +491,7 @@ mod tests {
       if principal != &LocalOsPrincipal::UnixUid(0) {
         return Err(LocalControlError::PermissionDenied);
       }
+
       *self.policy_enabled.lock().unwrap() = enabled;
       Ok(enabled)
     }
@@ -482,13 +500,16 @@ mod tests {
       let LocalOsPrincipal::UnixUid(uid) = principal else {
         return Err(LocalControlError::PermissionDenied);
       };
+
       assert_eq!(limit, 1);
+
       if cursor != 0 {
         return Ok(AuditPage {
           entries: Vec::new(),
           next_cursor: None,
         });
       }
+
       Ok(AuditPage {
         entries: vec![AuditEntry {
           event: "outcome".into(),
@@ -525,13 +546,17 @@ mod tests {
       let socket = socket.clone();
       async move { serve_unix(&socket, control, shutdown).await }
     });
+
     for _ in 0..100 {
       if socket.exists() {
         break;
       }
+
       tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
+
     assert!(socket.exists(), "dedicated socket did not bind");
+
     let channel = Endpoint::try_from("http://[::]:50051")
       .unwrap()
       .connect_with_connector(tower::service_fn(move |_: tonic::codegen::http::Uri| {
@@ -540,9 +565,12 @@ mod tests {
       }))
       .await
       .unwrap();
+
     let mut public_client = DeviceServiceClient::new(channel.clone());
     let missing_public_route = public_client.list_user_sessions(proto::ListUserSessionsRequest {}).await.unwrap_err();
+
     assert_eq!(missing_public_route.code(), tonic::Code::Unimplemented);
+
     let mut client = DeviceLocalServiceClient::new(channel);
     let own = client
       .get_enrollment(proto::GetEnrollmentRequest {
@@ -551,15 +579,19 @@ mod tests {
       .await
       .unwrap()
       .into_inner();
+
     assert_eq!(own.enrollment.unwrap().os_account_id, current_euid().to_string());
     assert_eq!(*control.observed_uid.lock().unwrap(), Some(current_euid()));
+
     let denied = client
       .get_enrollment(proto::GetEnrollmentRequest {
         user: "another".into(),
       })
       .await
       .unwrap_err();
+
     assert_eq!(denied.code(), tonic::Code::PermissionDenied);
+
     let invalid = client
       .enroll(proto::EnrollRequest {
         user: "neko".into(),
@@ -569,7 +601,9 @@ mod tests {
       })
       .await
       .unwrap_err();
+
     assert_eq!(invalid.code(), tonic::Code::InvalidArgument);
+
     let unavailable = client
       .enroll(proto::EnrollRequest {
         user: "neko".into(),
@@ -579,9 +613,13 @@ mod tests {
       })
       .await
       .unwrap_err();
+
     assert_eq!(unavailable.code(), tonic::Code::Unavailable);
+
     assert!(client.get_policy(proto::GetPolicyRequest {}).await.unwrap().into_inner().enabled);
+
     let changed = client.set_policy(proto::SetPolicyRequest { enabled: false }).await;
+
     if current_euid() == 0 {
       assert!(!changed.unwrap().into_inner().enabled);
       assert!(!client.get_policy(proto::GetPolicyRequest {}).await.unwrap().into_inner().enabled);
@@ -589,6 +627,7 @@ mod tests {
       assert_eq!(changed.unwrap_err().code(), tonic::Code::PermissionDenied);
       assert!(client.get_policy(proto::GetPolicyRequest {}).await.unwrap().into_inner().enabled);
     }
+
     let invalid_page = client
       .list_audit(proto::ListAuditRequest {
         cursor: 0,
@@ -596,7 +635,9 @@ mod tests {
       })
       .await
       .unwrap_err();
+
     assert_eq!(invalid_page.code(), tonic::Code::InvalidArgument);
+
     let first_page = client
       .list_audit(proto::ListAuditRequest {
         cursor: 0,
@@ -605,9 +646,11 @@ mod tests {
       .await
       .unwrap()
       .into_inner();
+
     assert_eq!(first_page.entries.len(), 1);
     assert_eq!(first_page.entries[0].os_account_id.as_deref(), Some(format!("uid:{}", current_euid()).as_str()));
     assert_eq!(first_page.next_cursor, Some(42));
+
     let last_page = client
       .list_audit(proto::ListAuditRequest {
         cursor: 42,
@@ -616,8 +659,10 @@ mod tests {
       .await
       .unwrap()
       .into_inner();
+
     assert!(last_page.entries.is_empty());
     assert_eq!(last_page.next_cursor, None);
+
     shutdown.cancel();
     server.await.unwrap().unwrap();
   }
@@ -641,16 +686,21 @@ mod tests {
       async move { serve_unix(&socket, control, shutdown).await }
     });
     let mut reachable = false;
+
     for _ in 0..100 {
       if tokio::net::UnixStream::connect(&socket).await.is_ok() {
         reachable = true;
         break;
       }
+
       tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
+
     assert!(reachable, "server did not reclaim the refused socket");
+
     shutdown.cancel();
     task.await.unwrap().unwrap();
+
     assert!(!socket.exists());
 
     let live = std::os::unix::net::UnixListener::bind(&socket).unwrap();
@@ -659,8 +709,10 @@ mod tests {
       policy_enabled: std::sync::Mutex::new(true),
     });
     let error = serve_unix(&socket, control, tokio_util::sync::CancellationToken::new()).await.unwrap_err();
+
     assert!(error.contains("live listener"));
     assert!(socket.exists(), "live listener pathname must not be unlinked");
+
     drop(live);
   }
 
@@ -675,6 +727,7 @@ mod tests {
       policy_enabled: std::sync::Mutex::new(true),
     });
     let error = serve_unix(&socket, control, tokio_util::sync::CancellationToken::new()).await.unwrap_err();
+
     assert!(error.contains("not an owned socket"));
     assert_eq!(std::fs::read(&socket).unwrap(), b"owner data");
   }

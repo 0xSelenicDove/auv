@@ -102,6 +102,7 @@ impl Authenticator {
         {
           allowed_unix_uid.map(|_| DeviceEntryAdmission(()))
         }
+
         #[cfg(windows)]
         {
           // TODO(device-entry-windows-local): Admit named-pipe Device entry
@@ -140,6 +141,7 @@ pub(crate) fn device_entry_caller<T>(request: &tonic::Request<T>) -> Result<&Cal
   if request.extensions().get::<DeviceEntryAdmission>().is_none() {
     return Err(Status::unauthenticated("Device entry requires a paired bearer or owner-verified local transport"));
   }
+
   caller(request)
 }
 

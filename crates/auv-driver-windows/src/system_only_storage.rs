@@ -43,9 +43,11 @@ pub fn require_system_host() -> io::Result<()> {
   let mut session = u32::MAX;
   // SAFETY: Windows writes one live session ID for this process.
   unsafe { ProcessIdToSessionId(GetCurrentProcessId(), &mut session) }.map_err(|_| denied())?;
+
   if session != 0 {
     return Err(denied());
   }
+
   let mut token = HANDLE::default();
   // SAFETY: Windows returns one owned token handle for the current process.
   unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) }.map_err(|_| denied())?;
@@ -54,22 +56,28 @@ pub fn require_system_host() -> io::Result<()> {
   let mut bytes = 0u32;
   // SAFETY: A null output buffer queries the required TOKEN_USER size.
   let _ = unsafe { GetTokenInformation(HANDLE(token.as_raw_handle()), TokenUser, None, 0, &mut bytes) };
+
   if bytes < size_of::<TOKEN_USER>() as u32 || bytes > 64 * 1024 || align_of::<TOKEN_USER>() > align_of::<usize>() {
     return Err(denied());
   }
+
   let mut data = vec![0usize; (bytes as usize).div_ceil(size_of::<usize>())];
   // SAFETY: The aligned word buffer has the queried capacity and stays live
   // while Windows writes TOKEN_USER and IsWellKnownSid reads its embedded SID.
   unsafe { GetTokenInformation(HANDLE(token.as_raw_handle()), TokenUser, Some(data.as_mut_ptr().cast()), bytes, &mut bytes) }
     .map_err(|_| denied())?;
+
   if (bytes as usize) < size_of::<TOKEN_USER>() {
     return Err(denied());
   }
+
   // SAFETY: The successful call initialized an aligned TOKEN_USER header.
   let user = unsafe { data.as_ptr().cast::<TOKEN_USER>().read() };
+
   if user.User.Sid.0.is_null() || !unsafe { IsWellKnownSid(user.User.Sid, WinLocalSystemSid) }.as_bool() {
     return Err(denied());
   }
+
   Ok(())
 }
 
@@ -107,9 +115,11 @@ pub fn verify_object(file: &File, directory: bool) -> io::Result<()> {
   // SAFETY: Windows writes the initialized BY_HANDLE_FILE_INFORMATION value.
   unsafe { GetFileInformationByHandle(handle, &mut information) }.map_err(|_| denied())?;
   let attributes = information.dwFileAttributes;
+
   if attributes & FILE_ATTRIBUTE_REPARSE_POINT.0 != 0 || (attributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0) != directory {
     return Err(denied());
   }
+
   let mut descriptor = PSECURITY_DESCRIPTOR::default();
   let security_info = OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION;
   // SAFETY: Windows returns one LocalAlloc security descriptor for this open
@@ -117,9 +127,11 @@ pub fn verify_object(file: &File, directory: bool) -> io::Result<()> {
   unsafe { GetSecurityInfo(handle, SE_FILE_OBJECT, security_info, None, None, None, None, Some(&mut descriptor)) }
     .ok()
     .map_err(|_| denied())?;
+
   if descriptor.0.is_null() {
     return Err(denied());
   }
+
   let mut output = PWSTR::null();
   // SAFETY: The descriptor is live; conversion allocates the output SDDL.
   let converted =
@@ -131,8 +143,10 @@ pub fn verify_object(file: &File, directory: bool) -> io::Result<()> {
   let actual = unsafe { output.to_string() }.map_err(|_| denied());
   // SAFETY: Release the one SDDL allocation returned by conversion.
   unsafe { LocalFree(HLOCAL(output.0.cast())) };
+
   if actual? != SYSTEM_OBJECT_SDDL {
     return Err(denied());
   }
+
   Ok(())
 }

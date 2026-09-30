@@ -88,6 +88,7 @@ pub fn enroll(home: &Path, uid: u32, credential: &[u8]) -> Result<(), HostError>
   if credential.is_empty() || credential.len() > MAX_PAYLOAD {
     return Err(HostError::InvalidRequest);
   }
+
   call(home, Operation::Enroll, uid, credential)
 }
 
@@ -97,6 +98,7 @@ pub fn probe_locked(home: &Path, uid: u32, selector: &str) -> Result<(), HostErr
   if !selector.starts_with("macos:") || selector.len() > MAX_PAYLOAD {
     return Err(HostError::InvalidRequest);
   }
+
   call(home, Operation::Probe, uid, selector.as_bytes())
 }
 
@@ -111,6 +113,7 @@ pub fn unlock(home: &Path, uid: u32, selector: &str) -> Result<(), HostError> {
   if !selector.starts_with("macos:") || selector.len() > MAX_PAYLOAD {
     return Err(HostError::InvalidRequest);
   }
+
   call(home, Operation::Unlock, uid, selector.as_bytes())
 }
 
@@ -120,6 +123,7 @@ pub fn lock(home: &Path, uid: u32, selector: &str) -> Result<(), HostError> {
   if !selector.starts_with("macos:") || selector.len() > MAX_PAYLOAD {
     return Err(HostError::InvalidRequest);
   }
+
   call(home, Operation::Lock, uid, selector.as_bytes())
 }
 
@@ -188,6 +192,7 @@ fn verify_installed_helper(stream: &UnixStream) -> Result<(), HostError> {
   let macos = contents.join("MacOS");
   let binary = macos.join("auv-device-helper-macos");
   let team_file = root.join("device-entry-host.team-id");
+
   for path in [
     library,
     support,
@@ -204,15 +209,19 @@ fn verify_installed_helper(stream: &UnixStream) -> Result<(), HostError> {
     } else {
       metadata.file_type().is_dir()
     };
+
     if metadata.uid() != 0 || metadata.mode() & 0o022 != 0 || !expected_type {
       return Err(HostError::Unauthorized);
     }
   }
+
   let team_id = std::fs::read_to_string(&team_file).map_err(|_| HostError::Unauthorized)?;
   let team_id = team_id.trim_end_matches('\n');
+
   if team_id != EXPECTED_TEAM_ID {
     return Err(HostError::Unauthorized);
   }
+
   let code = code_for_socket_peer(stream)?;
   let requirement: SecRequirement =
     format!("identifier \"dev.moeru.auv.device-entry-host\" and anchor apple generic and certificate leaf[subject.OU] = \"{team_id}\"")
@@ -221,9 +230,11 @@ fn verify_installed_helper(stream: &UnixStream) -> Result<(), HostError> {
   code.check_validity(Flags::NONE, &requirement).map_err(|_| HostError::Unauthorized)?;
   let actual = code.path(Flags::NONE).ok().and_then(|url| url.to_path()).ok_or(HostError::Unauthorized)?;
   let actual = std::fs::canonicalize(actual).map_err(|_| HostError::Unauthorized)?;
+
   if actual != binary && actual != app {
     return Err(HostError::Unauthorized);
   }
+
   Ok(())
 }
 
@@ -237,9 +248,11 @@ fn code_for_socket_peer(stream: &UnixStream) -> Result<SecCode, HostError> {
   // Audit tokens are opaque. Copy their native memory representation into
   // CFData for Security.framework without extracting/reusing a numeric PID.
   let mut bytes = [0_u8; 32];
+
   for (chunk, value) in bytes.chunks_exact_mut(4).zip(token.val) {
     chunk.copy_from_slice(&value.to_ne_bytes());
   }
+
   let token_data = CFData::from_buffer(&bytes);
   let mut attributes = GuestAttributes::new();
   attributes.set_audit_token(token_data.as_concrete_TypeRef());
@@ -255,6 +268,7 @@ mod tests {
     let (left, _right) = UnixStream::pair().unwrap();
     let code = code_for_socket_peer(&left).unwrap();
     let path = code.path(Flags::NONE).unwrap().to_path().unwrap();
+
     assert_eq!(std::fs::canonicalize(path).unwrap(), std::fs::canonicalize(std::env::current_exe().unwrap()).unwrap());
   }
 }

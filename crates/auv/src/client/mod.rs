@@ -195,6 +195,7 @@ impl Client {
     }
     if context.daemon_endpoint.is_none() && (context.device_id.is_some() || context.device_name.is_some()) {
       let profiles = profile::ProfileStore::from_env()?;
+
       return Self::resolve_device_context(context, &profiles, discovery::resolve(None)?).await;
     }
     let endpoint = match context.daemon_endpoint.as_deref() {
@@ -237,9 +238,11 @@ impl Client {
       })
       .filter(|device| context.device_name.as_ref().is_none_or(|name| device.device_name() == name))
       .collect::<Vec<_>>();
+
     let mut local = match local_endpoint {
       Some(endpoint) => {
         let endpoint_display = endpoint.to_string();
+
         match GrpcClient::connect(endpoint).await {
           Ok(grpc) => Some((endpoint_display, grpc)),
           Err(_) if remote_matches.len() == 1 => None,
@@ -262,11 +265,13 @@ impl Client {
       .filter_map(|device| device.r#ref.as_ref().map(|reference| reference.device_id.as_str()))
       .chain(remote_matches.iter().map(|device| device.device_id()))
       .collect::<Vec<_>>();
+
     match (local_matches.as_slice(), remote_matches.as_slice()) {
       ([local_device], []) => {
         let (endpoint, grpc) = local.expect("local match requires a connected local daemon");
         context_matches_canonical_device(&context, local_device)?;
         context.daemon_endpoint = Some(endpoint);
+
         return Ok(Self {
           grpc,
           context: Some(context),
@@ -276,6 +281,7 @@ impl Client {
       }
       ([], [remote]) => {
         context.config_profile = Some(remote.config_profile().to_string());
+
         return Self::resolve_context_with_profiles(context, &profiles).await;
       }
       ([], []) => return Err(ContextError::DeviceNotConfigured),

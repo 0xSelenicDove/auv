@@ -56,9 +56,11 @@ pub fn observe_console() -> Result<Option<ConsoleSession>, ObserveError> {
   // observed in this release. Add background sessions after owner approval.
   let registry =
     Command::new("/usr/sbin/ioreg").args(["-r", "-n", "Root", "-d", "1", "-a"]).output().map_err(|_| ObserveError::Unavailable)?;
+
   if !registry.status.success() {
     return Err(ObserveError::Unavailable);
   }
+
   // `ioreg -a` emits a binary plist. The fixed platform tool keeps plist
   // decoding behind this narrow macOS capability.
   let mut converter = Command::new("/usr/bin/plutil")
@@ -70,9 +72,11 @@ pub fn observe_console() -> Result<Option<ConsoleSession>, ObserveError> {
     .map_err(|_| ObserveError::Unavailable)?;
   converter.stdin.take().ok_or(ObserveError::Unavailable)?.write_all(&registry.stdout).map_err(|_| ObserveError::Unavailable)?;
   let output = converter.wait_with_output().map_err(|_| ObserveError::Unavailable)?;
+
   if !output.status.success() {
     return Err(ObserveError::Unavailable);
   }
+
   parse_snapshot(&output.stdout)
 }
 
@@ -88,20 +92,24 @@ fn parse_snapshot(bytes: &[u8]) -> Result<Option<ConsoleSession>, ObserveError> 
   let Some(user) = active.next() else {
     return Ok(None);
   };
+
   if active.next().is_some() {
     return Err(ObserveError::Ambiguous);
   }
+
   let name = user
     .get("kCGSSessionUserNameKey")
     .and_then(Value::as_str)
     .filter(|name| !name.is_empty() && *name != "loginwindow")
     .ok_or(ObserveError::UnknownState)?;
+
   let uid = user
     .get("kCGSSessionUserIDKey")
     .and_then(Value::as_u64)
     .and_then(|uid| u32::try_from(uid).ok())
     .filter(|uid| *uid != 0)
     .ok_or(ObserveError::UnknownState)?;
+
   let uuid =
     user.get("CGSSessionUniqueSessionUUID").and_then(Value::as_str).filter(|uuid| valid_uuid(uuid)).ok_or(ObserveError::UnknownState)?;
 
@@ -147,6 +155,7 @@ mod tests {
     let user = user(true, true);
     let locked = parse_snapshot(&snapshot(Some(true), &user)).unwrap().unwrap();
     let usable = parse_snapshot(&snapshot(Some(false), &user)).unwrap().unwrap();
+
     assert!(locked.same_identity(&usable));
     assert!(locked.is_locked());
     assert!(!usable.is_locked());
@@ -164,6 +173,7 @@ mod tests {
   #[test]
   fn rejects_ambiguous_or_invalid_identity() {
     let user = user(true, true);
+
     assert_eq!(parse_snapshot(&snapshot(Some(true), &format!("{user},{user}"))), Err(ObserveError::Ambiguous));
     assert_eq!(parse_snapshot(&snapshot(Some(true), &user.replace("neko", "loginwindow"))), Err(ObserveError::UnknownState));
     assert_eq!(
@@ -178,9 +188,12 @@ mod tests {
     let selected = parse_snapshot(&snapshot(Some(true), &user)).unwrap().unwrap();
     let changed_uuid = user.replace("EDFAAA3D-E075-4A31-A5F5-A066E6508D23", "2DC7C153-9924-4323-A561-218F4EAFA75E");
     let replacement = parse_snapshot(&snapshot(Some(false), &changed_uuid)).unwrap().unwrap();
+
     assert!(!selected.same_identity(&replacement));
+
     let changed_uid = user.replace("\"kCGSSessionUserIDKey\":501", "\"kCGSSessionUserIDKey\":502");
     let replacement = parse_snapshot(&snapshot(Some(false), &changed_uid)).unwrap().unwrap();
+
     assert!(!selected.same_identity(&replacement));
   }
 }

@@ -71,19 +71,23 @@ impl DeviceLocalControl for LinuxLocalEnrollment {
     if request.credential_kind != CredentialKind::OsPassword {
       return Err(LocalControlError::UnsupportedCredentialKind);
     }
+
     if request.storage_kind != StorageKind::Protected {
       // TODO(device-entry-linux-plaintext): explicit administrator-selected
       // plaintext fallback needs its own restricted store and removal gate.
       return Err(LocalControlError::UnsupportedStorageKind);
     }
+
     let account = resolve_user(&request.user)?;
     authorize(principal, account.uid)?;
+
     if current_euid() != account.uid {
       // An administrator may authorize another account, but the current host
       // cannot access that user's Secret Service. An authorized per-user host
       // is required before cross-account enrollment can be enabled.
       return Err(LocalControlError::HostUnavailable);
     }
+
     let _guard = self.account_locks.lock(&account.id).await.map_err(|_| LocalControlError::Persistence)?;
     let credential = request.credential;
     // The GNOME logind Unlock method does not consume this secret, but the
@@ -118,10 +122,13 @@ impl DeviceLocalControl for LinuxLocalEnrollment {
     // fails, the caller sees an error but no later remote request can unlock.
     // Retrying this method can still remove an orphan after the tombstone.
     self.metadata.remove(&account.id).map_err(|_| LocalControlError::Persistence)?;
+
     if current_euid() != account.uid {
       return Err(LocalControlError::HostUnavailable);
     }
+
     let vault = GnomeSecretVault::connect_for_current_user().await.map_err(vault_error)?;
+
     match vault.remove(account.uid).await {
       Ok(()) => Ok(()),
       Err(VaultError::Missing) if existed => Ok(()),
@@ -158,10 +165,13 @@ struct Account {
 
 fn resolve_user(user: &str) -> Result<Account, LocalControlError> {
   let name = CString::new(user).map_err(|_| LocalControlError::InvalidAccount)?;
+
   if user.is_empty() || user.trim() != user {
     return Err(LocalControlError::InvalidAccount);
   }
+
   let mut buffer = vec![0u8; 4096];
+
   loop {
     // SAFETY: passwd is a C record whose all-zero value is an output buffer
     // accepted by getpwnam_r; pointers are not read before the call succeeds.
@@ -170,20 +180,25 @@ fn resolve_user(user: &str) -> Result<Account, LocalControlError> {
     // SAFETY: name is a live NUL-terminated CString; record and found are
     // writable, buffer remains live, and its length matches the pointer.
     let result = unsafe { libc::getpwnam_r(name.as_ptr(), &mut record, buffer.as_mut_ptr().cast(), buffer.len(), &mut found) };
+
     if result == libc::ERANGE && buffer.len() < 1024 * 1024 {
       buffer.resize(buffer.len() * 2, 0);
       continue;
     }
+
     if result != 0 {
       return Err(LocalControlError::Persistence);
     }
+
     if found.is_null() || record.pw_name.is_null() {
       return Err(LocalControlError::InvalidAccount);
     }
+
     // SAFETY: a successful getpwnam_r points pw_name into its live output
     // buffer; copy the bytes before buffer or record can be dropped.
     let canonical = unsafe { CStr::from_ptr(record.pw_name) }.to_str().map_err(|_| LocalControlError::InvalidAccount)?.to_owned();
     let uid = record.pw_uid;
+
     return Ok(Account {
       name: canonical,
       uid,
@@ -224,6 +239,7 @@ mod tests {
   #[test]
   fn resolves_root_to_stable_uid() {
     let account = resolve_user("root").unwrap();
+
     assert_eq!(account.uid, 0);
     assert_eq!(account.id, "uid:0");
     assert_eq!(account.name, "root");
@@ -267,13 +283,18 @@ mod tests {
       Arc::new(tokio::sync::RwLock::new(())),
     );
     let own = backend.list_enrollments(&LocalOsPrincipal::UnixUid(1000)).await.unwrap();
+
     assert_eq!(own.len(), 1);
     assert_eq!(own[0].os_account_id, "uid:1000");
     assert_eq!(own[0].state, EnrollmentState::Pending);
+
     let admin = backend.list_enrollments(&LocalOsPrincipal::UnixUid(0)).await.unwrap();
+
     assert_eq!(admin.len(), 2);
     assert_eq!(backend.list_enrollments(&LocalOsPrincipal::WindowsSid("S-1".into())).await, Err(LocalControlError::PermissionDenied));
+
     metadata.remove("uid:1000").unwrap();
+
     assert!(backend.list_enrollments(&LocalOsPrincipal::UnixUid(1000)).await.unwrap().is_empty());
   }
 
@@ -289,6 +310,7 @@ mod tests {
       Arc::new(tokio::sync::RwLock::new(())),
     );
     let ordinary = LocalOsPrincipal::UnixUid(1000);
+
     assert_eq!(backend.get_policy(&ordinary).await, Ok(true));
     assert_eq!(backend.set_policy(&ordinary, false).await, Err(LocalControlError::PermissionDenied));
     assert_eq!(backend.get_policy(&ordinary).await, Ok(true));
@@ -300,6 +322,7 @@ mod tests {
   async fn audit_listing_uses_verified_uid_and_bounded_paging() {
     let directory = tempfile::tempdir().unwrap();
     let audit = test_audit(directory.path());
+
     for id in ["uid:1000", "uid:1001"] {
       audit
         .append(Record {
@@ -314,15 +337,21 @@ mod tests {
         })
         .unwrap();
     }
+
     let metadata = Arc::new(MetadataStore::open(directory.path()).unwrap());
     let backend = LinuxLocalEnrollment::new(metadata, Arc::new(AccountLocks::new()), audit, Arc::new(tokio::sync::RwLock::new(())));
     let own = backend.list_audit(&LocalOsPrincipal::UnixUid(1000), 0, 10).await.unwrap();
+
     assert_eq!(own.entries.len(), 1);
     assert_eq!(own.entries[0].os_account_id.as_deref(), Some("uid:1000"));
+
     let admin = backend.list_audit(&LocalOsPrincipal::UnixUid(0), 0, 1).await.unwrap();
+
     assert_eq!(admin.entries.len(), 1);
     assert!(admin.next_cursor.is_some());
+
     let second = backend.list_audit(&LocalOsPrincipal::UnixUid(0), admin.next_cursor.unwrap(), 1).await.unwrap();
+
     assert_eq!(second.entries.len(), 1);
     assert!(second.next_cursor.is_none());
     assert!(matches!(

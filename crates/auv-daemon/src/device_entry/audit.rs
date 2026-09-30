@@ -66,24 +66,30 @@ impl Audit {
     use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 
     let metadata = std::fs::symlink_metadata(root).map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
+
     if !metadata.file_type().is_dir() {
       return Err(DeviceEntryErrorReason::AuditUnavailable);
     }
+
     if metadata.uid() != current_euid() || metadata.permissions().mode() & 0o077 != 0 {
       return Err(DeviceEntryErrorReason::AuditUnavailable);
     }
+
     let path = root.join("device-entry-audit.jsonl");
     let mut options = OpenOptions::new();
     options.create(true).append(true).read(true);
     options.mode(0o600).custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC);
     let file = options.open(&path).map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
     let metadata = file.metadata().map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
+
     if !metadata.file_type().is_file() {
       return Err(DeviceEntryErrorReason::AuditUnavailable);
     }
+
     if metadata.uid() != current_euid() || metadata.permissions().mode() & 0o077 != 0 {
       return Err(DeviceEntryErrorReason::AuditUnavailable);
     }
+
     validate_existing(&file)?;
     // A newly created audit pathname must also survive a process crash.
     File::open(root).and_then(|directory| directory.sync_all()).map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
@@ -123,12 +129,15 @@ impl Audit {
     let write_result = file.seek(SeekFrom::End(0)).and_then(|_| file.write_all(&bytes)).and_then(|_| file.sync_data());
     #[cfg(unix)]
     let write_result = file.write_all(&bytes).and_then(|_| file.sync_data());
+
     if write_result.is_err() {
       // A short write can leave a torn JSONL record. Do not append another
       // attempt after any write or durability failure in this process.
       self.poisoned.store(true, Ordering::Release);
+
       return Err(DeviceEntryErrorReason::AuditUnavailable);
     }
+
     Ok(())
   }
 
@@ -154,37 +163,47 @@ impl Audit {
       LocalOsPrincipal::WindowsSid(sid) if sid.starts_with("S-1-") => Some(sid.clone()),
       _ => return Err(DeviceEntryErrorReason::AuditUnavailable),
     };
+
     if limit == 0 || limit > 100 {
       return Err(DeviceEntryErrorReason::AuditUnavailable);
     }
+
     let mut file = self.file.lock().map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
     self.require_healthy()?;
     let length = file.metadata().map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?.len();
+
     if cursor > length {
       return Err(DeviceEntryErrorReason::AuditUnavailable);
     }
+
     if cursor > 0 {
       file.seek(SeekFrom::Start(cursor - 1)).map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
       let mut previous = [0];
       file.read_exact(&mut previous).map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
+
       if previous[0] != b'\n' {
         return Err(DeviceEntryErrorReason::AuditUnavailable);
       }
     }
+
     file.seek(SeekFrom::Start(cursor)).map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
     let mut reader = BufReader::new(&mut *file);
     let mut entries = Vec::new();
     let mut scanned = 0;
+
     while entries.len() < limit && scanned < 1000 {
       let Some(line) = read_bounded_line(&mut reader)? else {
         break;
       };
+
       scanned += 1;
       let entry: AuditEntry = serde_json::from_slice(&line).map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
+
       if own_id.as_deref().is_none_or(|id| entry.os_account_id.as_deref() == Some(id)) {
         entries.push(entry);
       }
     }
+
     let position = reader.stream_position().map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
     Ok(AuditPage {
       entries,
@@ -211,17 +230,21 @@ fn validate_existing(file: &File) -> Result<(), DeviceEntryErrorReason> {
   let mut copy = file.try_clone().map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
   copy.seek(SeekFrom::Start(0)).map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
   let mut reader = BufReader::new(copy);
+
   while let Some(line) = read_bounded_line(&mut reader)? {
     let _: AuditEntry = serde_json::from_slice(&line).map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
   }
+
   Ok(())
 }
 
 fn read_bounded_line(reader: &mut impl BufRead) -> Result<Option<Vec<u8>>, DeviceEntryErrorReason> {
   const MAX_LINE_BYTES: usize = 8 * 1024;
   let mut line = Vec::new();
+
   loop {
     let available = reader.fill_buf().map_err(|_| DeviceEntryErrorReason::AuditUnavailable)?;
+
     if available.is_empty() {
       return if line.is_empty() {
         Ok(None)
@@ -229,13 +252,17 @@ fn read_bounded_line(reader: &mut impl BufRead) -> Result<Option<Vec<u8>>, Devic
         Err(DeviceEntryErrorReason::AuditUnavailable)
       };
     }
+
     let take = available.iter().position(|byte| *byte == b'\n').map_or(available.len(), |position| position + 1);
+
     if line.len() + take > MAX_LINE_BYTES {
       return Err(DeviceEntryErrorReason::AuditUnavailable);
     }
+
     let ends_line = available[take - 1] == b'\n';
     line.extend_from_slice(&available[..take]);
     reader.consume(take);
+
     if ends_line {
       return Ok(Some(line));
     }
@@ -280,6 +307,7 @@ mod tests {
     let root = tempfile::tempdir().unwrap();
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     let audit = Audit::open(root.path()).unwrap();
+
     for (id, selector) in [
       ("uid:501", "macos:a"),
       ("uid:502", "macos:b"),
@@ -298,12 +326,18 @@ mod tests {
         })
         .unwrap();
     }
+
     let first = audit.read_for_principal(&LocalOsPrincipal::UnixUid(0), 0, 2).unwrap();
+
     assert_eq!(first.entries.len(), 2);
+
     let second = audit.read_for_principal(&LocalOsPrincipal::UnixUid(0), first.next_cursor.unwrap(), 2).unwrap();
+
     assert_eq!(second.entries.len(), 1);
     assert!(second.next_cursor.is_none());
+
     let own = audit.read_for_principal(&LocalOsPrincipal::UnixUid(501), 0, 100).unwrap();
+
     assert_eq!(own.entries.len(), 2);
     assert!(own.entries.iter().all(|entry| entry.os_account_id.as_deref() == Some("uid:501")));
     assert_eq!(audit.read_for_principal(&LocalOsPrincipal::UnixUid(502), 0, 100).unwrap().entries.len(), 1);
@@ -322,6 +356,7 @@ mod tests {
       poisoned: AtomicBool::new(false),
       path,
     };
+
     for sid in ["S-1-5-21-1001", "S-1-5-21-1002"] {
       audit
         .append(Record {
@@ -336,12 +371,18 @@ mod tests {
         })
         .unwrap();
     }
+
     let own = audit.read_for_principal(&LocalOsPrincipal::WindowsSid("S-1-5-21-1001".into()), 0, 100).unwrap();
+
     assert_eq!(own.entries.len(), 1);
     assert_eq!(own.entries[0].os_account_id.as_deref(), Some("S-1-5-21-1001"));
+
     let system = audit.read_for_principal(&LocalOsPrincipal::WindowsSid("S-1-5-18".into()), 0, 100).unwrap();
+
     assert_eq!(system.entries.len(), 2);
+
     let administrator = audit.read_for_principal(&LocalOsPrincipal::WindowsAdministratorSid("S-1-5-21-2000".into()), 0, 100).unwrap();
+
     assert_eq!(administrator.entries.len(), 2);
   }
 
@@ -367,7 +408,9 @@ mod tests {
       result: None,
       at_unix_millis: 0,
     };
+
     assert!(matches!(audit.append(record()), Err(DeviceEntryErrorReason::AuditUnavailable)));
+
     *audit.file.lock().unwrap() = OpenOptions::new().append(true).open(&path).unwrap();
     assert!(matches!(audit.append(record()), Err(DeviceEntryErrorReason::AuditUnavailable)));
     assert!(std::fs::read(&path).unwrap().is_empty());
@@ -379,6 +422,7 @@ mod tests {
     let root = tempfile::tempdir().unwrap();
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     std::fs::write(root.path().join("device-entry-audit.jsonl"), b"{\"event\":\"attempt\"").unwrap();
+
     assert!(matches!(Audit::open(root.path()), Err(DeviceEntryErrorReason::AuditUnavailable)));
   }
 }

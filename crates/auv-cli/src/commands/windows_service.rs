@@ -52,18 +52,22 @@ fn validate(args: &ServeArgs) -> Result<(), String> {
 fn validate_with_root(args: &ServeArgs, expected_root: &std::path::Path) -> Result<(), String> {
   let root = args.store_root.as_ref().ok_or("--windows-service requires --store-root")?;
   let pairing = args.pairing_store.as_ref().ok_or("--windows-service requires --pairing-store")?;
+
   if !root.is_absolute() || !pairing.is_absolute() {
     return Err("Windows service store paths must be absolute".into());
   }
+
   if root != expected_root || pairing != &root.join("pairings.json") {
     return Err("Windows service requires --store-root at ProgramData\\AUVDeviceEntry and --pairing-store at its pairings.json".into());
   }
+
   // TODO(windows-service-installed-gate): Protected Windows PairingStore has
   // native unit coverage; require installed LocalSystem, ACL, and listener
   // verification before enabling a live Device-entry service.
   let [listener] = args.listeners.as_slice() else {
     return Err("Windows service requires exactly one explicit http://LOOPBACK_IP:PORT --listen URI".into());
   };
+
   let address = listener
     .strip_prefix("http://")
     .ok_or("Windows service requires an http://LOOPBACK_IP:PORT --listen URI")?
@@ -74,9 +78,11 @@ fn validate_with_root(args: &ServeArgs, expected_root: &std::path::Path) -> Resu
   if !address.ip().is_loopback() || address.port() == 0 {
     return Err("Windows service --listen must use a loopback IP and nonzero port".into());
   }
+
   if args.discovery_file.is_some() || args.daemon_idle_timeout.is_some() || !args.runner_providers.is_empty() {
     return Err("Windows service does not accept --discovery-file, --daemon-idle-timeout, or --runner-provider".into());
   }
+
   Ok(())
 }
 
@@ -99,6 +105,7 @@ fn serve_service() -> Result<(), String> {
       {
         let _ = report(&handle, ServiceState::StopPending, ServiceControlAccept::empty(), 0, 1, Duration::from_secs(30));
       }
+
       handler_shutdown.cancel();
       ServiceControlHandlerResult::NoError
     }
@@ -117,14 +124,17 @@ fn serve_service() -> Result<(), String> {
       .enable_all()
       .build()
       .map_err(|error| format!("failed to create Windows service runtime: {error}"))?;
+
     let heartbeat_shutdown = shutdown.clone();
     let heartbeat_status = status;
     runtime.spawn(async move {
       heartbeat_shutdown.cancelled().await;
       let mut ticker = tokio::time::interval(Duration::from_secs(10));
       ticker.tick().await;
+
       for checkpoint in 2.. {
         ticker.tick().await;
+
         if report(&heartbeat_status, ServiceState::StopPending, ServiceControlAccept::empty(), 0, checkpoint, Duration::from_secs(30))
           .is_err()
         {
@@ -136,6 +146,7 @@ fn serve_service() -> Result<(), String> {
       if shutdown.is_cancelled() {
         return Err("service stopped during startup".into());
       }
+
       report(&status, ServiceState::Running, ServiceControlAccept::STOP, 0, 0, Duration::ZERO)
     }))?;
     Ok::<(), String>(())
@@ -194,9 +205,11 @@ fn require_local_system_session_zero() -> Result<(), String> {
   let mut session = u32::MAX;
   // SAFETY: ProcessIdToSessionId writes one live u32.
   unsafe { ProcessIdToSessionId(GetCurrentProcessId(), &mut session) }.map_err(|error| error.to_string())?;
+
   if session != 0 {
     return Err("Windows service must run in Session 0".into());
   }
+
   let mut raw = HANDLE::default();
   // SAFETY: OpenProcessToken gives one owned handle on success.
   unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut raw) }.map_err(|error| error.to_string())?;
@@ -204,21 +217,27 @@ fn require_local_system_session_zero() -> Result<(), String> {
   let mut bytes = 0u32;
   // SAFETY: A null buffer queries the required TokenUser size.
   let _ = unsafe { GetTokenInformation(token.0, TokenUser, None, 0, &mut bytes) };
+
   if bytes < size_of::<TOKEN_USER>() as u32 || align_of::<TOKEN_USER>() > align_of::<usize>() {
     return Err("Windows service token user information is invalid".into());
   }
+
   let mut data = vec![0usize; (bytes as usize).div_ceil(size_of::<usize>())];
   // SAFETY: The usize buffer is aligned and sized for TOKEN_USER and its SID.
   unsafe { GetTokenInformation(token.0, TokenUser, Some(data.as_mut_ptr().cast()), bytes, &mut bytes) }
     .map_err(|error| error.to_string())?;
+
   if (bytes as usize) < size_of::<TOKEN_USER>() {
     return Err("Windows service token user information is truncated".into());
   }
+
   // SAFETY: GetTokenInformation wrote a complete TOKEN_USER header.
   let user = unsafe { data.as_ptr().cast::<TOKEN_USER>().read() };
+
   if user.User.Sid.0.is_null() || !unsafe { IsWellKnownSid(user.User.Sid, WinLocalSystemSid) }.as_bool() {
     return Err("Windows service must run as LocalSystem".into());
   }
+
   Ok(())
 }
 
@@ -241,8 +260,11 @@ mod tests {
       runner_providers: Vec::new(),
       windows_service: true,
     };
+
     assert!(validate_with_root(&args, root).is_ok());
+
     let service = service_options(args.clone()).unwrap();
+
     assert!(!service.local_driver_runner);
     assert!(!service.publish_discovery);
     assert!(!service.emit_bound_endpoints);
@@ -251,20 +273,29 @@ mod tests {
     let absent_root = root.join("new-store");
     args.store_root = Some(absent_root.clone());
     args.pairing_store = Some(absent_root.join("pairings.json"));
+
     assert!(validate_with_root(&args, &absent_root).is_ok());
+
     args.store_root = Some(root.to_path_buf());
     args.pairing_store = Some(root.join("pairings.json"));
 
     args.listeners.clear();
+
     assert!(validate_with_root(&args, root).unwrap_err().contains("--listen"));
+
     args.listeners.push("http://127.0.0.1:9847".into());
     args.listeners[0] = "http://0.0.0.0:9847".into();
+
     assert!(validate_with_root(&args, root).unwrap_err().contains("loopback"));
+
     args.listeners[0] = "http://127.0.0.1:9847".into();
     args.pairing_store = Some(root.join("nested").join("pairings.json"));
+
     assert!(validate_with_root(&args, root).unwrap_err().contains("pairings.json"));
+
     args.pairing_store = Some(root.join("pairings.json"));
     args.runner_providers.push(root.join("provider.json"));
+
     assert!(validate_with_root(&args, root).unwrap_err().contains("--runner-provider"));
   }
 }

@@ -467,6 +467,7 @@ fn write_document(path: &Path, document: &ConfigDocument) -> Result<(), ProfileE
       // get default file permissions under a permissive process umask.
       options.mode(0o600);
     }
+
     let mut file = options.open(&temporary).map_err(|source| ProfileError::Write {
       kind: "config profile store",
       path: temporary.clone(),

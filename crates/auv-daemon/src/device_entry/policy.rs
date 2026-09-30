@@ -164,6 +164,7 @@ impl<H: SessionHost, S: EnrollmentStore> Policy<H, S> {
     let _policy_guard = self.policy_gate.read().await;
     let result = self.ensure_inner(caller, &target, &mut attempt.selected).await;
     attempt.finish(&result)?;
+
     match (attempt.selected.take(), result) {
       (Some(selected), Ok(kind)) => Ok(EnsureUserSessionUnlockedEffect {
         kind,
@@ -189,6 +190,7 @@ impl<H: SessionHost, S: EnrollmentStore> Policy<H, S> {
       Err(reason) => reason.as_str(),
     };
     attempt.finish_named(audit_result)?;
+
     match (attempt.selected.take(), result) {
       (Some(selected), Ok(kind)) => Ok(EnsureUserSessionLockedEffect {
         kind,
@@ -218,19 +220,23 @@ impl<H: SessionHost, S: EnrollmentStore> Policy<H, S> {
     // not grant lock-only access to an unenrolled OS account. Lock never
     // retrieves the credential, but the target must have enrolled it.
     self.enrollment_for_lock(&selected)?;
+
     match selected.public.lock_state {
       UserSessionLockState::Locked => return Ok(DeviceLockEffectKind::AlreadyLocked),
       UserSessionLockState::Unknown => return Err(DeviceEntryErrorReason::UnsupportedOsState),
       UserSessionLockState::Usable => {}
     }
+
     // Native delivery is synchronous. Pairing revocation after this check
     // affects later requests; a request already admitted may complete.
     self.reauthorize(caller)?;
     self.host.lock_usable(&selected)?;
     let after = self.reobserve(&selected)?;
+
     if after.public.lock_state != UserSessionLockState::Locked {
       return Err(DeviceEntryErrorReason::OutcomeUnverified);
     }
+
     Ok(DeviceLockEffectKind::LockedExistingSession)
   }
 
@@ -264,6 +270,7 @@ impl<H: SessionHost, S: EnrollmentStore> Policy<H, S> {
       UserSessionLockState::Unknown => return Err(DeviceEntryErrorReason::UnsupportedOsState),
       UserSessionLockState::Locked => {}
     }
+
     // The installed PAM stack may act on the login keyring. Its check is an
     // admitted host effect, so the host rechecks this bearer immediately
     // before invoking PAM, after asynchronous vault retrieval.
@@ -273,17 +280,21 @@ impl<H: SessionHost, S: EnrollmentStore> Policy<H, S> {
       EnrollmentState::Ready => self.host.verify_ready_credential(selected, &authorize_effect).await,
       EnrollmentState::Suspended => return Err(DeviceEntryErrorReason::Suspended),
     };
+
     if matches!(verified, Err(DeviceEntryErrorReason::CredentialRejected)) {
       // An invalid enrolled OS credential must not authorize this or a later
       // request, even when an earlier attempt promoted it to Ready.
       self.store.suspend(&enrollment.os_account_id, enrollment.generation)?;
     }
+
     verified?;
+
     if enrollment.state == EnrollmentState::Pending {
       self.recheck(selected, enrollment)?;
       self.store.promote_ready(&enrollment.os_account_id, enrollment.generation)?;
       enrollment.state = EnrollmentState::Ready;
     }
+
     self.recheck(selected, enrollment)?;
     // NOTICE(pairing-linearization): The host checks the bearer immediately
     // before effectful PAM work. A second exact-credential read here admits
@@ -291,49 +302,62 @@ impl<H: SessionHost, S: EnrollmentStore> Policy<H, S> {
     // already admitted input may complete.
     self.reauthorize(caller)?;
     let delivered = self.host.unlock_locked(selected);
+
     if matches!(delivered, Err(DeviceEntryErrorReason::CredentialRejected)) {
       // A confirmed rejection suspends this generation. An input error or
       // unverified effect alone must not suspend the account.
       self.store.suspend(&enrollment.os_account_id, enrollment.generation)?;
     }
+
     delivered?;
     let after = self.reobserve(selected)?;
+
     if after.public.lock_state != UserSessionLockState::Usable {
       return Err(DeviceEntryErrorReason::OutcomeUnverified);
     }
+
     Ok(DeviceEntryEffectKind::UnlockedExistingSession)
   }
 
   fn eligible_enrollment(&self, selected: &ObservedSession) -> Result<Enrollment, DeviceEntryErrorReason> {
     let enrollment = self.enrollment_for_lock(selected)?;
+
     if enrollment.state == EnrollmentState::Pending && selected.public.lock_state == UserSessionLockState::Usable {
       // Pending credentials can become Ready only under the locked host.
       return Err(DeviceEntryErrorReason::Unenrolled);
     }
+
     Ok(enrollment)
   }
 
   fn enrollment_for_lock(&self, selected: &ObservedSession) -> Result<Enrollment, DeviceEntryErrorReason> {
     let enrollment = self.store.enrollment(&selected.os_account_id)?.ok_or(DeviceEntryErrorReason::Unenrolled)?;
+
     if enrollment.os_account_id != selected.os_account_id || enrollment.user != selected.public.user || enrollment.generation == 0 {
       return Err(DeviceEntryErrorReason::StaleSession);
     }
+
     if enrollment.state == EnrollmentState::Suspended {
       return Err(DeviceEntryErrorReason::Suspended);
     }
+
     Ok(enrollment)
   }
 
   fn recheck(&self, selected: &ObservedSession, enrollment: &Enrollment) -> Result<(), DeviceEntryErrorReason> {
     self.require_enabled()?;
     let now = self.reobserve(selected)?;
+
     if now.public.lock_state != UserSessionLockState::Locked {
       return Err(DeviceEntryErrorReason::StaleSession);
     }
+
     let current = self.eligible_enrollment(&now)?;
+
     if current.generation != enrollment.generation || current.state != enrollment.state {
       return Err(DeviceEntryErrorReason::Unenrolled);
     }
+
     Ok(())
   }
 
@@ -344,9 +368,11 @@ impl<H: SessionHost, S: EnrollmentStore> Policy<H, S> {
       .into_iter()
       .find(|session| session.public.selector == selected.public.selector)
       .ok_or(DeviceEntryErrorReason::StaleSession)?;
+
     if current.os_account_id != selected.os_account_id || current.public.user != selected.public.user {
       return Err(DeviceEntryErrorReason::StaleSession);
     }
+
     Ok(current)
   }
 
@@ -362,6 +388,7 @@ impl<H: SessionHost, S: EnrollmentStore> Policy<H, S> {
     if caller == &CallerId::local_owner() {
       return Ok(());
     }
+
     if self.pairing.as_ref().is_some_and(|pairing| pairing.is_active_caller(caller)) {
       Ok(())
     } else {
@@ -407,9 +434,11 @@ impl AuditAttempt {
     // be replaced by a misleading CANCELED record during Drop.
     self.finished = true;
     let written = self.audit.append(record("outcome", &self.id, &self.caller, self.selected.as_ref(), Some(result)));
+
     if written.is_err() {
       self.audit.poison();
     }
+
     written
   }
 }
@@ -437,9 +466,11 @@ fn select(sessions: Vec<ObservedSession>, target: &UserSessionTarget) -> Result<
     UserSessionTarget::User(_) => DeviceEntryErrorReason::UnsupportedOsState,
     UserSessionTarget::SessionSelector(_) => DeviceEntryErrorReason::StaleSession,
   })?;
+
   if matches.next().is_some() {
     return Err(DeviceEntryErrorReason::AmbiguousUser);
   }
+
   Ok(selected)
 }
 
@@ -508,6 +539,7 @@ mod tests {
     ) -> Result<(), DeviceEntryErrorReason> {
       authorize_effect()?;
       self.probes.fetch_add(1, Ordering::SeqCst);
+
       match *self.probe_error.lock().unwrap() {
         Some(error) => Err(error),
         None => Ok(()),
@@ -525,9 +557,11 @@ mod tests {
 
     fn unlock_locked(&self, selected: &ObservedSession) -> Result<(), DeviceEntryErrorReason> {
       self.deliveries.fetch_add(1, Ordering::SeqCst);
+
       if let Some(error) = *self.delivery_error.lock().unwrap() {
         return Err(error);
       }
+
       let mut sessions = self.sessions.lock().unwrap();
       let current = sessions.iter_mut().find(|current| current.public.selector == selected.public.selector).unwrap();
       current.public.lock_state = UserSessionLockState::Usable;
@@ -536,9 +570,11 @@ mod tests {
 
     fn lock_usable(&self, selected: &ObservedSession) -> Result<(), DeviceEntryErrorReason> {
       self.deliveries.fetch_add(1, Ordering::SeqCst);
+
       if let Some(error) = *self.delivery_error.lock().unwrap() {
         return Err(error);
       }
+
       let mut sessions = self.sessions.lock().unwrap();
       let current = sessions.iter_mut().find(|current| current.public.selector == selected.public.selector).unwrap();
       current.public.lock_state = UserSessionLockState::Locked;
@@ -566,6 +602,7 @@ mod tests {
       use std::os::unix::fs::PermissionsExt;
       std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     }
+
     let store = Arc::new(MetadataStore::open(root.path()).unwrap());
     let audit = Arc::new(Audit::open(root.path()).unwrap());
     (root, Policy::new(host, store, audit, Arc::new(AccountLocks::new()), Arc::new(tokio::sync::RwLock::new(())), None))
@@ -604,16 +641,20 @@ mod tests {
     let enrollment = policy.store.publish_pending("neko", "uid:1000").unwrap();
     policy.store.promote_ready("uid:1000", enrollment.generation).unwrap();
     let result = policy.ensure_locked(&caller(), UserSessionTarget::SessionSelector("s".into())).await.unwrap();
+
     assert_eq!(result.kind, DeviceLockEffectKind::LockedExistingSession);
     assert_eq!(result.session_selector, "s");
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 1);
     assert_eq!(host.probes.load(Ordering::SeqCst), 0);
     assert_eq!(host.ready_probes.load(Ordering::SeqCst), 0);
     assert_eq!(policy.get("s").unwrap().lock_state, UserSessionLockState::Locked);
+
     let audit = std::fs::read_to_string(root.path().join("device-entry-audit.jsonl")).unwrap();
+
     assert!(audit.contains("LOCKED_EXISTING_SESSION"));
 
     let again = policy.ensure_locked(&caller(), UserSessionTarget::SessionSelector("s".into())).await.unwrap();
+
     assert_eq!(again.kind, DeviceLockEffectKind::AlreadyLocked);
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 1);
   }
@@ -632,12 +673,14 @@ mod tests {
     policy.store.publish_pending("neko", "uid:1000").unwrap();
 
     let locked = policy.ensure_locked(&caller(), UserSessionTarget::SessionSelector("s".into())).await.unwrap();
+
     assert_eq!(locked.kind, DeviceLockEffectKind::LockedExistingSession);
     assert_eq!(locked.session_selector, "s");
     assert_eq!(host.probes.load(Ordering::SeqCst), 0);
     assert_eq!(policy.store.enrollment("uid:1000").unwrap().unwrap().state, EnrollmentState::Pending);
 
     let unlocked = policy.ensure(&caller(), UserSessionTarget::SessionSelector("s".into())).await.unwrap();
+
     assert_eq!(unlocked.kind, DeviceEntryEffectKind::UnlockedExistingSession);
     assert_eq!(unlocked.session_selector.as_deref(), Some("s"));
     assert_eq!(host.probes.load(Ordering::SeqCst), 1);
@@ -651,6 +694,7 @@ mod tests {
     let host = Arc::new(Host::new(vec![session("s", UserSessionLockState::Usable)]));
     let (_root, policy) = fixture(Arc::clone(&host));
     let error = policy.ensure_locked(&CallerId::paired_device("revoked"), UserSessionTarget::User("neko".into())).await.unwrap_err();
+
     assert_eq!(error, DeviceEntryErrorReason::Unauthorized);
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 0);
   }
@@ -661,6 +705,7 @@ mod tests {
     let host = Arc::new(Host::new(vec![session("s", UserSessionLockState::Usable)]));
     let (_root, policy) = fixture(Arc::clone(&host));
     let error = policy.ensure_locked(&caller(), UserSessionTarget::User("neko".into())).await.unwrap_err();
+
     assert_eq!(error, DeviceEntryErrorReason::Unenrolled);
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 0);
   }
@@ -691,10 +736,15 @@ mod tests {
     .unwrap();
 
     request.abort();
+
     assert!(request.await.unwrap_err().is_cancelled());
+
     drop(account_guard);
+
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 0);
+
     let entries = policy.audit.read_for_principal(&LocalOsPrincipal::UnixUid(0), 0, 10).unwrap().entries;
+
     assert_eq!(entries.len(), 2);
     assert_eq!(entries[0].event, "attempt");
     assert_eq!(entries[1].event, "outcome");
@@ -725,11 +775,16 @@ mod tests {
     .unwrap();
 
     request.abort();
+
     assert!(request.await.unwrap_err().is_cancelled());
+
     drop(policy_guard);
+
     assert_eq!(host.observations.load(Ordering::SeqCst), 0);
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 0);
+
     let entries = policy.audit.read_for_principal(&LocalOsPrincipal::UnixUid(0), 0, 10).unwrap().entries;
+
     assert_eq!(entries.len(), 2);
     assert_eq!(entries[0].event, "attempt");
     assert_eq!(entries[1].event, "outcome");
@@ -760,7 +815,9 @@ mod tests {
 
     assert_eq!(attempt.await.unwrap().unwrap_err(), DeviceEntryErrorReason::Unauthorized);
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 0);
+
     let audit = std::fs::read_to_string(root.path().join("device-entry-audit.jsonl")).unwrap();
+
     assert!(audit.contains("UNAUTHORIZED"));
     assert!(!audit.contains("credential_sha256"));
   }
@@ -845,7 +902,9 @@ mod tests {
     assert_eq!(attempt.await.unwrap().unwrap_err(), DeviceEntryErrorReason::Unauthorized);
     assert_eq!(effects.load(Ordering::SeqCst), 0);
     assert_eq!(inner.deliveries.load(Ordering::SeqCst), 0);
+
     let audit = std::fs::read_to_string(root.path().join("device-entry-audit.jsonl")).unwrap();
+
     assert!(audit.contains("UNAUTHORIZED"));
   }
 
@@ -869,7 +928,9 @@ mod tests {
     let token = pairing.issue_token(None).unwrap().expose_once();
     let enrolled = pairing.consume_token(&token, "paired-a".into(), "Paired A again".into()).unwrap();
     let new_caller = pairing.authenticate_bearer(&enrolled.expose_credential_once()).unwrap();
+
     assert!(pairing.is_active_caller(&new_caller));
+
     drop(account_guard);
 
     assert_eq!(attempt.await.unwrap().unwrap_err(), DeviceEntryErrorReason::Unauthorized);
@@ -886,12 +947,15 @@ mod tests {
     policy.store.invalidate_for_enroll("neko", "uid:1000").unwrap();
     policy.store.publish_pending("neko", "uid:1000").unwrap();
     let result = policy.ensure(&caller(), UserSessionTarget::User("neko".into())).await.unwrap();
+
     assert_eq!(result.kind, DeviceEntryEffectKind::UnlockedExistingSession);
     assert_eq!(host.probes.load(Ordering::SeqCst), 1);
     assert_eq!(host.ready_probes.load(Ordering::SeqCst), 0);
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 1);
     assert_eq!(policy.store.enrollment("uid:1000").unwrap().unwrap().state, EnrollmentState::Ready);
+
     let audit = std::fs::read_to_string(root.path().join("device-entry-audit.jsonl")).unwrap();
+
     assert_eq!(audit.lines().count(), 2);
     assert!(audit.contains("UNLOCKED_EXISTING_SESSION"));
     assert!(!audit.contains("credential"));
@@ -911,9 +975,12 @@ mod tests {
     policy.store.promote_ready("uid:1000", record.generation).unwrap();
 
     let first = policy.ensure(&caller(), UserSessionTarget::User("neko".into())).await.unwrap();
+
     assert_eq!(first.kind, DeviceEntryEffectKind::UnlockedExistingSession);
+
     host.sessions.lock().unwrap()[0].public.lock_state = UserSessionLockState::Locked;
     let second = policy.ensure(&caller(), UserSessionTarget::User("neko".into())).await.unwrap();
+
     assert_eq!(second.kind, DeviceEntryEffectKind::UnlockedExistingSession);
     assert_eq!(host.probes.load(Ordering::SeqCst), 2);
     assert_eq!(host.ready_probes.load(Ordering::SeqCst), 2);
@@ -1042,10 +1109,13 @@ mod tests {
     });
     tokio::time::timeout(std::time::Duration::from_secs(2), entered.notified()).await.unwrap();
     attempt.abort();
+
     assert!(attempt.await.unwrap_err().is_cancelled());
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 0);
     assert_eq!(policy.store.enrollment("uid:1000").unwrap().unwrap().state, EnrollmentState::Pending);
+
     let audit = std::fs::read_to_string(root.path().join("device-entry-audit.jsonl")).unwrap();
+
     assert_eq!(audit.lines().count(), 2);
     assert!(audit.contains("CANCELED"));
   }
@@ -1055,6 +1125,7 @@ mod tests {
     let host = Arc::new(Host::new(vec![session("s", UserSessionLockState::Locked)]));
     let (_root, policy) = fixture(Arc::clone(&host));
     policy.store.set_enabled(false).unwrap();
+
     assert!(matches!(policy.list(), Err(DeviceEntryErrorReason::Disabled)));
     assert!(matches!(policy.ensure(&caller(), UserSessionTarget::User("neko".into())).await, Err(DeviceEntryErrorReason::Disabled)));
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 0);
@@ -1151,7 +1222,9 @@ mod tests {
     })
     .await
     .unwrap();
+
     assert!(!disable.is_finished());
+
     release_tx.send(()).unwrap();
 
     assert_eq!(unlock.await.unwrap().unwrap().kind, DeviceEntryEffectKind::UnlockedExistingSession);
@@ -1168,6 +1241,7 @@ mod tests {
     let record = policy.store.publish_pending("neko", "uid:1000").unwrap();
     policy.store.promote_ready("uid:1000", record.generation).unwrap();
     let result = policy.ensure(&caller(), UserSessionTarget::SessionSelector("s".into())).await.unwrap();
+
     assert_eq!(result.kind, DeviceEntryEffectKind::AlreadyUsable);
     assert_eq!(host.probes.load(Ordering::SeqCst), 0);
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 0);
@@ -1180,13 +1254,17 @@ mod tests {
       session("s2", UserSessionLockState::Locked),
     ]));
     let (root, policy) = fixture(Arc::clone(&host));
+
     assert!(matches!(policy.ensure(&caller(), UserSessionTarget::User("neko".into())).await, Err(DeviceEntryErrorReason::AmbiguousUser)));
     assert!(matches!(
       policy.ensure(&caller(), UserSessionTarget::SessionSelector("s1".into())).await,
       Err(DeviceEntryErrorReason::Unenrolled)
     ));
+
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 0);
+
     let audit = std::fs::read_to_string(root.path().join("device-entry-audit.jsonl")).unwrap();
+
     assert_eq!(audit.lines().count(), 4);
     assert!(audit.contains("AMBIGUOUS_USER"));
     assert!(audit.contains("UNENROLLED"));
@@ -1204,6 +1282,7 @@ mod tests {
       policy.ensure(&caller(), UserSessionTarget::User("neko".into())).await,
       Err(DeviceEntryErrorReason::CredentialRejected)
     ));
+
     assert_eq!(policy.store.enrollment("uid:1000").unwrap().unwrap().state, EnrollmentState::Suspended);
     assert!(matches!(policy.ensure(&caller(), UserSessionTarget::User("neko".into())).await, Err(DeviceEntryErrorReason::Suspended)));
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 1);
@@ -1216,14 +1295,17 @@ mod tests {
     policy.store.invalidate_for_enroll("neko", "uid:1000").unwrap();
     let record = policy.store.publish_pending("neko", "uid:1000").unwrap();
     policy.store.promote_ready("uid:1000", record.generation).unwrap();
+
     assert!(matches!(
       policy.ensure(&caller(), UserSessionTarget::SessionSelector("previous".into())).await,
       Err(DeviceEntryErrorReason::StaleSession)
     ));
+
     assert!(matches!(
       policy.ensure(&caller(), UserSessionTarget::SessionSelector("current".into())).await,
       Err(DeviceEntryErrorReason::UnsupportedOsState)
     ));
+
     assert_eq!(host.deliveries.load(Ordering::SeqCst), 0);
   }
 
@@ -1235,15 +1317,19 @@ mod tests {
       use std::os::unix::fs::PermissionsExt;
       std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     }
+
     let store = MetadataStore::open(root.path()).unwrap();
     store.invalidate_for_enroll("neko", "uid:1000").unwrap();
     let old = store.publish_pending("neko", "uid:1000").unwrap();
     store.remove("uid:1000").unwrap();
+
     assert!(store.enrollment("uid:1000").unwrap().is_none());
+
     drop(store);
     let reopened = MetadataStore::open(root.path()).unwrap();
     reopened.invalidate_for_enroll("neko", "uid:1000").unwrap();
     let new = reopened.publish_pending("neko", "uid:1000").unwrap();
+
     assert!(new.generation > old.generation);
   }
 
@@ -1255,6 +1341,7 @@ mod tests {
       use std::os::unix::fs::PermissionsExt;
       std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     }
+
     let store = MetadataStore::open(root.path()).unwrap();
     store.invalidate_for_enroll("neko", "uid:1000").unwrap();
     let old = store.publish_pending("neko", "uid:1000").unwrap();
@@ -1263,10 +1350,13 @@ mod tests {
     // This durable write precedes the vault overwrite. If that later write
     // fails, an old READY enrollment cannot authorize remote input.
     store.invalidate_for_enroll("neko", "uid:1000").unwrap();
+
     assert_eq!(store.enrollment("uid:1000").unwrap().unwrap().state, EnrollmentState::Suspended);
+
     drop(store);
     let reopened = MetadataStore::open(root.path()).unwrap();
     let suspended = reopened.enrollment("uid:1000").unwrap().unwrap();
+
     assert_eq!(suspended.state, EnrollmentState::Suspended);
     assert!(suspended.generation > old.generation);
   }
@@ -1279,8 +1369,11 @@ mod tests {
       use std::os::unix::fs::PermissionsExt;
       std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     }
+
     let first = MetadataStore::open(root.path()).unwrap();
+
     assert!(matches!(MetadataStore::open(root.path()), Err(DeviceEntryErrorReason::ServiceUnavailable)));
+
     drop(first);
     MetadataStore::open(root.path()).unwrap();
   }

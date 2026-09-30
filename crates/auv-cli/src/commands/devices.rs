@@ -272,7 +272,9 @@ async fn sessions(args: DeviceSessionsArgs, selection: &auv::selection::RootSele
     .await
     .map_err(|error| error.to_string())?
     .ok_or_else(|| "no AUV daemon was discovered".to_string())?;
+
   let sessions = client.devices().list_user_sessions().await.map_err(|error| error.to_string())?;
+
   if args.json {
     let values = sessions
       .iter()
@@ -300,6 +302,7 @@ async fn sessions(args: DeviceSessionsArgs, selection: &auv::selection::RootSele
       .collect::<Vec<_>>();
     print_table(&rows, "(no login sessions)");
   }
+
   Ok(0)
 }
 
@@ -308,6 +311,7 @@ async fn change_lock_state(args: DeviceSessionTargetArgs, selection: &auv::selec
     .await
     .map_err(|error| error.to_string())?
     .ok_or_else(|| "no AUV daemon was discovered".to_string())?;
+
   let target = match (args.user, args.session) {
     (Some(user), None) => auv::devices::UserSessionTarget::User(user),
     (None, Some(session)) => auv::devices::UserSessionTarget::SessionSelector(session),
@@ -320,6 +324,7 @@ async fn change_lock_state(args: DeviceSessionTargetArgs, selection: &auv::selec
     let effect = client.devices().ensure_user_session_unlocked(target).await.map_err(|error| error.to_string())?;
     (effect.kind.as_str(), effect.user, effect.session_selector)
   };
+
   if args.json {
     println!(
       "{}",
@@ -336,6 +341,7 @@ async fn change_lock_state(args: DeviceSessionTargetArgs, selection: &auv::selec
       None => println!("{}: {}", kind.to_lowercase(), user),
     }
   }
+
   Ok(0)
 }
 

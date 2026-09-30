@@ -22,6 +22,7 @@ fn device_entry_mcp_tools_expose_only_nonsecret_selection_and_target_fields() {
   let session_properties = session_schema["properties"].as_object().unwrap();
   let get_properties = get_schema["properties"].as_object().unwrap();
   let unlock_properties = unlock_schema["properties"].as_object().unwrap();
+
   assert_eq!(session_properties.keys().map(String::as_str).collect::<Vec<_>>(), ["device_id", "device_name"]);
   assert_eq!(get_properties.keys().map(String::as_str).collect::<Vec<_>>(), ["device_id", "device_name", "session_selector"]);
   assert_eq!(get_schema["additionalProperties"], false);

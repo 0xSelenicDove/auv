@@ -44,9 +44,11 @@ pub(crate) fn root_path() -> io::Result<PathBuf> {
 
 pub(crate) fn directory(root: &Path) -> io::Result<File> {
   require_system_host()?;
+
   if root != root_path()? {
     return Err(denied());
   }
+
   let descriptor = Descriptor::system_only()?;
   let path = wide(root.as_os_str());
   // SAFETY: This creates only the fixed leaf under the OS ProgramData folder.
@@ -56,6 +58,7 @@ pub(crate) fn directory(root: &Path) -> io::Result<File> {
     Err(error) if error.code() == ERROR_ALREADY_EXISTS.to_hresult() => {}
     Err(error) => return Err(io::Error::other(error)),
   }
+
   // SAFETY: CreateFileW returns one owned directory handle. Excluding share
   // delete keeps this checked leaf from being renamed while the handle lives.
   let raw = unsafe {
@@ -84,9 +87,11 @@ pub(crate) enum Creation {
 
 pub(crate) fn file(root: &Path, name: &str, creation: Creation) -> io::Result<File> {
   require_system_host()?;
+
   if root != root_path()? || !valid_name(name) {
     return Err(denied());
   }
+
   let path = wide(root.join(name).as_os_str());
   let descriptor = Descriptor::system_only()?;
   let disposition = match creation {
@@ -122,16 +127,20 @@ pub(crate) fn file(root: &Path, name: &str, creation: Creation) -> io::Result<Fi
 
 pub(crate) fn replace(root: &Path, temporary_name: &str, destination_name: &str) -> io::Result<()> {
   require_system_host()?;
+
   if root != root_path()? || !valid_name(temporary_name) || !valid_name(destination_name) {
     return Err(denied());
   }
+
   let _root_guard = directory(root)?;
   file(root, temporary_name, Creation::Existing)?;
+
   match file(root, destination_name, Creation::Existing) {
     Ok(_) => {}
     Err(error) if error.kind() == io::ErrorKind::NotFound => {}
     Err(error) => return Err(error),
   }
+
   let source = wide(root.join(temporary_name).as_os_str());
   let destination = wide(root.join(destination_name).as_os_str());
   // NOTICE(device-entry-windows-publish): The Unix directory-fsync path used
@@ -167,7 +176,9 @@ mod tests {
     if require_system_host().is_ok() {
       return;
     }
+
     let root = root_path().unwrap();
+
     assert_eq!(directory(&root).unwrap_err().kind(), io::ErrorKind::PermissionDenied);
     assert_eq!(file(&root, "device-entry-policy.json", Creation::OpenOrCreate).unwrap_err().kind(), io::ErrorKind::PermissionDenied);
   }
@@ -178,6 +189,7 @@ mod tests {
     let path = root.path().join("user-owned-policy");
     std::fs::write(&path, b"{}\n").unwrap();
     let file = File::open(path).unwrap();
+
     assert_eq!(verify_object(&file, false).unwrap_err().kind(), io::ErrorKind::PermissionDenied);
   }
 
@@ -190,7 +202,9 @@ mod tests {
     // mklink /J creates a local junction without requiring developer-mode
     // symbolic-link privilege. Both paths are task-owned temporary fixtures.
     let status = std::process::Command::new("cmd").args(["/C", "mklink", "/J"]).arg(&junction).arg(&target).status().unwrap();
+
     assert!(status.success());
+
     let path = wide(junction.as_os_str());
     // SAFETY: The terminated path is live and the returned handle is owned by
     // File. OPEN_REPARSE_POINT exposes the junction itself for verification.
@@ -208,6 +222,7 @@ mod tests {
     .unwrap();
     // SAFETY: CreateFileW returned one uniquely owned handle.
     let file = unsafe { File::from_raw_handle(raw.0) };
+
     assert_eq!(verify_object(&file, true).unwrap_err().kind(), io::ErrorKind::PermissionDenied);
   }
 }

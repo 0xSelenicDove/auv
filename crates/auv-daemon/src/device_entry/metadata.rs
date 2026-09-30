@@ -92,6 +92,7 @@ impl MetadataStore {
         enrollments: HashMap::new(),
       },
     };
+
     Ok(Self {
       path,
       state: Mutex::new(state),
@@ -117,6 +118,7 @@ impl MetadataStore {
     if user.is_empty() || os_account_id.is_empty() {
       return Err(DeviceEntryErrorReason::ServiceUnavailable);
     }
+
     self.update(|state| {
       let next = next_generation(state.enrollments.get(os_account_id))?;
       state.enrollments.insert(
@@ -137,11 +139,14 @@ impl MetadataStore {
     if user.is_empty() || os_account_id.is_empty() {
       return Err(DeviceEntryErrorReason::ServiceUnavailable);
     }
+
     self.update(|state| {
       let current = state.enrollments.get(os_account_id).ok_or(DeviceEntryErrorReason::ServiceUnavailable)?;
+
       if current.user != user || !matches!(current.state, StoredState::Suspended) {
         return Err(DeviceEntryErrorReason::ServiceUnavailable);
       }
+
       let next = next_generation(Some(current))?;
       state.enrollments.insert(
         os_account_id.to_owned(),
@@ -167,6 +172,7 @@ impl MetadataStore {
       if let Some(record) = state.enrollments.get_mut(os_account_id) {
         record.state = StoredState::Removed;
       }
+
       Ok(())
     })
   }
@@ -185,12 +191,15 @@ impl MetadataStore {
     self.check_health()?;
     let mut state = self.state.lock().map_err(|_| DeviceEntryErrorReason::ServiceUnavailable)?;
     let value = operation(&mut state)?;
+
     if self.write(&state).is_err() {
       // A rename may have succeeded before directory fsync failed. Freeze
       // this process rather than guessing which generation survived on disk.
       self.poisoned.store(true, Ordering::Release);
+
       return Err(DeviceEntryErrorReason::ServiceUnavailable);
     }
+
     Ok(value)
   }
 
@@ -236,9 +245,11 @@ impl MetadataStore {
       storage_windows::replace(root, &temp_name, "device-entry-policy.json")?;
       Ok(())
     })();
+
     if result.is_err() {
       let _ = fs::remove_file(&temp);
     }
+
     result
   }
 }
@@ -258,9 +269,11 @@ impl EnrollmentStore for MetadataStore {
   fn promote_ready(&self, os_account_id: &str, generation: u64) -> Result<(), DeviceEntryErrorReason> {
     self.update(|state| {
       let record = state.enrollments.get_mut(os_account_id).ok_or(DeviceEntryErrorReason::Unenrolled)?;
+
       if record.generation != generation || !matches!(record.state, StoredState::Pending) {
         return Err(DeviceEntryErrorReason::Unenrolled);
       }
+
       record.state = StoredState::Ready;
       Ok(())
     })
@@ -269,9 +282,11 @@ impl EnrollmentStore for MetadataStore {
   fn suspend(&self, os_account_id: &str, generation: u64) -> Result<(), DeviceEntryErrorReason> {
     self.update(|state| {
       let record = state.enrollments.get_mut(os_account_id).ok_or(DeviceEntryErrorReason::Unenrolled)?;
+
       if record.generation != generation {
         return Err(DeviceEntryErrorReason::Unenrolled);
       }
+
       record.state = StoredState::Suspended;
       Ok(())
     })
@@ -292,6 +307,7 @@ fn enrollment_from_record(os_account_id: &str, record: &StoredEnrollment) -> Opt
     StoredState::Suspended => EnrollmentState::Suspended,
     StoredState::Removed => return None,
   };
+
   Some(Enrollment {
     user: record.user.clone(),
     os_account_id: os_account_id.to_owned(),
@@ -304,9 +320,11 @@ fn enrollment_from_record(os_account_id: &str, record: &StoredEnrollment) -> Opt
 fn private_directory(root: &Path) -> Result<(), DeviceEntryErrorReason> {
   use std::os::unix::fs::{MetadataExt, PermissionsExt};
   let metadata = fs::symlink_metadata(root).map_err(|_| DeviceEntryErrorReason::ServiceUnavailable)?;
+
   if !metadata.file_type().is_dir() || metadata.uid() != current_euid() || metadata.permissions().mode() & 0o077 != 0 {
     return Err(DeviceEntryErrorReason::ServiceUnavailable);
   }
+
   Ok(())
 }
 
@@ -314,9 +332,11 @@ fn private_directory(root: &Path) -> Result<(), DeviceEntryErrorReason> {
 fn private_file(file: &File) -> Result<(), DeviceEntryErrorReason> {
   use std::os::unix::fs::{MetadataExt, PermissionsExt};
   let metadata = file.metadata().map_err(|_| DeviceEntryErrorReason::ServiceUnavailable)?;
+
   if !metadata.file_type().is_file() || metadata.uid() != current_euid() || metadata.permissions().mode() & 0o077 != 0 {
     return Err(DeviceEntryErrorReason::ServiceUnavailable);
   }
+
   Ok(())
 }
 
@@ -335,23 +355,29 @@ fn read_private_file(path: &Path) -> Result<Option<Vec<u8>>, DeviceEntryErrorRea
   let bytes = match opened {
     Ok(file) => {
       let metadata = file.metadata().map_err(|_| DeviceEntryErrorReason::ServiceUnavailable)?;
+
       if !metadata.file_type().is_file() {
         return Err(DeviceEntryErrorReason::ServiceUnavailable);
       }
+
       #[cfg(unix)]
       if metadata.uid() != current_euid() || metadata.permissions().mode() & 0o077 != 0 {
         return Err(DeviceEntryErrorReason::ServiceUnavailable);
       }
+
       let mut bytes = Vec::new();
       file.take(1024 * 1024 + 1).read_to_end(&mut bytes).map_err(|_| DeviceEntryErrorReason::ServiceUnavailable)?;
+
       if bytes.len() > 1024 * 1024 {
         return Err(DeviceEntryErrorReason::ServiceUnavailable);
       }
+
       bytes
     }
     Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
     Err(_) => return Err(DeviceEntryErrorReason::ServiceUnavailable),
   };
+
   Ok(Some(bytes))
 }
 

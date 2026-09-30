@@ -23,10 +23,13 @@ impl SessionHost for MacosSessionHost {
     let Some(console) = current_console_session()? else {
       return Ok(Vec::new());
     };
+
     let account = resolve_uid(console.uid).map_err(|_| DeviceEntryErrorReason::ServiceUnavailable)?;
+
     if account.uid == 0 || account.name != console.session.user {
       return Err(DeviceEntryErrorReason::UnsupportedOsState);
     }
+
     Ok(vec![ObservedSession {
       public: console.session,
       os_account_id: account.id,
@@ -79,10 +82,13 @@ impl MacosSessionHost {
     validate_selected_state(selected, &current, expected_state)?;
     let uid =
       selected.os_account_id.strip_prefix("uid:").and_then(|value| value.parse::<u32>().ok()).ok_or(DeviceEntryErrorReason::StaleSession)?;
+
     let account = resolve_uid(uid).map_err(|_| DeviceEntryErrorReason::ServiceUnavailable)?;
+
     if account.uid == 0 || account.id != selected.os_account_id || account.name != selected.public.user {
       return Err(DeviceEntryErrorReason::StaleSession);
     }
+
     Ok(account)
   }
 }
@@ -98,9 +104,11 @@ fn validate_selected_state(
   {
     return Err(DeviceEntryErrorReason::StaleSession);
   }
+
   if selected.public.lock_state != expected_state || current.public.lock_state != expected_state {
     return Err(DeviceEntryErrorReason::StaleSession);
   }
+
   Ok(())
 }
 
@@ -143,6 +151,7 @@ mod tests {
   #[test]
   fn locked_selection_requires_same_login_instance_and_uid() {
     let selected = observed("macos:uuid-a", "neko", "uid:501", UserSessionLockState::Locked);
+
     assert_eq!(
       validate_selected_state(
         &selected,
@@ -180,6 +189,7 @@ mod tests {
   #[test]
   fn lock_selection_requires_same_usable_console() {
     let selected = observed("macos:uuid-a", "neko", "uid:501", UserSessionLockState::Usable);
+
     assert_eq!(
       validate_selected_state(
         &selected,

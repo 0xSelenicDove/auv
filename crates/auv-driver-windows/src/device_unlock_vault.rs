@@ -58,12 +58,15 @@ mod native {
   pub(super) fn enroll(_: &str, _: &str) -> Result<(), VaultError> {
     Err(VaultError::Unavailable)
   }
+
   pub(super) fn remove(_: &str) -> Result<(), VaultError> {
     Err(VaultError::Unavailable)
   }
+
   pub(super) fn verify_while_locked(_: &ConsoleSession) -> Result<(), VaultError> {
     Err(VaultError::Unavailable)
   }
+
   pub(super) fn retrieve(_: &str) -> Result<Zeroizing<String>, VaultError> {
     Err(VaultError::Unavailable)
   }
@@ -109,6 +112,7 @@ mod native {
     if !sid.starts_with("S-1-") || sid.len() > 128 || !sid.bytes().all(|byte| byte.is_ascii_digit() || byte == b'S' || byte == b'-') {
       return Err(VaultError::InvalidAccount);
     }
+
     Ok(format!("{sid}.dpapi"))
   }
 
@@ -131,6 +135,7 @@ mod native {
       Err(error) if error.code() == ERROR_ALREADY_EXISTS.to_hresult() => {}
       Err(_) => return Err(VaultError::Unavailable),
     }
+
     let raw = unsafe {
       CreateFileW(
         PCWSTR(root_wide.as_ptr()),
@@ -200,16 +205,21 @@ mod native {
         &mut output,
       )
     };
+
     if protected.is_err() {
       // SAFETY: DPAPI may have set an output allocation before returning an
       // error; release it if present. This output is encrypted, not plaintext.
       unsafe { LocalFree(HLOCAL(output.pbData.cast())) };
+
       return Err(VaultError::Unavailable);
     }
+
     if output.pbData.is_null() || output.cbData == 0 || output.cbData as u64 > MAX_BLOB {
       unsafe { LocalFree(HLOCAL(output.pbData.cast())) };
+
       return Err(VaultError::Unavailable);
     }
+
     // SAFETY: DPAPI initialized output.cbData bytes at output.pbData.
     let encrypted = Zeroizing::new(unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize) }.to_vec());
     // SAFETY: Release exactly the allocation returned by DPAPI.
@@ -222,6 +232,7 @@ mod native {
     if credential.is_empty() || credential.chars().any(char::is_control) || credential.encode_utf16().count() > 128 {
       return Err(VaultError::RetrievalFailed);
     }
+
     let (destination, _root_guard) = item_path(sid)?;
     let encrypted = protect(sid, credential)?;
     let mut nonce = [0u8; 16];
@@ -229,11 +240,14 @@ mod native {
     if unsafe { BCryptGenRandom(None, &mut nonce, BCRYPT_USE_SYSTEM_PREFERRED_RNG) }.is_err() {
       return Err(VaultError::Unavailable);
     }
+
     let mut name = String::new();
+
     for byte in nonce {
       use std::fmt::Write as _;
       write!(&mut name, "{byte:02x}").map_err(|_| VaultError::Unavailable)?;
     }
+
     let temporary = destination.with_extension(format!("{name}.tmp"));
     let descriptor = Descriptor::system_only().map_err(|_| VaultError::Unavailable)?;
     let temporary_wide = wide(temporary.as_os_str());
@@ -255,19 +269,25 @@ mod native {
     let mut file = unsafe { File::from_raw_handle(raw.0) };
     let written = file.write_all(&encrypted).and_then(|_| file.sync_all());
     drop(file);
+
     if written.is_err() {
       let _ = fs::remove_file(&temporary);
+
       return Err(VaultError::Unavailable);
     }
+
     let destination_wide = wide(destination.as_os_str());
     // SAFETY: Both paths are fixed children of the ACL-verified vault root.
     // Replace is atomic on this local filesystem; the new item carries the
     // SYSTEM-only DACL from its own CreateFileW call.
     let moved = unsafe { MoveFileExW(PCWSTR(temporary_wide.as_ptr()), PCWSTR(destination_wide.as_ptr()), MOVEFILE_REPLACE_EXISTING) };
+
     if moved.is_err() {
       let _ = fs::remove_file(&temporary);
+
       return Err(VaultError::Unavailable);
     }
+
     open_checked_file(&destination, GENERIC_READ.0)?;
     // Write-time readback proves the service identity can decrypt now. Policy
     // must still wait for verify_while_locked before calling enrollment READY.
@@ -276,9 +296,11 @@ mod native {
 
   pub(super) fn remove(sid: &str) -> Result<(), VaultError> {
     let (path, _root_guard) = item_path(sid)?;
+
     if !path.exists() {
       return Err(VaultError::NotEnrolled);
     }
+
     let file = open_checked_file(&path, GENERIC_READ.0 | DELETE.0)?;
     let disposition = FILE_DISPOSITION_INFO {
       DeleteFile: true.into(),
@@ -298,14 +320,18 @@ mod native {
 
   pub(super) fn retrieve(sid: &str) -> Result<Zeroizing<String>, VaultError> {
     let (path, _root_guard) = item_path(sid)?;
+
     if !path.exists() {
       return Err(VaultError::NotEnrolled);
     }
+
     let mut file = open_checked_file(&path, GENERIC_READ.0)?;
     let metadata = file.metadata().map_err(|_| VaultError::RetrievalFailed)?;
+
     if metadata.len() == 0 || metadata.len() > MAX_BLOB {
       return Err(VaultError::RetrievalFailed);
     }
+
     let mut encrypted = Zeroizing::new(vec![0u8; metadata.len() as usize]);
     file.read_exact(&mut encrypted).map_err(|_| VaultError::RetrievalFailed)?;
     let input = CRYPT_INTEGER_BLOB {
@@ -320,20 +346,26 @@ mod native {
     let mut output = CRYPT_INTEGER_BLOB::default();
     // SAFETY: Input and entropy remain live; DPAPI allocates the output.
     let unprotected = unsafe { CryptUnprotectData(&input, None, Some(&entropy), None, None, CRYPTPROTECT_UI_FORBIDDEN, &mut output) };
+
     if unprotected.is_err() {
       wipe_dpapi_plain(&mut output);
+
       return Err(VaultError::RetrievalFailed);
     }
+
     // SAFETY: LocalSize inspects the successful DPAPI LocalAlloc allocation.
     let allocated = if output.pbData.is_null() {
       0
     } else {
       unsafe { LocalSize(HLOCAL(output.pbData.cast())) }
     };
+
     if output.pbData.is_null() || output.cbData == 0 || output.cbData > 512 || output.cbData as usize > allocated {
       wipe_dpapi_plain(&mut output);
+
       return Err(VaultError::RetrievalFailed);
     }
+
     // SAFETY: DPAPI initialized the returned allocation for output.cbData.
     let plain = Zeroizing::new(unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize) }.to_vec());
     wipe_dpapi_plain(&mut output);
@@ -346,29 +378,37 @@ mod native {
     if output.pbData.is_null() {
       return;
     }
+
     // SAFETY: DPAPI returns a LocalAlloc allocation. On an error, cbData might
     // not be consistent with the allocation; LocalSize bounds all writes.
     unsafe {
       let allocated = LocalSize(HLOCAL(output.pbData.cast()));
+
       for index in 0..(output.cbData as usize).min(allocated) {
         output.pbData.add(index).write_volatile(0);
       }
+
       LocalFree(HLOCAL(output.pbData.cast()));
     }
+
     output.pbData = std::ptr::null_mut();
     output.cbData = 0;
   }
 
   pub(super) fn verify_while_locked(target: &ConsoleSession) -> Result<(), VaultError> {
     let current = observe_console().map_err(|_| VaultError::NotLocked)?.ok_or(VaultError::NotLocked)?;
+
     if !target.same_login(&current) || current.lock_state != ConsoleLockState::Locked {
       return Err(VaultError::NotLocked);
     }
+
     retrieve(&current.account_sid)?;
     let after = observe_console().map_err(|_| VaultError::NotLocked)?.ok_or(VaultError::NotLocked)?;
+
     if !target.same_login(&after) || after.lock_state != ConsoleLockState::Locked {
       return Err(VaultError::NotLocked);
     }
+
     Ok(())
   }
 
@@ -385,6 +425,7 @@ mod native {
       let denied = matches!(&result, Err(VaultError::Permissions));
       drop(result);
       fs::remove_file(&path).unwrap();
+
       assert!(denied);
     }
 
@@ -402,6 +443,7 @@ mod native {
       // SAFETY: The descriptor stays live while Windows returns a borrowed
       // owner SID pointer into it and a Boolean default-owner flag.
       unsafe { windows::Win32::Security::GetSecurityDescriptorOwner(descriptor.0, &mut owner, &mut defaulted) }.expect("descriptor owner");
+
       assert!(!defaulted.as_bool());
       assert!(unsafe { IsWellKnownSid(owner, WinLocalSystemSid) }.as_bool());
     }

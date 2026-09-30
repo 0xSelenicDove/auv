@@ -121,6 +121,7 @@ pub async fn run(args: DeviceLocalArgs, project_root: &Path) -> Result<i32, Stri
       .map_err(|error| format!("Device-local service unavailable or its LocalSystem identity could not be verified: {error}"))?
   };
   let service = client.service();
+
   match args.command {
     DeviceLocalCommand::Enroll {
       user,
@@ -134,6 +135,7 @@ pub async fn run(args: DeviceLocalArgs, project_root: &Path) -> Result<i32, Stri
         // that provider passes an owner-observed locked-session gate.
         return Err("Windows enrollment currently requires --kind windows-pin".to_string());
       }
+
       let mut credential = read_hidden_credential()?;
       let request = proto::EnrollRequest {
         user,
@@ -174,6 +176,7 @@ pub async fn run(args: DeviceLocalArgs, project_root: &Path) -> Result<i32, Stri
         .map_err(|status| format!("list enrollments failed ({})", status.code()))?
         .into_inner()
         .enrollments;
+
       for enrollment in entries {
         print_enrollment(Some(enrollment))?;
       }
@@ -206,6 +209,7 @@ pub async fn run(args: DeviceLocalArgs, project_root: &Path) -> Result<i32, Stri
       };
       println!("remote unlock enabled: {enabled}");
     }
+
     DeviceLocalCommand::Audit {
       command: AuditCommand::List { cursor, limit },
     } => {
@@ -214,6 +218,7 @@ pub async fn run(args: DeviceLocalArgs, project_root: &Path) -> Result<i32, Stri
         .await
         .map_err(|status| format!("list audit failed ({})", status.code()))?
         .into_inner();
+
       for entry in page.entries {
         println!(
           "{}\t{}\t{}\t{}\t{}\t{}",
@@ -225,11 +230,13 @@ pub async fn run(args: DeviceLocalArgs, project_root: &Path) -> Result<i32, Stri
           entry.result.unwrap_or_default()
         );
       }
+
       if let Some(next) = page.next_cursor {
         println!("next cursor: {next}");
       }
     }
   }
+
   Ok(0)
 }
 
@@ -273,6 +280,7 @@ fn read_hidden_credential() -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
     .write(true)
     .open("/dev/tty")
     .map_err(|_| "enrollment requires this Device's interactive terminal".to_string())?;
+
   let original = tcgetattr(&tty).map_err(|_| "failed to read terminal mode".to_string())?;
   let restoration_tty = tty.try_clone().map_err(|_| "failed to retain terminal mode".to_string())?;
   let mut hidden = original.clone();
@@ -283,6 +291,7 @@ fn read_hidden_credential() -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
     original: rustix::termios::Termios,
     restored: bool,
   }
+
   impl Restore {
     fn restore(&mut self) -> Result<(), String> {
       rustix::termios::tcsetattr(&self.tty, rustix::termios::OptionalActions::Now, &self.original)
@@ -291,6 +300,7 @@ fn read_hidden_credential() -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
       Ok(())
     }
   }
+
   impl Drop for Restore {
     fn drop(&mut self) {
       if !self.restored {
@@ -298,6 +308,7 @@ fn read_hidden_credential() -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
       }
     }
   }
+
   let mut restore = Restore {
     tty: restoration_tty,
     original,
@@ -306,26 +317,34 @@ fn read_hidden_credential() -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
   tty.write_all(b"OS login credential: ").map_err(|_| "failed to write terminal prompt".to_string())?;
   tty.flush().map_err(|_| "failed to flush terminal prompt".to_string())?;
   let mut credential = Zeroizing::new(Vec::new());
+
   loop {
     let mut byte = [0_u8; 1];
     let count = tty.read(&mut byte).map_err(|_| "failed to read terminal credential".to_string())?;
+
     if count == 0 {
       return Err("terminal closed before credential was entered".to_string());
     }
+
     if byte[0] == b'\n' {
       break;
     }
+
     if credential.len() >= 1024 {
       return Err("credential exceeds the 1024-byte limit".to_string());
     }
+
     credential.push(byte[0]);
     byte.zeroize();
   }
+
   tty.write_all(b"\n").map_err(|_| "failed to finish terminal prompt".to_string())?;
   restore.restore()?;
+
   if credential.is_empty() {
     return Err("credential cannot be empty".to_string());
   }
+
   std::str::from_utf8(&credential).map_err(|_| "credential must be UTF-8".to_string())?;
   Ok(credential)
 }
@@ -388,6 +407,7 @@ fn read_hidden_credential() -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
       let _ = unsafe { SetConsoleMode(self.0, self.1) };
     }
   }
+
   let _restore = RestoreMode(input_handle, original);
   let hidden = CONSOLE_MODE((original.0 | ENABLE_LINE_INPUT.0) & !ENABLE_ECHO_INPUT.0);
   // SAFETY: The input handle remains live and this mode preserves line editing.
@@ -400,14 +420,17 @@ fn read_hidden_credential() -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
   // SAFETY: The buffer has room for 256 UTF-16 code units and is live for the read.
   unsafe { ReadConsoleW(input_handle, buffer.as_mut_ptr().cast(), buffer.len() as u32, &mut count, None) }
     .map_err(|_| "failed to read console credential".to_string())?;
+
   let newline = "\r\n".encode_utf16().collect::<Vec<_>>();
   // SAFETY: The output handle remains a live console screen buffer.
   unsafe { WriteConsoleW(output_handle, &newline, None, None) }.map_err(|_| "failed to finish console prompt".to_string())?;
   let entered = &buffer[..count as usize];
   let entered = entered.strip_suffix(&[b'\r' as u16, b'\n' as u16]).or_else(|| entered.strip_suffix(&[b'\n' as u16])).unwrap_or(entered);
+
   if entered.is_empty() || entered.len() > 128 || entered.iter().any(|unit| *unit == 0) {
     return Err("credential must contain 1..=128 UTF-16 characters".to_string());
   }
+
   let text = Zeroizing::new(String::from_utf16(entered).map_err(|_| "credential must be valid Unicode".to_string())?);
   Ok(Zeroizing::new(text.as_bytes().to_vec()))
 }
@@ -426,6 +449,7 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(store.join("control"), std::fs::Permissions::from_mode(0o700)).unwrap();
     let socket = socket_path(root.path(), Some(Path::new("state"))).unwrap();
+
     assert!(socket.starts_with(std::fs::canonicalize("/tmp").unwrap()));
     assert_eq!(socket.file_name().unwrap(), "socket");
     assert_eq!(socket, auv_api_client::device_local::unix_socket_path(&store).unwrap());
@@ -445,6 +469,7 @@ mod tests {
     std::fs::create_dir(&store).unwrap();
     let expected = socket_path(root.path(), Some(Path::new("state"))).unwrap();
     symlink(root.path(), store.join("control")).unwrap();
+
     assert_eq!(socket_path(root.path(), Some(Path::new("state"))).unwrap(), expected);
   }
 }

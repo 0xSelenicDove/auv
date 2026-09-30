@@ -15,6 +15,7 @@ pub(super) fn lock(uid: u32, selector: &str, started: Instant) -> Result<(), Hos
   if selected(uid, selector)?.is_locked() {
     return Err(HostError::AlreadyLocked);
   }
+
   // Native delivery checks the same selected, usable console immediately
   // before posting. No Keychain item or credential is involved in locking.
   auv_driver_macos::device_session_lock::submit(uid, selector).map_err(|error| match error {
@@ -33,18 +34,23 @@ pub(super) fn unlock(home: &Path, uid: u32, selector: &str, started: Instant) ->
   if !selected(uid, selector)?.is_locked() {
     return Err(HostError::NotLocked);
   }
+
   // The Keychain read occurs only after the exact selected locked session is
   // observed. Recheck it before native delivery in case login state changed.
   let secret = vault::read(home, uid)?;
+
   if !selected(uid, selector)?.is_locked() {
     return Err(HostError::NotLocked);
   }
+
   // Reserve ten seconds for independent readback under the host's 18-second
   // request limit. A failed posting deadline never submits Return.
   let posting_budget = (started + Duration::from_secs(7)).saturating_duration_since(Instant::now()).as_secs_f64();
+
   if posting_budget <= 0.0 {
     return Err(HostError::InputUnavailableAt(InputFailure::DeadlineExceeded));
   }
+
   auv_driver_macos::device_session_unlock::submit(&secret, uid, selector, posting_budget).map_err(input_error)?;
   drop(secret);
 
@@ -58,9 +64,11 @@ fn wait_for_state(uid: u32, selector: &str, locked: bool, deadline: Instant) -> 
     if selected(uid, selector)?.is_locked() == locked {
       return Ok(());
     }
+
     if Instant::now() >= deadline {
       return Err(HostError::OutcomeUnverified);
     }
+
     thread::sleep(Duration::from_millis(100));
   }
 }
@@ -76,10 +84,13 @@ pub(super) fn probe_locked(home: &Path, uid: u32, selector: &str) -> Result<(), 
   if !selected(uid, selector)?.is_locked() {
     return Err(HostError::NotLocked);
   }
+
   drop(vault::read(home, uid)?);
+
   if !selected(uid, selector)?.is_locked() {
     return Err(HostError::NotLocked);
   }
+
   Ok(())
 }
 
@@ -92,8 +103,10 @@ fn selected(uid: u32, selector: &str) -> Result<ConsoleSession, HostError> {
       ObserveError::Unavailable | ObserveError::UnknownState => HostError::Unavailable,
     })?
     .ok_or(HostError::StaleSession)?;
+
   if current.uid() != uid || current.selector() != selector {
     return Err(HostError::StaleSession);
   }
+
   Ok(current)
 }

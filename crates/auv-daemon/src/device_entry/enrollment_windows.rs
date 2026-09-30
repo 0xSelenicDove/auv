@@ -47,9 +47,11 @@ impl WindowsLocalEnrollment {
   fn current_account(&self, user: &str) -> Result<(String, String), LocalControlError> {
     let console = observe_console().map_err(|_| LocalControlError::HostUnavailable)?.ok_or(LocalControlError::HostUnavailable)?;
     let name = account_name(&console);
+
     if user != name || console.account_sid.is_empty() {
       return Err(LocalControlError::InvalidAccount);
     }
+
     Ok((name, console.account_sid))
   }
 
@@ -58,10 +60,13 @@ impl WindowsLocalEnrollment {
     let stored = if sid == LOCAL_SYSTEM_SID {
       let mut matches =
         self.metadata.list_enrollments().map_err(|_| LocalControlError::Persistence)?.into_iter().filter(|record| record.user == user);
+
       let one = matches.next().ok_or(LocalControlError::NotFound)?;
+
       if matches.next().is_some() {
         return Err(LocalControlError::InvalidAccount);
       }
+
       one
     } else if is_administrator(principal) {
       // Administrator authority is limited to the selected live console
@@ -71,9 +76,11 @@ impl WindowsLocalEnrollment {
     } else {
       self.metadata.enrollment(sid).map_err(|_| LocalControlError::Persistence)?.ok_or(LocalControlError::NotFound)?
     };
+
     if stored.user != user {
       return Err(LocalControlError::NotFound);
     }
+
     authorize(principal, &stored.os_account_id)?;
     Ok(stored)
   }
@@ -94,6 +101,7 @@ impl DeviceLocalControl for WindowsLocalEnrollment {
     } else {
       Some(sid.to_owned())
     };
+
     let records = self.metadata.list_enrollments().map_err(|_| LocalControlError::Persistence)?;
     Ok(
       records
@@ -110,16 +118,20 @@ impl DeviceLocalControl for WindowsLocalEnrollment {
       // needs its own locked Winlogon gate before it can be enrolled here.
       return Err(LocalControlError::UnsupportedCredentialKind);
     }
+
     if request.storage_kind != StorageKind::Protected {
       // TODO(device-entry-windows-plaintext): No plaintext fallback has a
       // restricted Windows store or owner approval for this host.
       return Err(LocalControlError::UnsupportedStorageKind);
     }
+
     let credential = request.credential;
     let text = std::str::from_utf8(credential.as_bytes()).map_err(|_| LocalControlError::InvalidCredential)?;
+
     if text.is_empty() || text.chars().any(char::is_control) || text.encode_utf16().count() > 128 {
       return Err(LocalControlError::InvalidCredential);
     }
+
     let (name, sid) = self.current_account(&request.user)?;
     authorize(principal, &sid)?;
     let guard = self.account_locks.lock(&sid).await.map_err(|_| LocalControlError::Persistence)?;
@@ -148,18 +160,22 @@ impl DeviceLocalControl for WindowsLocalEnrollment {
       self.current_account(user)?.1
     } else {
       let stored = self.metadata.enrollment(principal_sid).map_err(|_| LocalControlError::Persistence)?;
+
       if stored.as_ref().is_some_and(|stored| stored.user != user) {
         return Err(LocalControlError::NotFound);
       }
+
       // A verified account owner may retry deletion of their own SID after
       // metadata was already tombstoned by a partial prior attempt.
       principal_sid.to_owned()
     };
+
     let guard = self.account_locks.lock(&sid).await.map_err(|_| LocalControlError::Persistence)?;
     let metadata = Arc::clone(&self.metadata);
     complete_account_mutation(guard, move || {
       let existed = metadata.enrollment(&sid).map_err(|_| LocalControlError::Persistence)?.is_some();
       metadata.remove(&sid).map_err(|_| LocalControlError::Persistence)?;
+
       match vault_remove(&sid) {
         Ok(()) => Ok(()),
         Err(VaultError::NotEnrolled) if existed => Ok(()),
@@ -178,6 +194,7 @@ impl DeviceLocalControl for WindowsLocalEnrollment {
     if verified_sid(principal)? != LOCAL_SYSTEM_SID && !is_administrator(principal) {
       return Err(LocalControlError::PermissionDenied);
     }
+
     let _guard = self.policy_gate.write().await;
     self.metadata.set_enabled(enabled).map_err(|_| LocalControlError::Persistence)?;
     self.metadata.enabled().map_err(|_| LocalControlError::Persistence)
@@ -204,6 +221,7 @@ fn is_administrator(principal: &LocalOsPrincipal) -> bool {
 
 fn authorize(principal: &LocalOsPrincipal, account_sid: &str) -> Result<(), LocalControlError> {
   let sid = verified_sid(principal)?;
+
   if sid == LOCAL_SYSTEM_SID || is_administrator(principal) || sid == account_sid {
     Ok(())
   } else {
@@ -231,6 +249,7 @@ mod tests {
     let other = LocalOsPrincipal::WindowsSid("S-1-5-21-1-2-3-1002".into());
     let administrator = LocalOsPrincipal::WindowsAdministratorSid("S-1-5-21-1-2-3-1002".into());
     let system = LocalOsPrincipal::WindowsSid(LOCAL_SYSTEM_SID.into());
+
     assert_eq!(authorize(&owner, "S-1-5-21-1-2-3-1001"), Ok(()));
     assert_eq!(authorize(&system, "S-1-5-21-1-2-3-1001"), Ok(()));
     assert_eq!(authorize(&administrator, "S-1-5-21-1-2-3-1001"), Ok(()));

@@ -59,6 +59,7 @@ impl DeviceService for DeviceServiceGrpc {
         reason: domain::device_entry_error_reason(reason) as i32,
       }),
     };
+
     Ok(Response::new(proto::ListUserSessionsResponse {
       result: Some(result),
     }))
@@ -70,15 +71,18 @@ impl DeviceService for DeviceServiceGrpc {
   ) -> Result<Response<proto::GetUserSessionResponse>, Status> {
     let caller = authentication::device_entry_caller(&request)?;
     let session_selector = &request.get_ref().session_selector;
+
     if session_selector.trim().is_empty() {
       return Err(Status::invalid_argument("session_selector is required"));
     }
+
     let result = match self.daemon.get_user_session(caller, session_selector) {
       Ok(session) => proto::get_user_session_response::Result::Session(domain::user_session(session)),
       Err(reason) => proto::get_user_session_response::Result::Error(proto::DeviceEntryError {
         reason: domain::device_entry_error_reason(reason) as i32,
       }),
     };
+
     Ok(Response::new(proto::GetUserSessionResponse {
       result: Some(result),
     }))
@@ -104,6 +108,7 @@ impl DeviceService for DeviceServiceGrpc {
         reason: domain::device_entry_error_reason(reason) as i32,
       }),
     };
+
     Ok(Response::new(proto::EnsureUserSessionUnlockedResponse {
       result: Some(result),
     }))
@@ -129,6 +134,7 @@ impl DeviceService for DeviceServiceGrpc {
         reason: domain::device_entry_error_reason(reason) as i32,
       }),
     };
+
     Ok(Response::new(proto::EnsureUserSessionLockedResponse {
       result: Some(result),
     }))
