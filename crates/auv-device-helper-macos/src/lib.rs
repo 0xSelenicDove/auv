@@ -30,7 +30,6 @@ pub enum HostError {
   InvalidRequest,
   StaleSession,
   NotLocked,
-  AlreadyLocked,
   VaultUnavailable,
   /// Legacy status from an installed helper without staged input diagnostics.
   InputUnavailable,
@@ -54,10 +53,6 @@ enum Operation {
   Probe = 2,
   Remove = 3,
   Unlock = 4,
-  // NOTICE(device-entry-macos-lock-ipc): Existing operation bytes keep their
-  // meaning. Deploy daemon and helper together before exposing Lock; an old
-  // helper rejects this byte as an invalid request.
-  Lock = 5,
 }
 
 impl TryFrom<u8> for Operation {
@@ -69,7 +64,6 @@ impl TryFrom<u8> for Operation {
       value if value == Self::Probe as u8 => Ok(Self::Probe),
       value if value == Self::Remove as u8 => Ok(Self::Remove),
       value if value == Self::Unlock as u8 => Ok(Self::Unlock),
-      value if value == Self::Lock as u8 => Ok(Self::Lock),
       _ => Err(HostError::InvalidRequest),
     }
   }
@@ -117,16 +111,6 @@ pub fn unlock(home: &Path, uid: u32, selector: &str) -> Result<(), HostError> {
   call(home, Operation::Unlock, uid, selector.as_bytes())
 }
 
-/// Lock exactly this existing, usable macOS console session.
-/// The helper sends the lock shortcut and independently reads back its state.
-pub fn lock(home: &Path, uid: u32, selector: &str) -> Result<(), HostError> {
-  if !selector.starts_with("macos:") || selector.len() > MAX_PAYLOAD {
-    return Err(HostError::InvalidRequest);
-  }
-
-  call(home, Operation::Lock, uid, selector.as_bytes())
-}
-
 fn call(home: &Path, operation: Operation, uid: u32, payload: &[u8]) -> Result<(), HostError> {
   let mut stream = UnixStream::connect(socket_path(home)).map_err(|_| HostError::Unavailable)?;
   verify_installed_helper(&stream)?;
@@ -165,7 +149,6 @@ fn decode_status(status: u8) -> Result<(), HostError> {
     15 => Err(HostError::InputUnavailableAt(InputFailure::FocusUnavailable)),
     16 => Err(HostError::InputUnavailableAt(InputFailure::FocusLost)),
     17 => Err(HostError::InputUnavailableAt(InputFailure::DeadlineExceeded)),
-    18 => Err(HostError::AlreadyLocked),
     _ => Err(HostError::Unavailable),
   }
 }

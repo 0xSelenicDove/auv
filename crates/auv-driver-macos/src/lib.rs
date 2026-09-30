@@ -4,8 +4,6 @@ mod descriptor;
 #[doc(hidden)]
 pub mod device_session;
 #[doc(hidden)]
-pub mod device_session_lock;
-#[doc(hidden)]
 pub mod device_session_unlock;
 mod driver;
 mod readiness;
