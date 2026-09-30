@@ -13,17 +13,14 @@ use auv_api_server::device_local::{
 };
 use auv_device_helper_macos::HostError;
 
-mod native;
-use native::resolve_user;
-pub(super) use native::{Account, resolve_uid};
-
 use super::audit::Audit;
 use super::local::{
   audit_page, authorize_unix as authorize, complete_account_mutation, local_enrollment, require_unix_admin as require_os_admin,
   unix_account_id as account_id, unix_uid,
 };
 use super::metadata::MetadataStore;
-use super::policy::{AccountLocks, EnrollmentStore};
+use super::policy::AccountLocks;
+use super::unix_account::resolve_user;
 
 pub(super) struct MacosLocalEnrollment {
   metadata: Arc<MetadataStore>,
@@ -146,20 +143,7 @@ mod tests {
   use std::os::unix::fs::PermissionsExt;
 
   #[test]
-  fn resolves_root_from_os_database_and_stable_uid() {
-    let account = resolve_user("root").unwrap();
-
-    assert_eq!(account.uid, 0);
-    assert_eq!(account.id, "uid:0");
-    assert_eq!(resolve_uid(account.uid).unwrap(), account);
-    assert!(account.home.is_absolute());
-  }
-
-  #[test]
-  fn rejects_invalid_target_and_cross_uid_caller() {
-    assert_eq!(resolve_user(""), Err(LocalControlError::InvalidAccount));
-    assert_eq!(resolve_user("root\0other"), Err(LocalControlError::InvalidAccount));
-    assert_eq!(resolve_user(" root"), Err(LocalControlError::InvalidAccount));
+  fn rejects_cross_uid_caller() {
     assert_eq!(authorize(&LocalOsPrincipal::UnixUid(501), 502), Err(LocalControlError::PermissionDenied));
     assert!(authorize(&LocalOsPrincipal::UnixUid(501), 501).is_ok());
     assert!(authorize(&LocalOsPrincipal::UnixUid(0), 502).is_ok());

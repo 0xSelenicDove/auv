@@ -14,6 +14,7 @@ use auv::devices::{
 use auv_api_server::control::{CallerId, Pairing};
 
 use super::audit::{Audit, Record, result_name};
+use super::metadata::MetadataStore;
 
 /// Stable OS account identity travels beside public session facts. A user
 /// supplied account name is never substituted for this host observation.
@@ -58,34 +59,6 @@ pub(super) trait SessionHost: Send + Sync {
   fn lock_usable(&self, selected: &ObservedSession) -> Result<(), DeviceEntryErrorReason>;
 }
 
-/// Metadata mutations by DeviceLocalService must use the same account lock
-/// map as `Policy` and change the generation on every enroll or deletion.
-/// A vault write must complete before publishing Pending metadata.
-pub(super) trait EnrollmentStore: Send + Sync {
-  fn enabled(&self) -> Result<bool, DeviceEntryErrorReason>;
-  fn enrollment(&self, os_account_id: &str) -> Result<Option<Enrollment>, DeviceEntryErrorReason>;
-  fn promote_ready(&self, os_account_id: &str, generation: u64) -> Result<(), DeviceEntryErrorReason>;
-  fn suspend(&self, os_account_id: &str, generation: u64) -> Result<(), DeviceEntryErrorReason>;
-}
-
-impl<T: EnrollmentStore + ?Sized> EnrollmentStore for Arc<T> {
-  fn enabled(&self) -> Result<bool, DeviceEntryErrorReason> {
-    (**self).enabled()
-  }
-
-  fn enrollment(&self, os_account_id: &str) -> Result<Option<Enrollment>, DeviceEntryErrorReason> {
-    (**self).enrollment(os_account_id)
-  }
-
-  fn promote_ready(&self, os_account_id: &str, generation: u64) -> Result<(), DeviceEntryErrorReason> {
-    (**self).promote_ready(os_account_id, generation)
-  }
-
-  fn suspend(&self, os_account_id: &str, generation: u64) -> Result<(), DeviceEntryErrorReason> {
-    (**self).suspend(os_account_id, generation)
-  }
-}
-
 pub(super) struct AccountLocks {
   locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
 }
@@ -106,19 +79,19 @@ impl AccountLocks {
   }
 }
 
-pub(super) struct Policy<H, S> {
+pub(super) struct Policy<H> {
   host: H,
-  store: S,
+  store: Arc<MetadataStore>,
   audit: Arc<Audit>,
   account_locks: Arc<AccountLocks>,
   policy_gate: Arc<tokio::sync::RwLock<()>>,
   pairing: Option<Arc<dyn Pairing>>,
 }
 
-impl<H: SessionHost, S: EnrollmentStore> Policy<H, S> {
+impl<H: SessionHost> Policy<H> {
   pub(super) fn new(
     host: H,
-    store: S,
+    store: Arc<MetadataStore>,
     audit: Arc<Audit>,
     account_locks: Arc<AccountLocks>,
     policy_gate: Arc<tokio::sync::RwLock<()>>,
@@ -499,7 +472,6 @@ mod tests {
 
   use auv::devices::UserSessionConnectionKind;
 
-  use super::super::metadata::MetadataStore;
   use super::*;
 
   struct Host {
@@ -595,7 +567,7 @@ mod tests {
     }
   }
 
-  fn fixture<H: SessionHost>(host: H) -> (tempfile::TempDir, Policy<H, Arc<MetadataStore>>) {
+  fn fixture<H: SessionHost>(host: H) -> (tempfile::TempDir, Policy<H>) {
     let root = tempfile::tempdir().unwrap();
     #[cfg(unix)]
     {
@@ -612,9 +584,7 @@ mod tests {
     CallerId::local_owner()
   }
 
-  fn paired_policy(
-    host: Arc<Host>,
-  ) -> (tempfile::TempDir, Arc<Policy<Arc<Host>, Arc<MetadataStore>>>, super::super::super::pairing::PairingStore, CallerId) {
+  fn paired_policy(host: Arc<Host>) -> (tempfile::TempDir, Arc<Policy<Arc<Host>>>, super::super::super::pairing::PairingStore, CallerId) {
     use super::super::super::pairing::PairingStore;
 
     let (root, mut policy) = fixture(host);

@@ -15,7 +15,7 @@ use auv_driver_windows::device_session::observe_console;
 use super::audit::Audit;
 use super::local::{audit_page, complete_account_mutation, local_enrollment};
 use super::metadata::MetadataStore;
-use super::policy::{AccountLocks, Enrollment as StoredEnrollment, EnrollmentStore};
+use super::policy::{AccountLocks, Enrollment as StoredEnrollment};
 use super::vault_windows::{VaultError, enroll as vault_enroll, remove as vault_remove};
 
 const LOCAL_SYSTEM_SID: &str = "S-1-5-18";

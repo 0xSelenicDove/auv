@@ -19,7 +19,7 @@ use auv::devices::EnrollmentState;
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 
-use super::policy::{Enrollment, EnrollmentStore};
+use super::policy::Enrollment;
 #[cfg(windows)]
 use super::storage_windows::{self, Creation};
 
@@ -254,19 +254,22 @@ impl MetadataStore {
   }
 }
 
-impl EnrollmentStore for MetadataStore {
-  fn enabled(&self) -> Result<bool, DeviceEntryErrorReason> {
+// Policy reads and state transitions. DeviceLocalService mutations must use
+// the same account lock map as `Policy` and change the generation on every
+// enroll or deletion; a vault write must complete before publishing Pending.
+impl MetadataStore {
+  pub(super) fn enabled(&self) -> Result<bool, DeviceEntryErrorReason> {
     self.check_health()?;
     Ok(self.state.lock().map_err(|_| DeviceEntryErrorReason::ServiceUnavailable)?.enabled)
   }
 
-  fn enrollment(&self, os_account_id: &str) -> Result<Option<Enrollment>, DeviceEntryErrorReason> {
+  pub(super) fn enrollment(&self, os_account_id: &str) -> Result<Option<Enrollment>, DeviceEntryErrorReason> {
     self.check_health()?;
     let state = self.state.lock().map_err(|_| DeviceEntryErrorReason::ServiceUnavailable)?;
     Ok(state.enrollments.get(os_account_id).and_then(|record| enrollment_from_record(os_account_id, record)))
   }
 
-  fn promote_ready(&self, os_account_id: &str, generation: u64) -> Result<(), DeviceEntryErrorReason> {
+  pub(super) fn promote_ready(&self, os_account_id: &str, generation: u64) -> Result<(), DeviceEntryErrorReason> {
     self.update(|state| {
       let record = state.enrollments.get_mut(os_account_id).ok_or(DeviceEntryErrorReason::Unenrolled)?;
 
@@ -279,7 +282,7 @@ impl EnrollmentStore for MetadataStore {
     })
   }
 
-  fn suspend(&self, os_account_id: &str, generation: u64) -> Result<(), DeviceEntryErrorReason> {
+  pub(super) fn suspend(&self, os_account_id: &str, generation: u64) -> Result<(), DeviceEntryErrorReason> {
     self.update(|state| {
       let record = state.enrollments.get_mut(os_account_id).ok_or(DeviceEntryErrorReason::Unenrolled)?;
 

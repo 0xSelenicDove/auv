@@ -136,11 +136,11 @@ pub(super) fn unix_account_id(uid: u32) -> String {
 pub(crate) struct LocalState {
   control: Arc<dyn DeviceLocalControl>,
   #[cfg(target_os = "macos")]
-  policy: Policy<MacosSessionHost, Arc<MetadataStore>>,
+  policy: Policy<MacosSessionHost>,
   #[cfg(target_os = "linux")]
-  policy: Policy<LinuxSessionHost, Arc<MetadataStore>>,
+  policy: Policy<LinuxSessionHost>,
   #[cfg(target_os = "windows")]
-  policy: Policy<WindowsSessionHost, Arc<MetadataStore>>,
+  policy: Policy<WindowsSessionHost>,
   #[cfg(unix)]
   socket: PathBuf,
   #[cfg(windows)]

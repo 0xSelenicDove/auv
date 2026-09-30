@@ -4,8 +4,6 @@
 //! credential in the target account's Secret Service. The installed gate is
 //! specific to one GNOME host; other account and desktop layouts need gates.
 
-use std::ffi::{CStr, CString};
-use std::ptr;
 use std::sync::Arc;
 
 use auv_api_server::device_local::{
@@ -19,7 +17,8 @@ use super::local::{
 };
 use super::metadata::MetadataStore;
 use super::pam_native;
-use super::policy::{AccountLocks, Enrollment as StoredEnrollment, EnrollmentStore};
+use super::policy::{AccountLocks, Enrollment as StoredEnrollment};
+use super::unix_account::resolve_user;
 use super::vault_linux::{GnomeSecretVault, VaultError};
 
 pub(super) struct LinuxLocalEnrollment {
@@ -150,57 +149,6 @@ impl DeviceLocalControl for LinuxLocalEnrollment {
   }
 }
 
-#[derive(Debug, Eq, PartialEq)]
-struct Account {
-  name: String,
-  uid: u32,
-  id: String,
-}
-
-fn resolve_user(user: &str) -> Result<Account, LocalControlError> {
-  let name = CString::new(user).map_err(|_| LocalControlError::InvalidAccount)?;
-
-  if user.is_empty() || user.trim() != user {
-    return Err(LocalControlError::InvalidAccount);
-  }
-
-  let mut buffer = vec![0u8; 4096];
-
-  loop {
-    // SAFETY: passwd is a C record whose all-zero value is an output buffer
-    // accepted by getpwnam_r; pointers are not read before the call succeeds.
-    let mut record: libc::passwd = unsafe { std::mem::zeroed() };
-    let mut found = ptr::null_mut();
-    // SAFETY: name is a live NUL-terminated CString; record and found are
-    // writable, buffer remains live, and its length matches the pointer.
-    let result = unsafe { libc::getpwnam_r(name.as_ptr(), &mut record, buffer.as_mut_ptr().cast(), buffer.len(), &mut found) };
-
-    if result == libc::ERANGE && buffer.len() < 1024 * 1024 {
-      buffer.resize(buffer.len() * 2, 0);
-      continue;
-    }
-
-    if result != 0 {
-      return Err(LocalControlError::Persistence);
-    }
-
-    if found.is_null() || record.pw_name.is_null() {
-      return Err(LocalControlError::InvalidAccount);
-    }
-
-    // SAFETY: a successful getpwnam_r points pw_name into its live output
-    // buffer; copy the bytes before buffer or record can be dropped.
-    let canonical = unsafe { CStr::from_ptr(record.pw_name) }.to_str().map_err(|_| LocalControlError::InvalidAccount)?.to_owned();
-    let uid = record.pw_uid;
-
-    return Ok(Account {
-      name: canonical,
-      uid,
-      id: account_id(uid),
-    });
-  }
-}
-
 fn vault_error(error: VaultError) -> LocalControlError {
   match error {
     VaultError::Missing => LocalControlError::NotFound,
@@ -228,22 +176,6 @@ mod tests {
   fn test_audit(root: &std::path::Path) -> Arc<Audit> {
     std::fs::set_permissions(root, std::fs::Permissions::from_mode(0o700)).unwrap();
     Arc::new(Audit::open(root).unwrap())
-  }
-
-  #[test]
-  fn resolves_root_to_stable_uid() {
-    let account = resolve_user("root").unwrap();
-
-    assert_eq!(account.uid, 0);
-    assert_eq!(account.id, "uid:0");
-    assert_eq!(account.name, "root");
-  }
-
-  #[test]
-  fn rejects_unknown_and_noncanonical_accounts() {
-    assert_eq!(resolve_user(""), Err(LocalControlError::InvalidAccount));
-    assert_eq!(resolve_user(" root"), Err(LocalControlError::InvalidAccount));
-    assert_eq!(resolve_user("__auv_no_such_account_20260928__"), Err(LocalControlError::InvalidAccount));
   }
 
   #[test]

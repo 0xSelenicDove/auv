@@ -6,9 +6,9 @@
 use auv::devices::{DeviceEntryErrorReason, UserSessionLockState};
 use auv_device_helper_macos::HostError;
 
-use super::enrollment_macos::{Account, resolve_uid};
 use super::macos::current_console_session;
 use super::policy::{ObservedSession, SessionHost};
+use super::unix_account::{Account, resolve_uid};
 
 pub(super) struct MacosSessionHost;
 

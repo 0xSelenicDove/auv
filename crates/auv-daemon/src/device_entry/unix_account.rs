@@ -1,15 +1,16 @@
-//! Native macOS account lookup through the system password database.
-//! Enrollment and the unlock host consume resolved account facts only.
+//! Unix account lookup through the system password database for macOS and
+//! Linux Device entry. Enrollment and the unlock hosts consume resolved
+//! account facts only; a requested name is never itself an authority key.
 
 use std::ffi::{CStr, CString};
 use std::path::PathBuf;
 use std::ptr;
 
-use super::super::local::unix_account_id as account_id;
+use super::local::unix_account_id as account_id;
 use auv_api_server::device_local::LocalControlError;
 
 #[derive(Debug, Eq, PartialEq)]
-pub(in crate::device_entry) struct Account {
+pub(super) struct Account {
   pub name: String,
   pub uid: u32,
   pub id: String,
@@ -28,7 +29,7 @@ pub(super) fn resolve_user(user: &str) -> Result<Account, LocalControlError> {
   })
 }
 
-pub(in crate::device_entry) fn resolve_uid(uid: u32) -> Result<Account, LocalControlError> {
+pub(super) fn resolve_uid(uid: u32) -> Result<Account, LocalControlError> {
   passwd_lookup(|record, buffer, found| {
     // SAFETY: the output pointers and buffer remain live through this call.
     unsafe { libc::getpwuid_r(uid, record, buffer.as_mut_ptr().cast(), buffer.len(), found) }
@@ -79,5 +80,29 @@ fn passwd_lookup(
       id: account_id(uid),
       home,
     });
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn resolves_root_from_os_database_and_stable_uid() {
+    let account = resolve_user("root").unwrap();
+
+    assert_eq!(account.uid, 0);
+    assert_eq!(account.id, "uid:0");
+    assert_eq!(account.name, "root");
+    assert_eq!(resolve_uid(account.uid).unwrap(), account);
+    assert!(account.home.is_absolute());
+  }
+
+  #[test]
+  fn rejects_unknown_and_noncanonical_accounts() {
+    assert_eq!(resolve_user(""), Err(LocalControlError::InvalidAccount));
+    assert_eq!(resolve_user("root\0other"), Err(LocalControlError::InvalidAccount));
+    assert_eq!(resolve_user(" root"), Err(LocalControlError::InvalidAccount));
+    assert_eq!(resolve_user("__auv_no_such_account_20260928__"), Err(LocalControlError::InvalidAccount));
   }
 }

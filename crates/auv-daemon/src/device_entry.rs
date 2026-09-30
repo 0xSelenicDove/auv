@@ -34,6 +34,9 @@ mod enrollment_linux;
 #[cfg(target_os = "linux")]
 mod pam_native;
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+mod unix_account;
+
 mod audit;
 mod metadata;
 mod policy;
