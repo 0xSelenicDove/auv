@@ -36,10 +36,10 @@ The target-local enrollment service marks an account `PENDING` after storage.
 While the exact selected session is locked, `probe_locked` reads the item
 without prompting before the account advances to `READY`. The spare-Mac gate
 confirmed retrieval and two supervised black-display unlocks through the
-actual Device API, with same-session readback and owner observation. See
-`docs/ai/references/session-api/2026-09-28-macos-locked-session-host-gate.md`
-in the source repository. Other host configurations and release installation
-remain open.
+actual Device API, with same-session readback and owner observation. See the
+[macOS locked-session host
+gate](../../docs/ai/references/session-api/2026-09-28-macos-locked-session-host-gate.md).
+Other host configurations and release installation remain open.
 
 NOTICE: The login Keychain choice is limited to the locked-existing-session
 release. Availability after logout is unproved and is outside this package's

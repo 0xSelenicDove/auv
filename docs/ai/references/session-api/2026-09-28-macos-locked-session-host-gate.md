@@ -271,10 +271,10 @@ then posts Command+A and Backspace before the credential. It must recheck the
 same locked session and secure-field focus after clearing. macOS does not
 expose a character count through this field's AX attributes, so clearing is
 supported by the controlled visible-input gates below, not by an AX emptiness
-readback. The installed helper and actual DeviceService still require a
-supervised credential-delivery gate and independent post-action verification
-before this route can be enabled. The earlier Return-to-focus primitive was
-removed because it could submit retained partial input.
+readback. At this stage, the installed helper and actual DeviceService still
+required a supervised credential-delivery gate and independent post-action
+verification before this route could be enabled. The earlier Return-to-focus
+primitive was removed because it could submit retained partial input.
 
 A follow-up signed, read-only AX diagnostic on the same locked `neko` session
 tested this visibility question without a credential or posted event. Its

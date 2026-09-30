@@ -4,8 +4,9 @@ Status: Windows service entrypoint implemented; native Windows compile, focused
 unit tests, and combined binary build passed. A uniquely named temporary
 installation started as LocalSystem in Session 0 and answered paired session
 inventory and target-local policy calls. PIN enrollment reached
-`pending protected` under SYSTEM-only vault storage; a locked-console unlock
-remains pending.
+`pending protected` under SYSTEM-only vault storage. At this recorded stage, a
+locked-console unlock remained pending; the later successful gate is recorded
+in the [Windows locked-session handoff](2026-09-28-windows-locked-session-host-handoff.md).
 
 `auv serve --windows-service` dispatches the existing daemon through the Windows
 Service Control Manager under service name `AuvDevice`. The process checks that
@@ -30,7 +31,8 @@ Windows Device entry state is enabled only for this SCM mode; ordinary
 foreground `auv serve` continues without the privileged Device entry store.
 The Windows `PairingStore` now uses the same protected directory and file
 operations as Device entry storage. The native file tests and installed
-service identity/listener checks passed; the locked-console gate remains open.
+service identity/listener checks passed; at this stage the locked-console gate
+remained open.
 
 The paired loopback listener cannot issue its own first token: that RPC
 requires a paired bearer. Before starting `AuvDevice`, an installer must run
@@ -74,10 +76,11 @@ Manual startup keeps this gate out of boot startup. A controlled installer
 prepares a restricted token file before the `New-Service` invocation above.
 The installed binary and
 worker directory must also be protected from ordinary-user replacement. Keep
-the pairing store private; it contains durable authentication state. The API
-Device unlock route, Windows target-local enrollment, worker placement, and
-locked-console result require their own installed behavior gate. SCM `Running`
-proves listener startup, not a successful unlock. The temporary installer must
+the pairing store private; it contains durable authentication state. At this
+stage, the API Device unlock route, Windows target-local enrollment, worker
+placement, and locked-console result still required their own installed
+behavior gate. SCM `Running` proves listener startup, not a successful unlock.
+The temporary installer must
 refuse a preexisting fixed store, enrollment vault, service, or installation
 directory. Its cleanup must verify a SYSTEM-written ownership marker and the
 known store contents before deleting either protected root.

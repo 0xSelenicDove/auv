@@ -381,13 +381,14 @@ that its actual unlock host can read while the selected user session is locked.
 Enrollment occurs locally on the target. `PENDING` means the secret is stored
 but locked-session retrieval under the installed host identity has not been
 verified; it is not yet eligible for remote unlock. `READY` requires that
-retrieval, and `SUSPENDED` follows confirmed OS credential rejection. A
-protected credential store is preferred;
-if no suitable backend is available, the target's local administrator may
-explicitly choose a plaintext credential file. There is no automatic plaintext
-fallback, and a remote paired caller cannot make that storage choice. The
-protected backends have configuration-specific installed-path gate evidence;
-release installation and other host configurations remain open.
+retrieval, and `SUSPENDED` follows confirmed OS credential rejection. The first
+native release supports protected credential stores only and rejects a
+plaintext choice explicitly. The broader accepted policy permits a future
+administrator-selected plaintext fallback, but no current CLI or service
+surface offers it. There is no automatic fallback, and a remote paired caller
+can never make that storage choice. The protected backends have
+configuration-specific installed-path gate evidence; release installation and
+other host configurations remain open.
 The credential never travels in the remote unlock request. See the
 [credential decision](ai/references/session-api/2026-09-27-device-entry-credential-decision.md).
 The target retains a local audit record of each remote entry request with
