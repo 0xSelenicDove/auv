@@ -11,13 +11,12 @@ use auv_api_server::device_local::{
   LocalOsPrincipal, StorageKind,
 };
 use auv_driver_windows::device_session::observe_console;
-use auv_driver_windows::device_unlock_vault::{VaultError, enroll as vault_enroll, remove as vault_remove};
 
 use super::audit::Audit;
-use super::host_windows::account_name;
 use super::local::{audit_page, complete_account_mutation, local_enrollment};
 use super::metadata::MetadataStore;
 use super::policy::{AccountLocks, Enrollment as StoredEnrollment, EnrollmentStore};
+use super::vault_windows::{VaultError, enroll as vault_enroll, remove as vault_remove};
 
 const LOCAL_SYSTEM_SID: &str = "S-1-5-18";
 
@@ -46,7 +45,7 @@ impl WindowsLocalEnrollment {
 
   fn current_account(&self, user: &str) -> Result<(String, String), LocalControlError> {
     let console = observe_console().map_err(|_| LocalControlError::HostUnavailable)?.ok_or(LocalControlError::HostUnavailable)?;
-    let name = account_name(&console);
+    let name = console.account_name();
 
     if user != name || console.account_sid.is_empty() {
       return Err(LocalControlError::InvalidAccount);

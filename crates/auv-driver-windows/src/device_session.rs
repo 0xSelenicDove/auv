@@ -35,6 +35,16 @@ impl ConsoleSession {
   pub fn same_login(&self, current: &Self) -> bool {
     self.session_id == current.session_id && self.logon_time == current.logon_time && self.account_sid == current.account_sid
   }
+
+  /// Display account name in `DOMAIN\user` form, or `user` without a domain.
+  /// It is not an authority key; compare `account_sid` for identity.
+  pub fn account_name(&self) -> String {
+    if self.domain.is_empty() {
+      self.user.clone()
+    } else {
+      format!(r"{}\{}", self.domain, self.user)
+    }
+  }
 }
 
 /// Failure to read a reliable physical-console session state.
@@ -139,9 +149,10 @@ pub enum ConsoleUnlockError {
 }
 
 /// Check that this process is LocalSystem in the specified Windows session.
-/// The Session 0 host and its selected-session worker use the same identity gate.
+/// The Session 0 host, its protected storage, and its selected-session worker
+/// use the same identity gate.
 #[cfg(target_os = "windows")]
-pub(crate) fn verify_local_system_process_in_session(session_id: u32) -> Result<(), ConsoleUnlockError> {
+pub fn verify_local_system_process_in_session(session_id: u32) -> Result<(), ConsoleUnlockError> {
   native::verify_local_system_process_in_session(session_id)
 }
 

@@ -5,10 +5,10 @@
 
 use auv::devices::{DeviceEntryErrorReason, UserSession, UserSessionConnectionKind, UserSessionLockState};
 use auv_driver_windows::device_session::{ConsoleLockState, ConsoleSession, ConsoleSessionError, observe_console};
-use auv_driver_windows::device_unlock_host::{HostError, lock_with_worker, unlock_enrolled_with_worker};
-use auv_driver_windows::device_unlock_vault::{VaultError, verify_while_locked};
+use auv_driver_windows::device_unlock_host::{HostError, lock_with_worker, unlock_with_worker};
 
 use super::policy::{ObservedSession, SessionHost};
+use super::vault_windows::{self, VaultError};
 
 pub(super) struct WindowsSessionHost;
 
@@ -22,9 +22,9 @@ impl SessionHost for WindowsSessionHost {
     selected: &ObservedSession,
     authorize_effect: &(dyn Fn() -> Result<(), DeviceEntryErrorReason> + Send + Sync),
   ) -> Result<(), DeviceEntryErrorReason> {
-    let session = selected_locked_console(selected)?;
+    let session = selected_console(selected, ConsoleLockState::Locked)?;
     authorize_effect()?;
-    verify_while_locked(&session).map_err(vault_error)
+    vault_windows::verify_while_locked(&session).map_err(vault_error)
   }
 
   async fn verify_ready_credential(
@@ -41,8 +41,11 @@ impl SessionHost for WindowsSessionHost {
   }
 
   fn unlock_locked(&self, selected: &ObservedSession) -> Result<(), DeviceEntryErrorReason> {
-    let session = selected_locked_console(selected)?;
-    let after = unlock_enrolled_with_worker(&session).map_err(host_error)?;
+    let session = selected_console(selected, ConsoleLockState::Locked)?;
+    // Retrieval stays in this LocalSystem service; the driver receives the
+    // credential only for the one-shot pipe transfer to its worker.
+    let credential = vault_windows::retrieve(&session.account_sid).map_err(vault_error)?;
+    let after = unlock_with_worker(&session, &credential).map_err(host_error)?;
 
     if !session.same_login(&after) || after.lock_state != ConsoleLockState::Usable {
       return Err(DeviceEntryErrorReason::OutcomeUnverified);
@@ -52,17 +55,7 @@ impl SessionHost for WindowsSessionHost {
   }
 
   fn lock_usable(&self, selected: &ObservedSession) -> Result<(), DeviceEntryErrorReason> {
-    let current = observe_console().map_err(session_error)?.ok_or(DeviceEntryErrorReason::StaleSession)?;
-
-    if selected.public.selector != current.selector()
-      || selected.public.user != account_name(&current)
-      || selected.os_account_id != current.account_sid
-      || selected.public.lock_state != UserSessionLockState::Usable
-      || current.lock_state != ConsoleLockState::Usable
-    {
-      return Err(DeviceEntryErrorReason::StaleSession);
-    }
-
+    let current = selected_console(selected, ConsoleLockState::Usable)?;
     let after = lock_with_worker(&current).map_err(host_error)?;
 
     if !current.same_login(&after) || after.lock_state != ConsoleLockState::Locked {
@@ -73,29 +66,31 @@ impl SessionHost for WindowsSessionHost {
   }
 }
 
-fn selected_locked_console(selected: &ObservedSession) -> Result<ConsoleSession, DeviceEntryErrorReason> {
+/// Re-reads the console and returns it only if it is still the selected
+/// login, account, and expected lock state in both the selection and the OS.
+fn selected_console(selected: &ObservedSession, state: ConsoleLockState) -> Result<ConsoleSession, DeviceEntryErrorReason> {
   let current = observe_console().map_err(session_error)?.ok_or(DeviceEntryErrorReason::StaleSession)?;
 
-  if selected_matches_locked_console(selected, &current) {
+  if selected_matches_console(selected, &current, state) {
     Ok(current)
   } else {
     Err(DeviceEntryErrorReason::StaleSession)
   }
 }
 
-fn selected_matches_locked_console(selected: &ObservedSession, current: &ConsoleSession) -> bool {
+fn selected_matches_console(selected: &ObservedSession, current: &ConsoleSession, state: ConsoleLockState) -> bool {
   selected.public.selector == current.selector()
-    && selected.public.user == account_name(current)
+    && selected.public.user == current.account_name()
     && selected.os_account_id == current.account_sid
-    && selected.public.lock_state == UserSessionLockState::Locked
-    && current.lock_state == ConsoleLockState::Locked
+    && selected.public.lock_state == public_lock_state(state)
+    && current.lock_state == state
 }
 
-pub(super) fn account_name(session: &ConsoleSession) -> String {
-  if session.domain.is_empty() {
-    session.user.clone()
-  } else {
-    format!(r"{}\{}", session.domain, session.user)
+fn public_lock_state(state: ConsoleLockState) -> UserSessionLockState {
+  match state {
+    ConsoleLockState::Locked => UserSessionLockState::Locked,
+    ConsoleLockState::Usable => UserSessionLockState::Usable,
+    ConsoleLockState::Unknown => UserSessionLockState::Unknown,
   }
 }
 
@@ -103,12 +98,8 @@ fn observed(session: &ConsoleSession) -> ObservedSession {
   ObservedSession {
     public: UserSession {
       selector: session.selector(),
-      user: account_name(session),
-      lock_state: match session.lock_state {
-        ConsoleLockState::Locked => UserSessionLockState::Locked,
-        ConsoleLockState::Usable => UserSessionLockState::Usable,
-        ConsoleLockState::Unknown => UserSessionLockState::Unknown,
-      },
+      user: session.account_name(),
+      lock_state: public_lock_state(session.lock_state),
       connection_kind: UserSessionConnectionKind::Physical,
       seat: Some("console".into()),
     },
@@ -163,17 +154,27 @@ mod tests {
     let selected = observed(&current);
 
     assert_eq!(selected.public.user, r"DESKTOP\neko");
-    assert!(selected_matches_locked_console(&selected, &current));
+    assert!(selected_matches_console(&selected, &current, ConsoleLockState::Locked));
 
     let mut different = current.clone();
     different.logon_time += 1;
 
-    assert!(!selected_matches_locked_console(&selected, &different));
+    assert!(!selected_matches_console(&selected, &different, ConsoleLockState::Locked));
 
     different = current.clone();
     different.account_sid = "S-1-5-21-123-456-789-1002".into();
 
-    assert!(!selected_matches_locked_console(&selected, &different));
-    assert!(!selected_matches_locked_console(&selected, &session(ConsoleLockState::Usable)));
+    assert!(!selected_matches_console(&selected, &different, ConsoleLockState::Locked));
+    assert!(!selected_matches_console(&selected, &session(ConsoleLockState::Usable), ConsoleLockState::Locked));
+  }
+
+  #[test]
+  fn lock_requires_the_selected_login_to_still_be_usable() {
+    let current = session(ConsoleLockState::Usable);
+    let selected = observed(&current);
+
+    assert!(selected_matches_console(&selected, &current, ConsoleLockState::Usable));
+    assert!(!selected_matches_console(&selected, &session(ConsoleLockState::Locked), ConsoleLockState::Usable));
+    assert!(!selected_matches_console(&observed(&session(ConsoleLockState::Locked)), &current, ConsoleLockState::Usable));
   }
 }

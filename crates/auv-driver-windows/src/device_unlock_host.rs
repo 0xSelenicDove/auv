@@ -24,15 +24,12 @@ pub enum HostError {
   Unverified,
 }
 
-/// Read the selected account's target-local vault entry under the installed
-/// LocalSystem identity, then start one console worker. The worker executable
-/// is resolved beside this installed service process, never from a request.
-// TODO(device-unlock-windows-service): Register this only after the installed
-// LocalSystem service, peer-authenticated enrollment, and live locked gate pass.
-pub fn unlock_enrolled_with_worker(target: &ConsoleSession) -> Result<ConsoleSession, HostError> {
-  native::checked_target(target)?;
-  let credential = crate::device_unlock_vault::retrieve(&target.account_sid).map_err(|_| HostError::Unavailable)?;
-  native::unlock_with_worker(target, &credential)
+/// Start one console worker for this exact locked login and transfer the
+/// credential over a one-shot local pipe. The caller owns credential storage
+/// and retrieval; the worker executable is resolved beside this installed
+/// service process, never from a request.
+pub fn unlock_with_worker(target: &ConsoleSession, credential: &str) -> Result<ConsoleSession, HostError> {
+  native::unlock_with_worker(target, credential)
 }
 
 /// Lock this exact usable physical-console login from the installed
@@ -63,10 +60,6 @@ mod native {
   }
 
   pub(super) fn lock_with_worker(_: &ConsoleSession) -> Result<ConsoleSession, HostError> {
-    Err(HostError::Unavailable)
-  }
-
-  pub(super) fn checked_target(_: &ConsoleSession) -> Result<(), HostError> {
     Err(HostError::Unavailable)
   }
 
@@ -162,7 +155,7 @@ mod native {
     value.encode_wide().chain(Some(0)).collect()
   }
 
-  pub(super) fn checked_target(target: &ConsoleSession) -> Result<(), HostError> {
+  fn checked_target(target: &ConsoleSession) -> Result<(), HostError> {
     let current = observe_console().map_err(|_| HostError::Unverified)?.ok_or(HostError::StaleSession)?;
 
     if !target.same_login(&current) {

@@ -16,6 +16,8 @@ mod host_macos;
 mod enrollment_windows;
 #[cfg(target_os = "windows")]
 mod host_windows;
+#[cfg(target_os = "windows")]
+mod vault_windows;
 
 #[cfg(target_os = "linux")]
 mod linux;
