@@ -146,12 +146,14 @@ pub use spatial_memory_query::{
   AnswerStatus, FovSource, LandmarkTarget, QueryKind, SpatialMemoryAnswer, SpatialMemoryQuery, VisibilityClass, query_spatial_memory,
 };
 pub use spatial_memory_store::{
-  LandmarkKind, LandmarkObservation, LandmarkSource, ObservationRef, SPATIAL_MEMORY_STORE_SCHEMA_VERSION, SpatialLandmark,
-  SpatialMemoryConfig, SpatialMemoryStore, SpatialMemoryStoreData, SpatialMemoryStoreError,
+  LandmarkKind, LandmarkObservation, LandmarkSource, ObservationRef, PruneReason, PrunedLandmark, SPATIAL_MEMORY_STORE_SCHEMA_VERSION,
+  SpatialLandmark, SpatialMemoryConfig, SpatialMemoryStore, SpatialMemoryStoreData, SpatialMemoryStoreError,
 };
 pub use spatial_memory_tool::{
-  ClosedSetLabel, FreshnessInfo, MatchSource, MemoryGetInput, MemoryGetOutput, MemoryQueryInput, MemoryQueryOutput, MemorySearchInput,
-  MemorySearchItem, MemorySearchOutput, StalenessStatus, memory_get, memory_query, memory_search,
+  ClosedSetLabel, FreshnessInfo, IngestDepthMethod, IngestSource, MatchSource, MemoryGetInput, MemoryGetOutput, MemoryIngestInput,
+  MemoryIngestOutput, MemoryMaintainInput, MemoryMaintainOutput, MemoryQueryInput, MemoryQueryOutput, MemoryRecordMissInput,
+  MemoryRecordMissOutput, MemorySearchInput, MemorySearchItem, MemorySearchOutput, StalenessStatus, memory_get, memory_ingest,
+  memory_maintain, memory_query, memory_record_miss, memory_search,
 };
 pub use stage_status::StageStatus;
 pub use training_job::{

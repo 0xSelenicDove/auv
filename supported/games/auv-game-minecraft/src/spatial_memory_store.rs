@@ -119,6 +119,21 @@ impl Default for SpatialMemoryConfig {
   }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PruneReason {
+  ExpiredTtl,
+  StaleTimeout,
+  TooManyMisses,
+  LowConfidence,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrunedLandmark {
+  pub landmark_id: String,
+  pub reason: PruneReason,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SpatialMemoryStoreData {
   pub schema_version: u32,
@@ -372,44 +387,71 @@ impl SpatialMemoryStore {
 
   /// Prune stale or low-confidence landmarks based on configured thresholds:
   /// - Dynamic landmarks: evicted immediately if `now_millis - last_observed_millis > ttl_millis`
-  /// - Static landmarks:
-  ///   - `now_millis - last_observed_millis > stale_threshold_millis`
-  ///   - `confidence < min_confidence`
-  ///   - `consecutive_misses >= max_consecutive_misses`
-  /// Returns the number of pruned landmarks.
-  pub fn prune_stale(&mut self, now_millis: u64) -> usize {
-    let before_len = self.landmarks.len();
+  /// Prune stale or low-confidence landmarks based on configured thresholds,
+  /// returning detailed eviction attribution for each removed landmark.
+  ///
+  /// Attribution priority convention (when multiple eviction criteria are met):
+  /// `ExpiredTtl` > `StaleTimeout` > `TooManyMisses` > `LowConfidence`.
+  pub fn prune_stale_with_reasons(&mut self, now_millis: u64) -> Vec<PrunedLandmark> {
     let stale_threshold = self.config.stale_threshold_millis;
     let min_conf = self.config.min_confidence;
     let max_misses = self.config.max_consecutive_misses;
 
-    let mut pruned = Vec::new();
+    let mut pruned_info = Vec::new();
+    let mut pruned_positions = Vec::new();
+
     self.landmarks.retain(|id, lm| {
-      let keep = match lm.kind {
+      let prune_reason = match lm.kind {
         LandmarkKind::Dynamic { ttl_millis, .. } => {
           let is_expired = ttl_millis > 0 && lm.last_observed_millis > 0 && now_millis.saturating_sub(lm.last_observed_millis) > ttl_millis;
-          !is_expired
+          if is_expired {
+            Some(PruneReason::ExpiredTtl)
+          } else {
+            None
+          }
         }
         LandmarkKind::Static => {
           let is_expired =
             stale_threshold > 0 && lm.last_observed_millis > 0 && now_millis.saturating_sub(lm.last_observed_millis) > stale_threshold;
-          let is_low_confidence = lm.confidence < min_conf;
           let is_too_many_misses = max_misses > 0 && lm.consecutive_misses >= max_misses;
+          let is_low_confidence = lm.confidence < min_conf;
 
-          !is_expired && !is_low_confidence && !is_too_many_misses
+          if is_expired {
+            Some(PruneReason::StaleTimeout)
+          } else if is_too_many_misses {
+            Some(PruneReason::TooManyMisses)
+          } else if is_low_confidence {
+            Some(PruneReason::LowConfidence)
+          } else {
+            None
+          }
         }
       };
-      if !keep {
-        pruned.push((id.clone(), lm.position));
+
+      if let Some(reason) = prune_reason {
+        pruned_info.push(PrunedLandmark {
+          landmark_id: id.clone(),
+          reason,
+        });
+        pruned_positions.push((id.clone(), lm.position));
+        false
+      } else {
+        true
       }
-      keep
     });
 
-    for (id, pos) in pruned {
+    for (id, pos) in pruned_positions {
       self.remove_from_index(&id, pos);
     }
 
-    before_len - self.landmarks.len()
+    pruned_info
+  }
+
+  /// Prune stale or low-confidence landmarks based on configured thresholds.
+  /// Thin wrapper over `prune_stale_with_reasons`.
+  /// Returns the number of pruned landmarks.
+  pub fn prune_stale(&mut self, now_millis: u64) -> usize {
+    self.prune_stale_with_reasons(now_millis).len()
   }
 
   pub fn upsert_from_raycast(&mut self, hit: &RaycastHit, obs: &ObservationRef) -> String {
