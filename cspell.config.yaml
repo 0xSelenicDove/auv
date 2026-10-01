@@ -36,6 +36,7 @@ words:
   - libglvnd
   - libiconv
   - libxcb
+  - libxkbcommon
   - locomo
   - Logg
   - mediaremote

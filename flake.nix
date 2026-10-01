@@ -63,6 +63,7 @@
               libiconv
             ]) ++ pkgs.lib.optionals pkgs.stdenv.isLinux (with pkgs; [
               wayland
+              libxkbcommon
               libglvnd
               pipewire
               libgbm
