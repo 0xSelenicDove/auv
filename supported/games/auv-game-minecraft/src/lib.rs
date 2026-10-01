@@ -150,8 +150,8 @@ pub use spatial_memory_store::{
   SpatialMemoryConfig, SpatialMemoryStore, SpatialMemoryStoreData, SpatialMemoryStoreError,
 };
 pub use spatial_memory_tool::{
-  ClosedSetLabel, DEFAULT_STALE_THRESHOLD_MILLIS, FreshnessInfo, MatchSource, MemoryGetInput, MemoryGetOutput, MemoryQueryInput,
-  MemoryQueryOutput, MemorySearchInput, MemorySearchItem, MemorySearchOutput, StalenessStatus, memory_get, memory_query, memory_search,
+  ClosedSetLabel, FreshnessInfo, MatchSource, MemoryGetInput, MemoryGetOutput, MemoryQueryInput, MemoryQueryOutput, MemorySearchInput,
+  MemorySearchItem, MemorySearchOutput, StalenessStatus, memory_get, memory_query, memory_search,
 };
 pub use stage_status::StageStatus;
 pub use training_job::{

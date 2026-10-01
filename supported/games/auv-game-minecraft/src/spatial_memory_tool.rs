@@ -18,8 +18,6 @@ use crate::spatial_memory_query::{
 use crate::spatial_memory_store::{SpatialLandmark, SpatialMemoryStore};
 use crate::types::{BlockPosition, PlayerPose, Viewport};
 
-pub const DEFAULT_STALE_THRESHOLD_MILLIS: u64 = 300_000;
-
 // -----------------------------------------------------------------------------
 // Common Primitives
 // -----------------------------------------------------------------------------
@@ -222,8 +220,16 @@ pub fn memory_search(store: &SpatialMemoryStore, input: &MemorySearchInput) -> M
       }
     }
 
-    // 3. Joint Search: description == label OR stripped block_id contains label
-    let match_desc = lm.description.as_deref().map(|d| d.eq_ignore_ascii_case(target_label)).unwrap_or(false);
+    // 3. Joint Search: description == label (accounting for production "label (0.xx)" format)
+    //    OR stripped block_id contains label
+    let match_desc = lm
+      .description
+      .as_deref()
+      .map(|d| {
+        let desc_label = d.split(" (").next().unwrap_or(d).trim();
+        desc_label.eq_ignore_ascii_case(target_label)
+      })
+      .unwrap_or(false);
 
     let match_block = lm.observations.iter().filter_map(|o| o.block_id.as_deref()).any(|bid| {
       let clean = bid.strip_prefix("minecraft:").unwrap_or(bid);
@@ -336,12 +342,29 @@ mod tests {
     };
     store.upsert_from_raycast(&hit_door, &obs_2);
 
-    // 3. Visual perception landmark: crafting table at (-5, 95, 10), description="crafting_table"
+    // 3. Visual perception landmark: crafting table at (-5, 95, 10), description="crafting_table (0.90)" (production format)
     let obs_3 = ObservationRef {
       observation_id: "obs-vis-3".to_string(),
       captured_at_millis: 150_000,
     };
-    store.upsert_from_perception(BlockPosition::new(-5, 95, 10), "crafting_table", 0.90, &obs_3);
+    store.upsert_from_perception(BlockPosition::new(-5, 95, 10), "crafting_table (0.90)", 0.90, &obs_3);
+
+    // 4. Dual-source landmark: furnace with both raycast block_id and visual perception description
+    let hit_furnace = RaycastHit {
+      block_pos: BlockPosition::new(10, 95, 10),
+      face: BlockFace::South,
+      block_id: "minecraft:furnace".to_string(),
+    };
+    let obs_4a = ObservationRef {
+      observation_id: "obs-tele-4".to_string(),
+      captured_at_millis: 100_000,
+    };
+    store.upsert_from_raycast(&hit_furnace, &obs_4a);
+    let obs_4b = ObservationRef {
+      observation_id: "obs-vis-4".to_string(),
+      captured_at_millis: 150_000,
+    };
+    store.upsert_from_perception(BlockPosition::new(10, 95, 10), "furnace (0.88)", 0.88, &obs_4b);
 
     store
   }
@@ -398,6 +421,23 @@ mod tests {
     assert_eq!(out_ct.items.len(), 1);
     assert_eq!(out_ct.items[0].matched_by, MatchSource::Description);
     assert_eq!(out_ct.items[0].status, SpatialClaimStatus::Candidate);
+
+    // Search for furnace: matches BOTH block_id ("minecraft:furnace") AND description ("furnace (0.88)")
+    let out_furnace = memory_search(
+      &store,
+      &MemorySearchInput {
+        label: ClosedSetLabel::Furnace,
+        near: None,
+        radius_m: None,
+        min_confidence: None,
+        status_filter: None,
+        now_millis: None,
+      },
+    );
+    assert_eq!(out_furnace.items.len(), 1);
+    assert_eq!(out_furnace.items[0].matched_by, MatchSource::Both);
+    assert_eq!(out_furnace.items[0].label, "furnace");
+    assert_eq!(out_furnace.items[0].status, SpatialClaimStatus::Confirmed);
 
     // Search with radius filter: only within 4m of (0,95,10)
     let out_radius = memory_search(
