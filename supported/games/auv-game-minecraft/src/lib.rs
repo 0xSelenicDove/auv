@@ -35,6 +35,7 @@ pub mod spatial_memory_ingest;
 pub mod spatial_memory_observation;
 pub mod spatial_memory_query;
 pub mod spatial_memory_store;
+pub mod spatial_memory_tool;
 pub mod stage_status;
 pub mod training_job;
 pub mod training_launch;
@@ -147,6 +148,10 @@ pub use spatial_memory_query::{
 pub use spatial_memory_store::{
   LandmarkKind, LandmarkObservation, LandmarkSource, ObservationRef, SPATIAL_MEMORY_STORE_SCHEMA_VERSION, SpatialLandmark,
   SpatialMemoryConfig, SpatialMemoryStore, SpatialMemoryStoreData, SpatialMemoryStoreError,
+};
+pub use spatial_memory_tool::{
+  ClosedSetLabel, DEFAULT_STALE_THRESHOLD_MILLIS, FreshnessInfo, MatchSource, MemoryGetInput, MemoryGetOutput, MemoryQueryInput,
+  MemoryQueryOutput, MemorySearchInput, MemorySearchItem, MemorySearchOutput, StalenessStatus, memory_get, memory_query, memory_search,
 };
 pub use stage_status::StageStatus;
 pub use training_job::{

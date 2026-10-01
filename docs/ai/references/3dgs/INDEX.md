@@ -28,6 +28,7 @@
 
 ## 相关文档
 
+- [`2026-10-01-spatial-memory-tool-api-spec.md`](2026-10-01-spatial-memory-tool-api-spec.md) - 记忆系统 Tool API 接口定义（v0.1 已批准，LLM 与外部空间记忆系统的 6 个 typed tool-call 边界：写、负证据、维护、几何查询、联合语义搜索、取记录；锁定无状态设计、深度权威阶梯与联合检索语义；确立两步走实现规划）
 - [`2026-10-01-3dgs-positioning-and-freeze.md`](2026-10-01-3dgs-positioning-and-freeze.md) - 3DGS 系统生态位推演与全向冻结决议（记录 3DGS 剥离在线空间记忆后的三个理论生态位：人机交互离线数字孪生回放、环境仿真沙盒与数据合成、独立外挂资产扫描工具；宣布全向冻结“一个都不动”，锁死结构化空间记忆与 AUV 核心航道）
 - [`2026-09-30-traj-geo-spike.md`](2026-09-30-traj-geo-spike.md) - 轨迹累积后台 3D 几何 Spike 结项报告（正常游玩单视角前向徘徊 3-pass 轨迹累积、Brush 1000 步实测、中位数距离 2.041m / 表面覆盖率 4.1%、单目深度反投影基线对比、实证前向光流退化与不适定性、明确 NO-GO 裁决关闭 3DGS 几何抽取路线）
 - [`2026-09-30-line-closeout.md`](2026-09-30-line-closeout.md) - 3DGS / 结构化空间记忆线 Closeout（事实/分析/推测三层口径、全阶段交付与裁决总表、9 条诚实边界、冻结政策与未来方向）
