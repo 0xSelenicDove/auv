@@ -3,6 +3,7 @@ ignorePaths: []
 dictionaryDefinitions: []
 dictionaries: []
 words:
+  - AIRI
   - alaya
   - alint
   - antfu
@@ -12,12 +13,14 @@ words:
   - bbox
   - bufbuild
   - bumpp
+  - BYOA
   - clippy
   - conv
   - cust
   - decimalturn
   - direnv
   - dotenv
+  - evals
   - fsrs
   - graphiti
   - guiiai
@@ -25,9 +28,13 @@ words:
   - hnsw
   - iden
   - insel
+  - Kerbal
+  - Kimi
   - kwaa
+  - KWWK
   - libgbm
   - libglvnd
+  - libiconv
   - libxcb
   - locomo
   - Logg
@@ -64,6 +71,7 @@ words:
   - sonarjs
   - sqlx
   - stdenv
+  - swiftc
   - taze
   - tesseract
   - tinyexec
