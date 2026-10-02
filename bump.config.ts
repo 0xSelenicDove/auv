@@ -20,6 +20,7 @@ interface CargoDependencyTables {
 interface CargoManifest extends CargoDependencyTables {
   package?: {
     publish?: boolean | string[] | { workspace: boolean }
+    version?: string
   }
   target?: Record<string, CargoDependencyTables>
 }
@@ -90,6 +91,18 @@ async function syncCargoToml() {
     }
   }
 
+  // The N-API crate is an independent, unpublished Cargo workspace, so the
+  // member loop above cannot discover it. Its compiled version must still
+  // match the npm package version checked by the JavaScript entrypoint.
+  const nativeManifestPath = join(cwd(), 'js/packages/cli/Cargo.toml')
+  const nativeManifestSource = await readFile(nativeManifestPath, 'utf8')
+  const nativeManifest = parse(nativeManifestSource) as CargoManifest
+  if (nativeManifest.package?.version !== oldVersion) {
+    throw new Error(`js/packages/cli/Cargo.toml must use the current workspace version ${oldVersion}`)
+  }
+  nativeManifest.package.version = newVersion
+  memberUpdates.push({ path: nativeManifestPath, source: patch(nativeManifestSource, nativeManifest) })
+
   cargoToml.workspace.package.version = newVersion
   console.info(`Bumping Cargo.toml and ${memberUpdates.length} member manifests to ${newVersion}`)
 
@@ -110,6 +123,10 @@ export default defineConfig({
 
     await syncCargoToml()
     await x('cargo', ['generate-lockfile'])
+    // The N-API crate is a separate Cargo workspace with its own committed
+    // lockfile, and release builds pass `--locked`. Refresh only the versions
+    // of its local path packages; leave registry dependencies untouched.
+    await x('cargo', ['update', '--workspace', '--offline', '--manifest-path', 'js/packages/cli/Cargo.toml'])
   },
   push: false,
   recursive: true,

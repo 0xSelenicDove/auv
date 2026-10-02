@@ -126,6 +126,7 @@ fn map_host_error(error: HostError) -> DeviceEntryErrorReason {
       DeviceEntryErrorReason::OutcomeUnverified
     }
     HostError::VaultUnavailable => DeviceEntryErrorReason::Unenrolled,
+    HostError::ProtocolUnsupported | HostError::Revoked => DeviceEntryErrorReason::HostIncompatible,
     HostError::Unavailable | HostError::Unauthorized | HostError::InvalidRequest => DeviceEntryErrorReason::ServiceUnavailable,
   }
 }
@@ -274,6 +275,8 @@ mod tests {
       DeviceEntryErrorReason::OutcomeUnverified
     );
     assert_eq!(map_host_error(HostError::StaleSession), DeviceEntryErrorReason::StaleSession);
+    assert_eq!(map_host_error(HostError::ProtocolUnsupported), DeviceEntryErrorReason::HostIncompatible);
+    assert_eq!(map_host_error(HostError::Revoked), DeviceEntryErrorReason::HostIncompatible);
   }
 
   #[test]

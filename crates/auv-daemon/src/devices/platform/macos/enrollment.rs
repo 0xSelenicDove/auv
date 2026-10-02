@@ -133,6 +133,7 @@ impl DeviceLocalControl for MacosLocalEnrollment {
 fn enroll_host_error(error: HostError) -> LocalControlError {
   match error {
     HostError::InvalidRequest => LocalControlError::InvalidCredential,
+    HostError::ProtocolUnsupported | HostError::Revoked => LocalControlError::HostIncompatible,
     _ => LocalControlError::HostUnavailable,
   }
 }
