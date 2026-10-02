@@ -1,0 +1,354 @@
+[
+  {
+    "id": "Q01",
+    "question_type": "t1_relative_bearing",
+    "frame_index": 0,
+    "image_path": "images/frame_000000.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": 0.5,
+        "y": 96.62,
+        "z": 11.873094
+      },
+      "yaw": -180.0,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(0.50, 96.62, 11.87), yaw=-180.0°, pitch=0.0°。\n请问：离你最近的箱子在什么方位（前/后/左/右）？距离几米？\n请给出方位和距离。"
+  },
+  {
+    "id": "Q02",
+    "question_type": "t3_recall_behind",
+    "frame_index": 0,
+    "image_path": "images/frame_000000.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": 0.5,
+        "y": 96.62,
+        "z": 11.873094
+      },
+      "yaw": -180.0,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(0.50, 96.62, 11.87), yaw=-180.0°, pitch=0.0°。\n请问：你背后 5 米内有没有箱子？如果有，具体在哪个坐标？\n请回答有或无，并给出具体坐标与距离（若有）。"
+  },
+  {
+    "id": "Q03",
+    "question_type": "t2_counterfactual_frustum",
+    "frame_index": 10,
+    "image_path": "images/frame_000010.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": 0.460066,
+        "y": 96.62,
+        "z": 4.374273
+      },
+      "yaw": -180.0,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(0.46, 96.62, 4.37), yaw=-180.0°, pitch=0.0°。\n如果现在你原地向右转 90°（新 yaw 为 -90.0°），你的视野视锥内能看到什么地标（如箱子）？\n请列出可见地标及其大致位置或 ID，若无则回答无。"
+  },
+  {
+    "id": "Q04",
+    "question_type": "t1_relative_bearing",
+    "frame_index": 20,
+    "image_path": "images/frame_000020.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": 0.395556,
+        "y": 97.4166,
+        "z": -3.580278
+      },
+      "yaw": -181.800003,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(0.40, 97.42, -3.58), yaw=-181.8°, pitch=0.0°。\n请问：离你最近的箱子在什么方位（前/后/左/右）？距离几米？\n请给出方位和距离。"
+  },
+  {
+    "id": "Q05",
+    "question_type": "t2_counterfactual_frustum",
+    "frame_index": 24,
+    "image_path": "images/frame_000024.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": 0.374053,
+        "y": 96.62,
+        "z": -3.7
+      },
+      "yaw": -181.800003,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(0.37, 96.62, -3.70), yaw=-181.8°, pitch=0.0°。\n如果现在你原地向右转 90°（新 yaw 为 -91.8°），你的视野视锥内能看到什么地标（如箱子）？\n请列出可见地标及其大致位置或 ID，若无则回答无。"
+  },
+  {
+    "id": "Q06",
+    "question_type": "t3_recall_behind",
+    "frame_index": 24,
+    "image_path": "images/frame_000024.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": 0.374053,
+        "y": 96.62,
+        "z": -3.7
+      },
+      "yaw": -181.800003,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(0.37, 96.62, -3.70), yaw=-181.8°, pitch=0.0°。\n请问：你背后 5 米内有没有箱子？如果有，具体在哪个坐标？\n请回答有或无，并给出具体坐标与距离（若有）。"
+  },
+  {
+    "id": "Q07",
+    "question_type": "t1_relative_bearing",
+    "frame_index": 25,
+    "image_path": "images/frame_000025.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": 2.5,
+        "y": 96.62,
+        "z": 11.971094
+      },
+      "yaw": -180.0,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(2.50, 96.62, 11.97), yaw=-180.0°, pitch=0.0°。\n请问：离你最近的箱子在什么方位（前/后/左/右）？距离几米？\n请给出方位和距离。"
+  },
+  {
+    "id": "Q08",
+    "question_type": "t1_relative_bearing",
+    "frame_index": 35,
+    "image_path": "images/frame_000035.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": 2.453922,
+        "y": 96.62,
+        "z": 3.925047
+      },
+      "yaw": -180.0,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(2.45, 96.62, 3.93), yaw=-180.0°, pitch=0.0°。\n请问：离你最近的箱子在什么方位（前/后/左/右）？距离几米？\n请给出方位和距离。"
+  },
+  {
+    "id": "Q09",
+    "question_type": "t2_counterfactual_frustum",
+    "frame_index": 35,
+    "image_path": "images/frame_000035.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": 2.453922,
+        "y": 96.62,
+        "z": 3.925047
+      },
+      "yaw": -180.0,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(2.45, 96.62, 3.93), yaw=-180.0°, pitch=0.0°。\n如果现在你原地向左转 90°（新 yaw 为 90.0°），你的视野视锥内能看到什么地标（如箱子）？\n请列出可见地标及其大致位置或 ID，若无则回答无。"
+  },
+  {
+    "id": "Q10",
+    "question_type": "t1_relative_bearing",
+    "frame_index": 45,
+    "image_path": "images/frame_000045.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": 2.389413,
+        "y": 96.62,
+        "z": -1.7
+      },
+      "yaw": -181.800003,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(2.39, 96.62, -1.70), yaw=-181.8°, pitch=0.0°。\n请问：离你最近的箱子在什么方位（前/后/左/右）？距离几米？\n请给出方位和距离。"
+  },
+  {
+    "id": "Q11",
+    "question_type": "t2_counterfactual_frustum",
+    "frame_index": 49,
+    "image_path": "images/frame_000049.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": 2.36791,
+        "y": 96.62,
+        "z": -1.7
+      },
+      "yaw": -181.800003,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(2.37, 96.62, -1.70), yaw=-181.8°, pitch=0.0°。\n如果现在你原地向左转 90°（新 yaw 为 88.2°），你的视野视锥内能看到什么地标（如箱子）？\n请列出可见地标及其大致位置或 ID，若无则回答无。"
+  },
+  {
+    "id": "Q12",
+    "question_type": "t3_recall_behind",
+    "frame_index": 50,
+    "image_path": "images/frame_000050.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": -0.5,
+        "y": 96.62,
+        "z": 11.873094
+      },
+      "yaw": -180.0,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(-0.50, 96.62, 11.87), yaw=-180.0°, pitch=0.0°。\n请问：你背后 5 米内有没有箱子？如果有，具体在哪个坐标？\n请回答有或无，并给出具体坐标与距离（若有）。"
+  },
+  {
+    "id": "Q13",
+    "question_type": "t1_relative_bearing",
+    "frame_index": 60,
+    "image_path": "images/frame_000060.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": -0.539934,
+        "y": 96.62,
+        "z": 4.146468
+      },
+      "yaw": -180.0,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(-0.54, 96.62, 4.15), yaw=-180.0°, pitch=0.0°。\n请问：离你最近的箱子在什么方位（前/后/左/右）？距离几米？\n请给出方位和距离。"
+  },
+  {
+    "id": "Q14",
+    "question_type": "t2_counterfactual_frustum",
+    "frame_index": 60,
+    "image_path": "images/frame_000060.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": -0.539934,
+        "y": 96.62,
+        "z": 4.146468
+      },
+      "yaw": -180.0,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(-0.54, 96.62, 4.15), yaw=-180.0°, pitch=0.0°。\n如果现在你原地向右转 90°（新 yaw 为 -90.0°），你的视野视锥内能看到什么地标（如箱子）？\n请列出可见地标及其大致位置或 ID，若无则回答无。"
+  },
+  {
+    "id": "Q15",
+    "question_type": "t2_counterfactual_frustum",
+    "frame_index": 65,
+    "image_path": "images/frame_000065.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": -0.573725,
+        "y": 96.62,
+        "z": 0.383195
+      },
+      "yaw": -181.800003,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(-0.57, 96.62, 0.38), yaw=-181.8°, pitch=0.0°。\n如果现在你原地向左转 90°（新 yaw 为 88.2°），你的视野视锥内能看到什么地标（如箱子）？\n请列出可见地标及其大致位置或 ID，若无则回答无。"
+  },
+  {
+    "id": "Q16",
+    "question_type": "t3_recall_behind",
+    "frame_index": 65,
+    "image_path": "images/frame_000065.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": -0.573725,
+        "y": 96.62,
+        "z": 0.383195
+      },
+      "yaw": -181.800003,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(-0.57, 96.62, 0.38), yaw=-181.8°, pitch=0.0°。\n请问：你背后 5 米内有没有箱子？如果有，具体在哪个坐标？\n请回答有或无，并给出具体坐标与距离（若有）。"
+  },
+  {
+    "id": "Q17",
+    "question_type": "t1_relative_bearing",
+    "frame_index": 70,
+    "image_path": "images/frame_000070.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": -0.604444,
+        "y": 96.62,
+        "z": -3.477139
+      },
+      "yaw": -181.800003,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(-0.60, 96.62, -3.48), yaw=-181.8°, pitch=0.0°。\n请问：离你最近的箱子在什么方位（前/后/左/右）？距离几米？\n请给出方位和距离。"
+  },
+  {
+    "id": "Q18",
+    "question_type": "t3_recall_behind",
+    "frame_index": 70,
+    "image_path": "images/frame_000070.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": -0.604444,
+        "y": 96.62,
+        "z": -3.477139
+      },
+      "yaw": -181.800003,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(-0.60, 96.62, -3.48), yaw=-181.8°, pitch=0.0°。\n请问：你背后 5 米内有没有箱子？如果有，具体在哪个坐标？\n请回答有或无，并给出具体坐标与距离（若有）。"
+  },
+  {
+    "id": "Q19",
+    "question_type": "t2_counterfactual_frustum",
+    "frame_index": 72,
+    "image_path": "images/frame_000072.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": -0.604444,
+        "y": 96.62,
+        "z": -3.7
+      },
+      "yaw": -180.0,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(-0.60, 96.62, -3.70), yaw=-180.0°, pitch=0.0°。\n如果现在你原地调头 180°（新 yaw 为 0.0°），你的视野视锥内能看到什么地标（如箱子）？\n请列出可见地标及其大致位置或 ID，若无则回答无。"
+  },
+  {
+    "id": "Q20",
+    "question_type": "t3_recall_behind",
+    "frame_index": 72,
+    "image_path": "images/frame_000072.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": -0.604444,
+        "y": 96.62,
+        "z": -3.7
+      },
+      "yaw": -180.0,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(-0.60, 96.62, -3.70), yaw=-180.0°, pitch=0.0°。\n请问：你背后 5 米内有没有箱子？如果有，具体在哪个坐标？\n请回答有或无，并给出具体坐标与距离（若有）。"
+  },
+  {
+    "id": "Q21",
+    "question_type": "t1_relative_bearing",
+    "frame_index": 74,
+    "image_path": "images/frame_000074.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": -0.625947,
+        "y": 96.62,
+        "z": -3.7
+      },
+      "yaw": -181.800003,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(-0.63, 96.62, -3.70), yaw=-181.8°, pitch=0.0°。\n请问：离你最近的箱子在什么方位（前/后/左/右）？距离几米？\n请给出方位和距离。"
+  },
+  {
+    "id": "Q22",
+    "question_type": "t3_recall_behind",
+    "frame_index": 74,
+    "image_path": "images/frame_000074.png",
+    "observer_pose": {
+      "eye_position": {
+        "x": -0.625947,
+        "y": 96.62,
+        "z": -3.7
+      },
+      "yaw": -181.800003,
+      "pitch": 0.0
+    },
+    "prompt_text": "你当前在 Minecraft 中，位姿为 eye_pos=(-0.63, 96.62, -3.70), yaw=-181.8°, pitch=0.0°。\n请问：你背后 5 米内有没有石头墙？如果有，具体在哪个坐标？\n请回答有或无，并给出具体坐标与距离（若有）。"
+  }
+]

@@ -1,0 +1,457 @@
+[
+  {
+    "id": "Q01",
+    "question_type": "t1_relative_bearing",
+    "closest_landmark_gt": {
+      "landmark_id": "lm-0-95--3-static",
+      "label": "chest",
+      "position": {
+        "x": 0,
+        "y": 95,
+        "z": -3
+      },
+      "distance_m": 14.42,
+      "target_yaw": -180.0,
+      "yaw_delta": 0.0,
+      "quadrant": "前"
+    },
+    "frustum_gt": null,
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q02",
+    "question_type": "t3_recall_behind",
+    "closest_landmark_gt": null,
+    "frustum_gt": null,
+    "recall_behind_gt": {
+      "target_label": "chest",
+      "has_target_behind": false,
+      "matching_landmarks": []
+    }
+  },
+  {
+    "id": "Q03",
+    "question_type": "t2_counterfactual_frustum",
+    "closest_landmark_gt": null,
+    "frustum_gt": {
+      "counterfactual_yaw": -90.0,
+      "delta_yaw": 90.0,
+      "visible_landmarks": [],
+      "visible_labels": []
+    },
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q04",
+    "question_type": "t1_relative_bearing",
+    "closest_landmark_gt": {
+      "landmark_id": "lm-0-95--3-static",
+      "label": "chest",
+      "position": {
+        "x": 0,
+        "y": 95,
+        "z": -3
+      },
+      "distance_m": 2.2,
+      "target_yaw": -5.5,
+      "yaw_delta": 176.3,
+      "quadrant": "后"
+    },
+    "frustum_gt": null,
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q05",
+    "question_type": "t2_counterfactual_frustum",
+    "closest_landmark_gt": null,
+    "frustum_gt": {
+      "counterfactual_yaw": -91.800003,
+      "delta_yaw": 90.0,
+      "visible_landmarks": [
+        "lm-1-96--5-block_surface",
+        "lm-2-95--3-block_surface",
+        "lm-2-95--5-block_surface",
+        "lm-2-96--3-block_surface",
+        "lm-2-96--5-block_surface",
+        "lm-2-97--5-block_surface"
+      ],
+      "visible_labels": [
+        "cobblestone",
+        "stone"
+      ]
+    },
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q06",
+    "question_type": "t3_recall_behind",
+    "closest_landmark_gt": null,
+    "frustum_gt": null,
+    "recall_behind_gt": {
+      "target_label": "chest",
+      "has_target_behind": true,
+      "matching_landmarks": [
+        {
+          "landmark_id": "lm-0-95--3-block_surface",
+          "label": "chest",
+          "position": {
+            "x": 0,
+            "y": 95,
+            "z": -3
+          },
+          "distance_m": 2.04,
+          "target_yaw": -4.2,
+          "yaw_delta": 177.6,
+          "quadrant": "后"
+        },
+        {
+          "landmark_id": "lm--2-95--3-block_surface",
+          "label": "chest",
+          "position": {
+            "x": -2,
+            "y": 95,
+            "z": -3
+          },
+          "distance_m": 2.77,
+          "target_yaw": 47.8,
+          "yaw_delta": -130.4,
+          "quadrant": "左"
+        }
+      ]
+    }
+  },
+  {
+    "id": "Q07",
+    "question_type": "t1_relative_bearing",
+    "closest_landmark_gt": {
+      "landmark_id": "lm-0-95--3-static",
+      "label": "chest",
+      "position": {
+        "x": 0,
+        "y": 95,
+        "z": -3
+      },
+      "distance_m": 14.65,
+      "target_yaw": 172.1,
+      "yaw_delta": -7.9,
+      "quadrant": "前"
+    },
+    "frustum_gt": null,
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q08",
+    "question_type": "t1_relative_bearing",
+    "closest_landmark_gt": {
+      "landmark_id": "lm-0-95--3-static",
+      "label": "chest",
+      "position": {
+        "x": 0,
+        "y": 95,
+        "z": -3
+      },
+      "distance_m": 6.81,
+      "target_yaw": 163.1,
+      "yaw_delta": -16.9,
+      "quadrant": "前"
+    },
+    "frustum_gt": null,
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q09",
+    "question_type": "t2_counterfactual_frustum",
+    "closest_landmark_gt": null,
+    "frustum_gt": {
+      "counterfactual_yaw": 90.0,
+      "delta_yaw": -90.0,
+      "visible_landmarks": [
+        "lm--2-94-0-block_surface",
+        "lm--2-94-4-block_surface",
+        "lm--2-94-8-block_surface"
+      ],
+      "visible_labels": [
+        "grass_block"
+      ]
+    },
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q10",
+    "question_type": "t1_relative_bearing",
+    "closest_landmark_gt": {
+      "landmark_id": "lm-0-95--3-static",
+      "label": "chest",
+      "position": {
+        "x": 0,
+        "y": 95,
+        "z": -3
+      },
+      "distance_m": 2.34,
+      "target_yaw": 112.9,
+      "yaw_delta": -65.3,
+      "quadrant": "左"
+    },
+    "frustum_gt": null,
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q11",
+    "question_type": "t2_counterfactual_frustum",
+    "closest_landmark_gt": null,
+    "frustum_gt": {
+      "counterfactual_yaw": 88.199997,
+      "delta_yaw": -90.0,
+      "visible_landmarks": [
+        "lm--1-95--5-block_surface",
+        "lm--1-96--5-block_surface",
+        "lm--1-97--5-block_surface",
+        "lm--1-98--5-block_surface",
+        "lm--2-94--4-block_surface",
+        "lm--2-94-0-block_surface",
+        "lm--2-95--3-block_surface",
+        "lm--2-95--5-block_surface",
+        "lm--2-96--5-block_surface",
+        "lm--2-97--5-block_surface",
+        "lm--2-98--5-block_surface",
+        "lm-0-95--3-block_surface",
+        "lm-1-96--3-block_surface"
+      ],
+      "visible_labels": [
+        "chest",
+        "cobblestone",
+        "grass_block",
+        "stone"
+      ]
+    },
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q12",
+    "question_type": "t3_recall_behind",
+    "closest_landmark_gt": null,
+    "frustum_gt": null,
+    "recall_behind_gt": {
+      "target_label": "chest",
+      "has_target_behind": false,
+      "matching_landmarks": []
+    }
+  },
+  {
+    "id": "Q13",
+    "question_type": "t1_relative_bearing",
+    "closest_landmark_gt": {
+      "landmark_id": "lm--2-95--3-static",
+      "label": "chest",
+      "position": {
+        "x": -2,
+        "y": 95,
+        "z": -3
+      },
+      "distance_m": 6.81,
+      "target_yaw": 171.8,
+      "yaw_delta": -8.2,
+      "quadrant": "前"
+    },
+    "frustum_gt": null,
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q14",
+    "question_type": "t2_counterfactual_frustum",
+    "closest_landmark_gt": null,
+    "frustum_gt": {
+      "counterfactual_yaw": -90.0,
+      "delta_yaw": 90.0,
+      "visible_landmarks": [
+        "lm-2-94-0-block_surface",
+        "lm-2-94-4-block_surface"
+      ],
+      "visible_labels": [
+        "grass_block"
+      ]
+    },
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q15",
+    "question_type": "t2_counterfactual_frustum",
+    "closest_landmark_gt": null,
+    "frustum_gt": {
+      "counterfactual_yaw": 88.199997,
+      "delta_yaw": -90.0,
+      "visible_landmarks": [],
+      "visible_labels": []
+    },
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q16",
+    "question_type": "t3_recall_behind",
+    "closest_landmark_gt": null,
+    "frustum_gt": null,
+    "recall_behind_gt": {
+      "target_label": "chest",
+      "has_target_behind": false,
+      "matching_landmarks": []
+    }
+  },
+  {
+    "id": "Q17",
+    "question_type": "t1_relative_bearing",
+    "closest_landmark_gt": {
+      "landmark_id": "lm--2-95--3-static",
+      "label": "chest",
+      "position": {
+        "x": -2,
+        "y": 95,
+        "z": -3
+      },
+      "distance_m": 1.74,
+      "target_yaw": 42.5,
+      "yaw_delta": -135.7,
+      "quadrant": "后"
+    },
+    "frustum_gt": null,
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q18",
+    "question_type": "t3_recall_behind",
+    "closest_landmark_gt": null,
+    "frustum_gt": null,
+    "recall_behind_gt": {
+      "target_label": "chest",
+      "has_target_behind": true,
+      "matching_landmarks": [
+        {
+          "landmark_id": "lm--2-95--3-block_surface",
+          "label": "chest",
+          "position": {
+            "x": -2,
+            "y": 95,
+            "z": -3
+          },
+          "distance_m": 2.06,
+          "target_yaw": 31.2,
+          "yaw_delta": -147.0,
+          "quadrant": "后"
+        },
+        {
+          "landmark_id": "lm-0-95--3-block_surface",
+          "label": "chest",
+          "position": {
+            "x": 0,
+            "y": 95,
+            "z": -3
+          },
+          "distance_m": 2.16,
+          "target_yaw": -36.8,
+          "yaw_delta": 145.0,
+          "quadrant": "后"
+        }
+      ]
+    }
+  },
+  {
+    "id": "Q19",
+    "question_type": "t2_counterfactual_frustum",
+    "closest_landmark_gt": null,
+    "frustum_gt": {
+      "counterfactual_yaw": 0.0,
+      "delta_yaw": 180.0,
+      "visible_landmarks": [
+        "lm--2-94-0-block_surface",
+        "lm--2-94-12-block_surface",
+        "lm--2-94-4-block_surface",
+        "lm--2-94-8-block_surface",
+        "lm--2-95--3-block_surface",
+        "lm-0-94-0-block_surface",
+        "lm-0-94-12-block_surface",
+        "lm-0-94-4-block_surface",
+        "lm-0-94-8-block_surface",
+        "lm-0-95--3-block_surface",
+        "lm-1-95--3-block_surface",
+        "lm-1-96--3-block_surface",
+        "lm-2-94-0-block_surface",
+        "lm-2-94-12-block_surface",
+        "lm-2-94-4-block_surface",
+        "lm-2-94-8-block_surface"
+      ],
+      "visible_labels": [
+        "chest",
+        "cobblestone",
+        "grass_block"
+      ]
+    },
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q20",
+    "question_type": "t3_recall_behind",
+    "closest_landmark_gt": null,
+    "frustum_gt": null,
+    "recall_behind_gt": {
+      "target_label": "chest",
+      "has_target_behind": true,
+      "matching_landmarks": [
+        {
+          "landmark_id": "lm--2-95--3-block_surface",
+          "label": "chest",
+          "position": {
+            "x": -2,
+            "y": 95,
+            "z": -3
+          },
+          "distance_m": 2.22,
+          "target_yaw": 27.8,
+          "yaw_delta": -152.2,
+          "quadrant": "后"
+        },
+        {
+          "landmark_id": "lm-0-95--3-block_surface",
+          "label": "chest",
+          "position": {
+            "x": 0,
+            "y": 95,
+            "z": -3
+          },
+          "distance_m": 2.32,
+          "target_yaw": -33.0,
+          "yaw_delta": 147.0,
+          "quadrant": "后"
+        }
+      ]
+    }
+  },
+  {
+    "id": "Q21",
+    "question_type": "t1_relative_bearing",
+    "closest_landmark_gt": {
+      "landmark_id": "lm--2-95--3-static",
+      "label": "chest",
+      "position": {
+        "x": -2,
+        "y": 95,
+        "z": -3
+      },
+      "distance_m": 1.86,
+      "target_yaw": 36.1,
+      "yaw_delta": -142.1,
+      "quadrant": "后"
+    },
+    "frustum_gt": null,
+    "recall_behind_gt": null
+  },
+  {
+    "id": "Q22",
+    "question_type": "t3_recall_behind",
+    "closest_landmark_gt": null,
+    "frustum_gt": null,
+    "recall_behind_gt": {
+      "target_label": "stone",
+      "has_target_behind": false,
+      "matching_landmarks": []
+    }
+  }
+]
