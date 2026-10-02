@@ -50,7 +50,11 @@ jobs:
             archive: auv-x86_64-apple-darwin.tar.gz
             binding: auv-binding.darwin-x64.node
             executable: auv
-          - os: macos-14
+          # NOTICE(helper-icon-xcode): The helper's Icon Composer icon needs
+          # Xcode 26. macos-14 cannot run it, and on macos-15-arm64
+          # (macOS 15.7.9) Xcode 26.3's ibtoold crashes on a missing
+          # MediaToolbox symbol. macos-26 ships Xcode 26.6 on macOS 26.
+          - os: macos-26
             target: aarch64-apple-darwin
             archive: auv-aarch64-apple-darwin.tar.gz
             binding: auv-binding.darwin-arm64.node
@@ -120,7 +124,13 @@ jobs:
           output="target/embedded-helper-${{ matrix.target }}"
           notarization_archive="target/AUV-Helper-notarization-${{ matrix.target }}.zip"
           embedded_archive="target/AUV-Helper-${{ matrix.target }}.zip"
-          AUV_MACOS_TARGET='${{ matrix.target }}' \
+          # NOTICE(helper-icon-xcode): macos-15 images install Xcode 26 but
+          # default to Xcode 16, whose actool silently ignores `.icon` input.
+          # Select the newest Xcode 26 only for the helper package build.
+          helper_xcode="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)"
+          test -n "$helper_xcode" || { echo 'no Xcode 26 found for the AUV Helper icon' >&2; exit 1; }
+          DEVELOPER_DIR="$helper_xcode/Contents/Developer" \
+            AUV_MACOS_TARGET='${{ matrix.target }}' \
             AUV_MACOS_SIGN_IDENTITY="$application_identity" \
             crates/auv-device-helper-macos/package/package.sh "$output"
           ditto -c -k --keepParent "$output/AUV Helper.app" "$notarization_archive"
@@ -136,6 +146,8 @@ jobs:
 
       - name: Build NAPI binding
         working-directory: js/packages/cli
+        # The multi-line command uses POSIX line continuations.
+        shell: bash
         run: |
           pnpm build:js
           pnpm exec napi build --platform --release --esm --js binding.js --dts binding.d.ts \
