@@ -1,0 +1,79 @@
+{
+  "schema_version": "auv.operation.v1",
+  "name": "qqmusic.prepare_playback",
+  "description": "Prepare QQ Music playback: volume 40%, skip next, ensure playing, verify window alive",
+  "compilation_metadata": {
+    "compiler": "human-manual-compilation",
+    "source_record": "2026-10-04-qqmusic-vlm-record.json",
+    "date": "2026-10-04",
+    "crux_goal": "repeated execution approaches zero reasoning-token cost"
+  },
+  "target": {
+    "app_name": "QQMusic.exe",
+    "backend": "windows.smtc+coreaudio+wgc"
+  },
+  "steps": [
+    {
+      "id": "step_1_query_state",
+      "name": "Query Playback State",
+      "description": "Query current playback state and track metadata via SMTC",
+      "action": {
+        "type": "smtc_query",
+        "app_id": "QQMusic.exe"
+      },
+      "verification_gate": {
+        "type": "smtc_session_present",
+        "timeout_ms": 1000,
+        "escalate_on_mismatch": "would escalate to VLM"
+      }
+    },
+    {
+      "id": "step_2_ensure_playing_and_volume",
+      "name": "Ensure Playing & Volume 40%",
+      "description": "Set process volume to 40% via CoreAudio and trigger play if not playing",
+      "action": {
+        "type": "ensure_playing_and_volume",
+        "app_id": "QQMusic.exe",
+        "volume": 0.40
+      },
+      "verification_gate": {
+        "type": "status_and_volume_gate",
+        "expected_status": "Playing",
+        "expected_volume": 0.40,
+        "volume_tolerance": 0.05,
+        "timeout_ms": 2000,
+        "escalate_on_mismatch": "would escalate to VLM"
+      }
+    },
+    {
+      "id": "step_3_skip_next_track",
+      "name": "Skip Next Track",
+      "description": "Skip to next track via SMTC and verify title change",
+      "action": {
+        "type": "skip_next",
+        "app_id": "QQMusic.exe"
+      },
+      "verification_gate": {
+        "type": "title_change_gate",
+        "require_title_change": true,
+        "timeout_ms": 3000,
+        "escalate_on_mismatch": "would escalate to VLM"
+      }
+    },
+    {
+      "id": "step_4_verify_window_alive",
+      "name": "Verify Window Alive (WGC)",
+      "description": "Capture QQ Music window via WGC and assert non-black pixel ratio",
+      "action": {
+        "type": "wgc_capture",
+        "app_id": "QQMusic.exe"
+      },
+      "verification_gate": {
+        "type": "wgc_alive_gate",
+        "min_non_black_ratio": 0.50,
+        "timeout_ms": 2000,
+        "escalate_on_mismatch": "would escalate to VLM"
+      }
+    }
+  ]
+}
