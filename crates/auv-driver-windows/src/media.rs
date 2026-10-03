@@ -1,0 +1,444 @@
+//! System Media Transport Controls (SMTC) and CoreAudio session media controller.
+//!
+//! Exposes background media playback control (Play, Pause, Next, Previous, Toggle),
+//! structured now-playing metadata (Title, Artist, Album, Status), and process-targeted
+//! audio session volume control for Windows applications (including QQ Music).
+//!
+//! All operations operate entirely in the background via WinRT SMTC and Windows
+//! CoreAudio COM interfaces without stealing foreground window focus or injecting
+//! simulated input.
+
+use serde::{Deserialize, Serialize};
+
+/// Current playback state of an SMTC session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MediaPlaybackStatus {
+  Closed,
+  Opened,
+  Changing,
+  Stopped,
+  Playing,
+  Paused,
+  Unknown(i32),
+}
+
+/// Metadata for the currently loaded or playing track.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct MediaTrackMetadata {
+  pub title: String,
+  pub artist: String,
+  pub album_title: String,
+  pub album_artist: String,
+  pub genres: Vec<String>,
+}
+
+/// Structured summary of a media session and its current playback state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NowPlayingState {
+  pub app_id: String,
+  pub status: MediaPlaybackStatus,
+  pub track: Option<MediaTrackMetadata>,
+}
+
+#[cfg(target_os = "windows")]
+mod native {
+  use windows::Media::Control::{GlobalSystemMediaTransportControlsSession, GlobalSystemMediaTransportControlsSessionManager};
+  use windows::Win32::Media::Audio::{
+    DEVICE_STATE_ACTIVE, IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2, IMMDevice, IMMDeviceEnumerator,
+    ISimpleAudioVolume, MMDeviceEnumerator, eCommunications, eMultimedia, eRender,
+  };
+  use windows::Win32::System::Com::{CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize};
+  use windows::core::Interface;
+
+  use super::{MediaPlaybackStatus, MediaTrackMetadata, NowPlayingState};
+  use crate::error::backend;
+  use auv_driver_common::error::DriverResult;
+
+  /// A wrapper around WinRT [`GlobalSystemMediaTransportControlsSession`].
+  #[derive(Clone)]
+  pub struct SmtcSession {
+    inner: GlobalSystemMediaTransportControlsSession,
+    app_id: String,
+  }
+
+  impl SmtcSession {
+    pub fn new(session: GlobalSystemMediaTransportControlsSession) -> Self {
+      let app_id = session.SourceAppUserModelId().map(|h| h.to_string()).unwrap_or_default();
+      Self {
+        inner: session,
+        app_id,
+      }
+    }
+
+    pub fn app_id(&self) -> &str {
+      &self.app_id
+    }
+
+    pub fn playback_status(&self) -> DriverResult<MediaPlaybackStatus> {
+      let info = self.inner.GetPlaybackInfo().map_err(|e| backend(format!("GetPlaybackInfo failed for {}: {e}", self.app_id)))?;
+      let raw_status = info.PlaybackStatus().map_err(|e| backend(format!("PlaybackStatus failed for {}: {e}", self.app_id)))?;
+      Ok(match raw_status.0 {
+        0 => MediaPlaybackStatus::Closed,
+        1 => MediaPlaybackStatus::Opened,
+        2 => MediaPlaybackStatus::Changing,
+        3 => MediaPlaybackStatus::Stopped,
+        4 => MediaPlaybackStatus::Playing,
+        5 => MediaPlaybackStatus::Paused,
+        other => MediaPlaybackStatus::Unknown(other),
+      })
+    }
+
+    pub fn track_metadata(&self) -> DriverResult<MediaTrackMetadata> {
+      let op = self
+        .inner
+        .TryGetMediaPropertiesAsync()
+        .map_err(|e| backend(format!("TryGetMediaPropertiesAsync failed for {}: {e}", self.app_id)))?;
+      let props = op.get().map_err(|e| backend(format!("Failed to retrieve media properties for {}: {e}", self.app_id)))?;
+
+      let title = props.Title().map(|h| h.to_string()).unwrap_or_default();
+      let artist = props.Artist().map(|h| h.to_string()).unwrap_or_default();
+      let album_title = props.AlbumTitle().map(|h| h.to_string()).unwrap_or_default();
+      let album_artist = props.AlbumArtist().map(|h| h.to_string()).unwrap_or_default();
+      let genres = if let Ok(genres_vec) = props.Genres() {
+        let count = genres_vec.Size().unwrap_or(0);
+        let mut list = Vec::with_capacity(count as usize);
+        for i in 0..count {
+          if let Ok(g) = genres_vec.GetAt(i) {
+            list.push(g.to_string());
+          }
+        }
+        list
+      } else {
+        Vec::new()
+      };
+
+      Ok(MediaTrackMetadata {
+        title,
+        artist,
+        album_title,
+        album_artist,
+        genres,
+      })
+    }
+
+    pub fn play(&self) -> DriverResult<bool> {
+      let op = self.inner.TryPlayAsync().map_err(|e| backend(format!("TryPlayAsync call failed for {}: {e}", self.app_id)))?;
+      op.get().map_err(|e| backend(format!("TryPlayAsync execution failed for {}: {e}", self.app_id)))
+    }
+
+    pub fn pause(&self) -> DriverResult<bool> {
+      let op = self.inner.TryPauseAsync().map_err(|e| backend(format!("TryPauseAsync call failed for {}: {e}", self.app_id)))?;
+      op.get().map_err(|e| backend(format!("TryPauseAsync execution failed for {}: {e}", self.app_id)))
+    }
+
+    pub fn toggle_play_pause(&self) -> DriverResult<bool> {
+      let op = self
+        .inner
+        .TryTogglePlayPauseAsync()
+        .map_err(|e| backend(format!("TryTogglePlayPauseAsync call failed for {}: {e}", self.app_id)))?;
+      op.get().map_err(|e| backend(format!("TryTogglePlayPauseAsync execution failed for {}: {e}", self.app_id)))
+    }
+
+    pub fn skip_next(&self) -> DriverResult<bool> {
+      let op = self.inner.TrySkipNextAsync().map_err(|e| backend(format!("TrySkipNextAsync call failed for {}: {e}", self.app_id)))?;
+      op.get().map_err(|e| backend(format!("TrySkipNextAsync execution failed for {}: {e}", self.app_id)))
+    }
+
+    pub fn skip_previous(&self) -> DriverResult<bool> {
+      let op =
+        self.inner.TrySkipPreviousAsync().map_err(|e| backend(format!("TrySkipPreviousAsync call failed for {}: {e}", self.app_id)))?;
+      op.get().map_err(|e| backend(format!("TrySkipPreviousAsync execution failed for {}: {e}", self.app_id)))
+    }
+
+    pub fn stop(&self) -> DriverResult<bool> {
+      let op = self.inner.TryStopAsync().map_err(|e| backend(format!("TryStopAsync call failed for {}: {e}", self.app_id)))?;
+      op.get().map_err(|e| backend(format!("TryStopAsync execution failed for {}: {e}", self.app_id)))
+    }
+
+    pub fn snapshot(&self) -> DriverResult<NowPlayingState> {
+      let status = self.playback_status()?;
+      let meta = self.track_metadata()?;
+      let track = if meta.title.is_empty() && meta.artist.is_empty() && meta.album_title.is_empty() {
+        None
+      } else {
+        Some(meta)
+      };
+      Ok(NowPlayingState {
+        app_id: self.app_id.clone(),
+        status,
+        track,
+      })
+    }
+  }
+
+  /// Manages discovery and selection of SMTC media sessions.
+  pub struct SmtcMediaManager {
+    manager: GlobalSystemMediaTransportControlsSessionManager,
+  }
+
+  impl SmtcMediaManager {
+    pub fn new() -> DriverResult<Self> {
+      let op = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
+        .map_err(|e| backend(format!("Failed to request SMTC session manager: {e}")))?;
+      let manager = op.get().map_err(|e| backend(format!("Failed to retrieve SMTC session manager: {e}")))?;
+      Ok(Self { manager })
+    }
+
+    pub fn current_session(&self) -> DriverResult<Option<SmtcSession>> {
+      match self.manager.GetCurrentSession() {
+        Ok(session) => Ok(Some(SmtcSession::new(session))),
+        // WinRT returns S_OK (0x0) with a null interface pointer when there is no active
+        // media session, which windows-rs converts into an Error with HRESULT(0).
+        // Only HRESULT(0) represents a legitimate absence of an active session; non-zero
+        // HRESULTs (e.g. RPC server unavailable, access denied) must be propagated.
+        Err(e) if e.code().0 == 0 => Ok(None),
+        Err(e) => Err(backend(format!("Failed to get current SMTC session: {e}"))),
+      }
+    }
+
+    pub fn list_sessions(&self) -> DriverResult<Vec<SmtcSession>> {
+      let sessions = self.manager.GetSessions().map_err(|e| backend(format!("Failed to get SMTC sessions: {e}")))?;
+      let count = sessions.Size().map_err(|e| backend(format!("Failed to get SMTC sessions size: {e}")))?;
+      let mut result = Vec::with_capacity(count as usize);
+      for i in 0..count {
+        let s = sessions.GetAt(i).map_err(|e| backend(format!("Failed to get SMTC session at index {i}: {e}")))?;
+        result.push(SmtcSession::new(s));
+      }
+      Ok(result)
+    }
+
+    pub fn find_session(&self, query: &str) -> DriverResult<Option<SmtcSession>> {
+      let lower = query.to_lowercase();
+      let sessions = self.list_sessions()?;
+      for s in sessions {
+        if s.app_id().to_lowercase().contains(&lower) {
+          return Ok(Some(s));
+        }
+      }
+      Ok(None)
+    }
+
+    pub fn now_playing(&self) -> DriverResult<Option<NowPlayingState>> {
+      if let Some(current) = self.current_session()? {
+        return Ok(Some(current.snapshot()?));
+      }
+      let all = self.list_sessions()?;
+      if let Some(first) = all.first() {
+        return Ok(Some(first.snapshot()?));
+      }
+      Ok(None)
+    }
+  }
+
+  /// CoreAudio volume control for per-process audio sessions.
+  pub struct AudioVolumeController;
+
+  impl AudioVolumeController {
+    /// Returns process volume for `target_pid` in `[0.0, 1.0]`.
+    pub fn get_process_volume(target_pid: u32) -> DriverResult<f32> {
+      let vol = find_process_simple_volume(target_pid)?;
+      unsafe { vol.GetMasterVolume().map_err(|e| backend(format!("GetMasterVolume failed for PID {target_pid}: {e}"))) }
+    }
+
+    /// Sets process volume for `target_pid` to a float in `[0.0, 1.0]`.
+    pub fn set_process_volume(target_pid: u32, level: f32) -> DriverResult<()> {
+      let clamped = level.clamp(0.0, 1.0);
+      let vol = find_process_simple_volume(target_pid)?;
+      unsafe {
+        vol.SetMasterVolume(clamped, std::ptr::null()).map_err(|e| backend(format!("SetMasterVolume failed for PID {target_pid}: {e}")))
+      }
+    }
+
+    /// Returns process mute status for `target_pid`.
+    pub fn get_process_mute(target_pid: u32) -> DriverResult<bool> {
+      let vol = find_process_simple_volume(target_pid)?;
+      unsafe { vol.GetMute().map(|b| b.as_bool()).map_err(|e| backend(format!("GetMute failed for PID {target_pid}: {e}"))) }
+    }
+
+    /// Sets process mute status for `target_pid`.
+    pub fn set_process_mute(target_pid: u32, muted: bool) -> DriverResult<()> {
+      let vol = find_process_simple_volume(target_pid)?;
+      unsafe {
+        vol
+          .SetMute(windows::Win32::Foundation::BOOL(if muted { 1 } else { 0 }), std::ptr::null())
+          .map_err(|e| backend(format!("SetMute failed for PID {target_pid}: {e}")))
+      }
+    }
+  }
+
+  struct ComGuard {
+    uninit: bool,
+  }
+
+  impl Drop for ComGuard {
+    fn drop(&mut self) {
+      if self.uninit {
+        unsafe { CoUninitialize() };
+      }
+    }
+  }
+
+  fn init_com() -> ComGuard {
+    let hr = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
+    ComGuard { uninit: hr.is_ok() }
+  }
+
+  unsafe fn search_device_for_process_volume(device: &IMMDevice, target_pid: u32) -> Option<ISimpleAudioVolume> {
+    unsafe {
+      let mgr: IAudioSessionManager2 = device.Activate(CLSCTX_ALL, None).ok()?;
+      let session_enum: IAudioSessionEnumerator = mgr.GetSessionEnumerator().ok()?;
+      let count = session_enum.GetCount().ok()?;
+      for i in 0..count {
+        if let Ok(session_ctrl) = session_enum.GetSession(i)
+          && let Ok(ctrl2) = session_ctrl.cast::<IAudioSessionControl2>()
+          && ctrl2.GetProcessId().ok() == Some(target_pid)
+          && let Ok(vol) = session_ctrl.cast::<ISimpleAudioVolume>()
+        {
+          return Some(vol);
+        }
+      }
+      None
+    }
+  }
+
+  fn find_process_simple_volume(target_pid: u32) -> DriverResult<ISimpleAudioVolume> {
+    let _com = init_com();
+    unsafe {
+      let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+        .map_err(|e| backend(format!("Failed to instantiate MMDeviceEnumerator: {e}")))?;
+
+      // 1. Check default multimedia render endpoint first (fast path for common case)
+      if let Ok(default_device) = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia)
+        && let Some(vol) = search_device_for_process_volume(&default_device, target_pid)
+      {
+        return Ok(vol);
+      }
+
+      // 2. Check default communications render endpoint (for voice / communication applications)
+      if let Ok(comm_device) = enumerator.GetDefaultAudioEndpoint(eRender, eCommunications)
+        && let Some(vol) = search_device_for_process_volume(&comm_device, target_pid)
+      {
+        return Ok(vol);
+      }
+
+      // 3. Enumerate all active render endpoints (handles processes explicitly routed to non-default devices)
+      let collection =
+        enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE).map_err(|e| backend(format!("EnumAudioEndpoints failed: {e}")))?;
+      let count = collection.GetCount().map_err(|e| backend(format!("EnumAudioEndpoints GetCount failed: {e}")))?;
+      for i in 0..count {
+        if let Ok(device) = collection.Item(i)
+          && let Some(vol) = search_device_for_process_volume(&device, target_pid)
+        {
+          return Ok(vol);
+        }
+      }
+
+      Err(backend(format!("No active audio session found for PID {target_pid}")))
+    }
+  }
+}
+
+#[cfg(target_os = "windows")]
+pub use native::{AudioVolumeController, SmtcMediaManager, SmtcSession};
+
+#[cfg(not(target_os = "windows"))]
+use auv_driver_common::error::{DriverError, DriverResult};
+
+#[cfg(not(target_os = "windows"))]
+pub struct SmtcMediaManager;
+
+#[cfg(not(target_os = "windows"))]
+impl SmtcMediaManager {
+  pub fn new() -> DriverResult<Self> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn current_session(&self) -> DriverResult<Option<SmtcSession>> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn list_sessions(&self) -> DriverResult<Vec<SmtcSession>> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn find_session(&self, _query: &str) -> DriverResult<Option<SmtcSession>> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn now_playing(&self) -> DriverResult<Option<NowPlayingState>> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+}
+
+#[cfg(not(target_os = "windows"))]
+#[derive(Clone, Debug)]
+pub struct SmtcSession;
+
+#[cfg(not(target_os = "windows"))]
+impl SmtcSession {
+  pub fn app_id(&self) -> &str {
+    ""
+  }
+
+  pub fn playback_status(&self) -> DriverResult<MediaPlaybackStatus> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn track_metadata(&self) -> DriverResult<MediaTrackMetadata> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn play(&self) -> DriverResult<bool> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn pause(&self) -> DriverResult<bool> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn toggle_play_pause(&self) -> DriverResult<bool> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn skip_next(&self) -> DriverResult<bool> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn skip_previous(&self) -> DriverResult<bool> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn stop(&self) -> DriverResult<bool> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+
+  pub fn snapshot(&self) -> DriverResult<NowPlayingState> {
+    Err(DriverError::unsupported("SMTC is only supported on Windows"))
+  }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub struct AudioVolumeController;
+
+#[cfg(not(target_os = "windows"))]
+impl AudioVolumeController {
+  pub fn get_process_volume(_target_pid: u32) -> DriverResult<f32> {
+    Err(DriverError::unsupported("Audio volume control is only supported on Windows"))
+  }
+
+  pub fn set_process_volume(_target_pid: u32, _level: f32) -> DriverResult<()> {
+    Err(DriverError::unsupported("Audio volume control is only supported on Windows"))
+  }
+
+  pub fn get_process_mute(_target_pid: u32) -> DriverResult<bool> {
+    Err(DriverError::unsupported("Audio volume control is only supported on Windows"))
+  }
+
+  pub fn set_process_mute(_target_pid: u32, _muted: bool) -> DriverResult<()> {
+    Err(DriverError::unsupported("Audio volume control is only supported on Windows"))
+  }
+}
+
+#[cfg(test)]
+#[path = "media_test.rs"]
+mod tests;
