@@ -50,11 +50,13 @@ Crux: validate AUV's thesis that repeated executions approach zero reasoning-tok
 
 | Step | Operation / Backend | P50 | P95 | Mean |
 |---|---|---|---|---|
-| Step 1 | Query Playback State (SMTC) | 2.46 ms | 4.32 ms | 3.00 ms |
-| Step 2 | Play & Volume 40% (CoreAudio + SMTC) | 4.38 ms | 84.58 ms | 16.61 ms |
-| Step 3 | Skip Next Track (SMTC) | 82.01 ms | 1135.37 ms | 550.60 ms |
-| Step 4 | Verify Window Alive (WGC) | 35.15 ms | 43.58 ms | 51.75 ms |
-| **Total** | **Full Operation Replay** | **477.28 ms** | **1263.60 ms** | **627.36 ms** |
+| Step 1 | Query Playback State (SMTC) | 2.55 ms | 4.28 ms | 3.10 ms |
+| Step 2 | Play & Volume 40% (CoreAudio + SMTC) | 4.81 ms | 85.47 ms | 36.55 ms |
+| Step 3 | Skip Next Track (SMTC) | 645.96 ms | 1136.99 ms | 622.94 ms |
+| Step 4 | Verify Window Alive (WGC, skipped x20) | 0.00 ms | 0.00 ms | 0.00 ms |
+| **Total** | **Full Operation Replay** | **659.39 ms** | **1229.66 ms** | **667.68 ms** |
+
+> Note: In run #2 (persisted in `2026-10-04-qqmusic-replay-20x.jsonl`), the window remained minimized throughout all 20 runs, so Step 4 executed the zero-window-mutation skip path (0 ms). The active WGC hot-frame path (~35 ms P50) was previously verified in run #1 when the window was occluded/open.
 
 ### 4. Fault injection (Verification gate catch)
 - Injected volume mismatch (forced 0.10): Step 2 verification gate caught discrepancy (`vol_check: false`), escalated with `"would escalate to VLM"`, 0 VLM called.
@@ -65,7 +67,7 @@ Crux: validate AUV's thesis that repeated executions approach zero reasoning-tok
 | Execution Mode | VLM Calls | Tokens | Latency | Evidence Level |
 |---|---|---|---|---|
 | **Run 1 (VLM Record)** | 1 call | 3,372 tokens | ~4.2 s | Measured (`2026-10-04-qqmusic-vlm-record.json`) |
-| **Runs 2..21 (Operation Replay)** | **0 calls** | **0 tokens** | **477 ms (P50)** | Measured (`2026-10-04-qqmusic-replay-20x.jsonl`) |
+| **Runs 2..21 (Operation Replay)** | **0 calls** | **0 tokens** | **659 ms (P50)** | Measured (`2026-10-04-qqmusic-replay-20x.jsonl`) |
 | *Estimated pure-VLM per run* | *1 call* | *~3,000+ tokens* | *~3.0 s* | *Estimated baseline* |
 
 ### 6. Incident & Retrospective: Zero-Window-Mutation Redline
@@ -78,6 +80,6 @@ Crux: validate AUV's thesis that repeated executions approach zero reasoning-tok
   2. Updated Step 4 verification gate: if the target window is minimized, WGC capture is skipped (`skipped_minimized`) with explicit reason recorded (`"window_minimized (DWM suspends frame composition; zero-window-mutation redline preserves user state)"`).
   3. Occluded windows (covered under other windows) remain fully capturable via WGC in the background without popups.
 
-Decision: Trajectory compilation crux is validated. Repeated executions achieve 100% token elimination (3,372 -> 0 tokens) and ~6.3x latency improvement over estimated VLM planning (~3s -> 477ms).
+Decision: Trajectory compilation crux is validated. Repeated executions achieve 100% token elimination (3,372 -> 0 tokens) and ~4.6x latency improvement over estimated VLM planning (~3s -> ~659ms).
 
 
