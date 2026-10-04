@@ -91,6 +91,26 @@ Download the archive for your architecture:
 Extract the archive to a permanent directory. Add that directory to your user
 `PATH`. Keep `auv.exe` and `auv-helper.exe` in the same directory.
 
+### Install with proto
+
+Install and configure [proto](https://moonrepo.dev/docs/proto) first. Then add
+the AUV plugin and install the latest release:
+
+```sh
+proto plugin add auv "https://raw.githubusercontent.com/moeru-ai/auv/main/toolchain/proto/auv.toml" --to global
+proto install auv latest --config-mode global --pin global
+auv --version
+```
+
+> [!NOTE]
+>
+> `AUV Helper.app` for macOS and `auv-helper.exe` for Windows are included in
+> the `proto` installation.
+
+> [!WARNING]
+>
+> Linux musl is not supported. (But PRs are welcomed!)
+
 ### Install with Cargo
 
 Prerequisites: [Rust](https://www.rust-lang.org/tools/install) and the platform
