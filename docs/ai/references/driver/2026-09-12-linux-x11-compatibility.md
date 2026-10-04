@@ -24,6 +24,30 @@ Coordinates are root pixels with scale 1, independent of Xft font DPI.
 
 ## Validation evidence
 
+### 2026-10-05 OSWorld input-seam completion
+
+Evidence level: **live-validated in isolated Xvfb**, plus native Linux compile;
+this is not an OSWorld end-to-end result.
+
+The X11 backend now implements the existing shared held-key controller and
+logical-mouse coordinator. The root facade and daemon Runner therefore use the
+same bounded down/up, sampled movement, sampled drag, cancellation, timeout,
+and release-cleanup contracts as the other Linux backend. A new additive
+`ScrollScreenPoint` Runner RPC and registered `input.scrollPoint` invoke command
+expose foreground wheel delivery to paired clients.
+
+The updated Tk receiver observed left-button down/up and Shift key down/up while
+the driver also completed sampled move/drag and logical mouse lifecycle calls.
+On Docker/OrbStack Debian bookworm arm64 with Rust 1.91, Xvfb 800x600x24, and
+Tk 8.6, the ignored live regression passed: `1 passed; 0 failed`. Native Linux
+`cargo check -p auv-driver-linux-x11 -p auv-driver --tests` also passed.
+
+`buf lint`, generated-code regeneration, and
+`buf breaking proto --against '.git#branch=main,subdir=proto'` passed. The
+schema change is additive. This closes the missing OSWorld action primitives;
+cursor compositing, an OSWorld action adapter, benchmark VM reset/setup, and
+semantic task evaluation remain separate work.
+
 ### 2026-10-04 facade and Runner integration
 
 Evidence level: **live-validated for the named environment**, not a general
@@ -144,11 +168,13 @@ Physical-seat Xorg, GPU-accelerated Xorg, XWayland, multiple X screens, non-US
 layouts, and OSWorld remain unvalidated. Rootless XWayland cannot be assumed to
 expose native Wayland surfaces or a full desktop screenshot.
 
-Window/AT-SPI APIs, background input, clipboard ownership, and overlays are
+Window/AT-SPI APIs, background input, clipboard ownership, cursor compositing,
+and overlays are
 intentionally omitted from the X11 backend. The root facade can apply its
 existing capture-driven Tesseract OCR to an X11 display capture; this does not
 add X11 window targeting. Ctrl+A replacement is app-dependent; drag is a direct
-move without a timed trajectory. Input errors can occur after partial delivery.
+move only when callers choose the `drag` convenience; `drag_mouse` supports
+sampled trajectories. Input errors can occur after partial delivery.
 
 `auv-driver::LocalDriver` selects this backend only when `WAYLAND_DISPLAY` is
 missing or empty and `DISPLAY` is nonempty. A nonempty `WAYLAND_DISPLAY` keeps

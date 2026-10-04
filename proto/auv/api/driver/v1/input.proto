@@ -73,6 +73,12 @@ service InputService {
     option (auv.api.annotations.v1.discoverable) = true;
     option (auv.api.annotations.v1.effect) = METHOD_EFFECT_INPUT;
   }
+  // Delivers foreground wheel detents at one screen point. Positive X scrolls
+  // right and positive Y scrolls down, matching the shared Driver contract.
+  rpc ScrollScreenPoint(ScrollScreenPointRequest) returns (ScrollScreenPointResponse) {
+    option (auv.api.annotations.v1.discoverable) = true;
+    option (auv.api.annotations.v1.effect) = METHOD_EFFECT_INPUT;
+  }
   // Accepts one complete motion and streams delivery progress. Invalid input
   // ends the RPC with a gRPC status before the first pointer event.
   // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
@@ -254,6 +260,18 @@ message ClickScreenPointRequest {
 }
 
 message ClickScreenPointResponse {
+  ScreenPoint point = 1;
+  InputActionResult action = 2;
+}
+
+message ScrollScreenPointRequest {
+  ScreenPoint point = 1;
+  double delta_x = 2;
+  double delta_y = 3;
+  google.protobuf.Duration settle = 4;
+}
+
+message ScrollScreenPointResponse {
   ScreenPoint point = 1;
   InputActionResult action = 2;
 }

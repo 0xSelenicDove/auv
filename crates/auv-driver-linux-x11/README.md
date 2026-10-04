@@ -36,9 +36,10 @@ driver even when `DISPLAY` also names an XWayland server. With neither variable,
 the facade preserves the Wayland default and its existing diagnostics.
 
 The daemon Runner uses the same selection. Display capture and foreground
-input are available there; unsupported X11 window and clipboard calls remain
-explicit errors. This does not make every higher-level Electron workflow
-X11-capable.
+input are available there, including sampled movement/drag, bounded held
+buttons/keys, and screen-point scrolling. Unsupported X11 window and clipboard
+calls remain explicit errors. This does not make every higher-level Electron
+workflow X11-capable.
 
 ## Evidence
 
@@ -98,12 +99,21 @@ assert!(!delivery.verified); // Inspect a new observation to verify the UI effec
 - `display().list/capture/capture_region`: selected monitor or contained region.
 - `input().current_position/move_to/click_at/click_button_at/drag`: foreground
   pointer operations. `drag` is a direct move, not a timed trajectory.
+- `input().move_mouse/drag_mouse`: shared sampled trajectories with progress
+  notification and one-admission press/move/release cleanup.
+- `input().create_mouse/mouse_down/move_mouse_to/mouse_up/remove_mouse` and
+  `hold_mouse`: bounded logical-button ownership over the shared OS cursor.
 - `input().press_key/press_keys/type_text`: named keys, scoped key combinations,
   and Unicode text. `type_text` does not use the clipboard.
   `replace_existing` sends Ctrl+A then Backspace and requires the focused app
   to bind Ctrl+A to select-all; this is not universal (Tk defaults differ).
+- `input().key_down/key_up/hold_keys`: bounded held combinations using the
+  shared reverse-order release controller.
 - `input().scroll_at`: whole wheel detents (positive X right, positive Y down),
   at most 1024 detents per axis per call. No pixel-scroll conversion is implied.
+
+The same screen-point wheel operation is available through the Runner
+`ScrollScreenPoint` RPC and `auv invoke input.scrollPoint X Y DX DY`.
 
 Coordinates are integral X11 root-window pixels. Capture scale is 1.0;
 Xft font DPI is not treated as input coordinate scaling. XTEST motion is
@@ -144,8 +154,9 @@ env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 \
 ```
 
 It checks monitor pixels, region bounds, application text, screenshot freshness,
-mouse buttons, scrolling, and pointer position against a temporary Tk fixture
-with an explicit Ctrl+A select-all binding. When using Docker, pass `--init`
-so `xvfb-run` receives the X server readiness signal.
+mouse buttons, scrolling, sampled movement/drag, logical button down/up, held
+key down/up, and pointer position against a temporary Tk fixture with an
+explicit Ctrl+A select-all binding. When using Docker, pass `--init` so
+`xvfb-run` receives the X server readiness signal.
 The fixture and X server are disposed after the test. It does not run OSWorld
 or establish general Xorg/Wayland desktop support.

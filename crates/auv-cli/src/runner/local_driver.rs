@@ -734,6 +734,35 @@ impl InputService for LocalInputService {
     }))
   }
 
+  async fn scroll_screen_point(
+    &self,
+    request: Request<proto::ScrollScreenPointRequest>,
+  ) -> Result<Response<proto::ScrollScreenPointResponse>, Status> {
+    let request = request.into_inner();
+    let point = screen_point_from_proto(request.point.ok_or_else(|| Status::invalid_argument("point is required"))?)?;
+    let settle = duration_from_proto(request.settle, std::time::Duration::ZERO, "settle")?;
+    if !request.delta_x.is_finite() || !request.delta_y.is_finite() {
+      return Err(Status::invalid_argument("scroll deltas must be finite"));
+    }
+    let scroll = auv_driver::Scroll::new(request.delta_x, request.delta_y);
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    {
+      let session = self.session.clone();
+      let action = run_input_blocking(move || session.input().scroll_at(point.point(), scroll, settle)).await?;
+      Ok(Response::new(proto::ScrollScreenPointResponse {
+        point: Some(screen_point_to_proto(point)),
+        action: Some(input_action_to_proto(action)?),
+      }))
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    {
+      // TODO(macos-screen-scroll-point): expose this RPC when the macOS driver owns a
+      // typed screen-point scroll capability instead of only window scrolling.
+      let _ = (&self.session, point, scroll, settle);
+      Err(Status::unimplemented("screen-point scrolling is unavailable on this Runner platform"))
+    }
+  }
+
   async fn move_mouse(&self, request: Request<proto::MoveMouseRequest>) -> Result<Response<Self::MoveMouseStream>, Status> {
     let request = move_mouse_request_from_proto(&self.session, request.into_inner())?;
     // One transport handoff slot; progress history lives in no output queue.

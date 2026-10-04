@@ -2,7 +2,8 @@
 #![cfg(target_os = "linux")]
 
 use auv_driver_common::{
-  CaptureOptions, Click, ClickModifiers, Driver, KeyPressOptions, Point, Rect, Scroll, TextSubmit, TypeTextOptions, input::MouseButton,
+  CaptureOptions, Click, ClickModifiers, Driver, InputPolicy, InputTarget, KeyPressOptions, MoveMouseRequest, Point, Rect, Scroll,
+  TextSubmit, TypeTextOptions, input::MouseButton,
 };
 use auv_driver_linux_x11::X11Driver;
 use std::{
@@ -66,6 +67,15 @@ def event(e):
     with (p/'events').open('a') as f:
         f.write(str(e.num)+':'+str(e.state & 1)+'\n')
 root.bind('<ButtonPress>', event)
+def transition(kind):
+    def record(e):
+        with (p/'transitions').open('a') as f:
+            f.write(kind+':'+str(e.keysym if kind.startswith('key') else e.num)+'\n')
+    return record
+root.bind('<ButtonPress>', transition('button-down'), add='+')
+root.bind('<ButtonRelease>', transition('button-up'))
+root.bind('<KeyPress>', transition('key-down'))
+root.bind('<KeyRelease>', transition('key-up'))
 root.update()
 (p/'ready').touch()
 root.mainloop()
@@ -119,6 +129,21 @@ root.mainloop()
   input.scroll_at(Point::new(450.0, 450.0), Scroll::new(1.0, 1.0), Duration::ZERO).unwrap();
   input.drag(Point::new(450.0, 450.0), Point::new(500.0, 500.0), MouseButton::Left).unwrap();
   assert_eq!(input.current_position().unwrap(), Point::new(500.0, 500.0));
+  let (point, _) = input.move_mouse(MoveMouseRequest::direct(Point::new(520.0, 520.0)), |_| true).unwrap();
+  assert_eq!(point, Point::new(520.0, 520.0));
+  let (point, _) = input.drag_mouse(MoveMouseRequest::direct(Point::new(540.0, 540.0)), MouseButton::Left).unwrap();
+  assert_eq!(point, Point::new(540.0, 540.0));
+
+  let mouse = input.create_mouse().unwrap();
+  input.mouse_down(&InputTarget::Foreground, mouse, Point::new(560.0, 560.0), MouseButton::Left, Duration::from_secs(1)).unwrap();
+  input.move_mouse_to(mouse, Point::new(580.0, 580.0)).unwrap();
+  input.mouse_up(mouse).unwrap();
+  input.remove_mouse(mouse).unwrap();
+
+  input.click_at(Point::new(50.0, 40.0), Click::Single, ClickModifiers::default()).unwrap();
+  let hold =
+    input.key_down(&InputTarget::Foreground, vec!["Shift".into()], InputPolicy::ForegroundPreferred, Duration::from_secs(1)).unwrap();
+  input.key_up(hold.into_id()).unwrap();
   input
     .press_key(KeyPressOptions {
       key: "Escape".into(),
@@ -131,5 +156,13 @@ root.mainloop()
   wait_for(|| {
     fs::read_to_string(fixture.directory.join("events"))
       .is_ok_and(|events| events.contains("3:0\n") && events.contains("5:0\n") && events.contains("5:1\n"))
+  });
+  wait_for(|| {
+    fs::read_to_string(fixture.directory.join("transitions")).is_ok_and(|events| {
+      events.contains("button-down:1\n")
+        && events.contains("button-up:1\n")
+        && events.contains("key-down:Shift_L\n")
+        && events.contains("key-up:Shift_L\n")
+    })
   });
 }

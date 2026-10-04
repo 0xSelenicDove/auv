@@ -148,6 +148,15 @@ async fn runner_input_exposes_typed_screen_point_click() {
 }
 
 #[tokio::test]
+async fn runner_input_exposes_typed_screen_point_scroll() {
+  let runner = RunnerClient::new(disconnected_client(), route()).expect("runner client");
+  let input = runner.input();
+  let call =
+    input.scroll_screen_point(auv_driver::Point::new(10.0, 20.0), auv_driver::Scroll::new(-2.0, 3.0), std::time::Duration::from_millis(25));
+  drop(call);
+}
+
+#[tokio::test]
 async fn runner_input_exposes_typed_mouse_motion() {
   let runner = RunnerClient::new(disconnected_client(), route()).expect("runner client");
   let input = runner.input();

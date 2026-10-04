@@ -5,6 +5,39 @@ use auv_tracing::{Context, MemoryTracingStore, RunId, TraceRecord, configure, di
 use std::sync::Arc;
 
 #[test]
+fn scroll_parses_and_validates_screen_wheel_input() {
+  let crate::InvokeCommandCliParse::Invoke {
+    inputs, typed_args, ..
+  } = scroll_point_invoke_command()
+    .parse_cli_args(&[
+      "640".into(),
+      "360".into(),
+      "-2".into(),
+      "6".into(),
+      "--settle-ms".into(),
+      "25".into(),
+    ])
+    .expect("screen scroll should parse")
+  else {
+    panic!("expected parsed invocation");
+  };
+  assert_eq!(inputs["delta_x"], "-2.0");
+  assert_eq!(inputs["delta_y"], "6.0");
+  let args = typed_args.get::<ScrollArgs>().expect("typed scroll args");
+  assert_eq!(args.validated().unwrap().1, auv_driver::Scroll::new(-2.0, 6.0));
+
+  let invalid: ScrollArgs = serde_json::from_value(serde_json::json!({
+    "x": 10.0,
+    "y": 20.0,
+    "delta_x": 0.0,
+    "delta_y": 1.0,
+    "settle-ms": 30001
+  }))
+  .unwrap();
+  assert_eq!(invalid.validated().unwrap_err(), "input.scrollPoint --settle-ms must be within 0..=30000");
+}
+
+#[test]
 fn click_point_accepts_repeated_and_comma_separated_modifiers() {
   for values in [
     vec!["cmd", "shift"],

@@ -4,11 +4,11 @@ use crate::{
 };
 use auv_driver_common::{
   Click, ClickModifiers, DisturbanceLevel, DriverError, DriverResult, InputActionResult, InputDeliveryPath, InputPolicy, InputTarget,
-  KeyPressOptions, KeyboardInput, KeyboardInputError, KeyboardInputProgress, Point, PressKeysOptions, Scroll, TextSubmit, TypeTextOptions,
-  input::MouseButton,
+  KeyPressOptions, KeyboardBackend, KeyboardInput, KeyboardInputError, KeyboardInputProgress, Point, PressKeysOptions, Scroll, TextSubmit,
+  TypeTextOptions, input::MouseButton, mouse_input::MouseBackend,
 };
 use enigo::{Axis, Button, Coordinate, Direction, Key, Keyboard, Mouse};
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 /// Serialized foreground XTEST input. No operation retries after delivery.
 #[derive(Clone, Copy, Debug)]
@@ -17,6 +17,40 @@ pub struct InputApi<'a> {
 }
 
 impl InputApi<'_> {
+  pub fn key_down(
+    &self,
+    target: &InputTarget,
+    keys: Vec<String>,
+    policy: InputPolicy,
+    timeout: Duration,
+  ) -> DriverResult<auv_driver_common::KeyboardHold> {
+    validate_foreground(target, policy, "X11 targeted keyboard input")?;
+    let keys = parse_keys(&PressKeysOptions {
+      keys,
+      ..Default::default()
+    })?;
+    let backend = Arc::new(HeldKeyboardBackend {
+      session: self.session.clone(),
+      keys,
+    });
+    auv_driver_common::keyboard_hold_controller().clone().down(backend, timeout)
+  }
+
+  pub fn key_up(&self, hold: auv_driver_common::KeyboardHoldId) -> DriverResult<InputActionResult> {
+    auv_driver_common::keyboard_hold_controller().up(hold)
+  }
+
+  pub fn hold_keys(
+    &self,
+    target: &InputTarget,
+    keys: Vec<String>,
+    policy: InputPolicy,
+    duration: Duration,
+  ) -> DriverResult<InputActionResult> {
+    let mut hold = self.key_down(target, keys, policy, duration.saturating_add(Duration::from_secs(1)))?;
+    hold.wait_and_release(duration)
+  }
+
   /// Validates a complete foreground batch before delivering its first event.
   pub fn input_keyboard(
     &self,
@@ -71,9 +105,69 @@ impl InputApi<'_> {
   }
   /// Moves the visible pointer to an integral X11 root coordinate.
   pub fn move_to(&self, point: Point) -> DriverResult<InputActionResult> {
-    let (x, y) = coordinates(point)?;
-    self.session.lock_input()?.move_mouse(x, y, Coordinate::Abs).map_err(backend)?;
-    Ok(delivered(true))
+    self.move_mouse_to(0, point)
+  }
+
+  /// Delivers a sampled movement through the shared logical-mouse lifecycle.
+  pub fn move_mouse(
+    &self,
+    request: auv_driver_common::MoveMouseRequest,
+    notify: impl FnMut(auv_driver_common::mouse_input::MotionEvent) -> bool,
+  ) -> DriverResult<(Point, InputActionResult)> {
+    let receiver = self.pointer_backend(request.target.as_ref())?;
+    auv_driver_common::mouse_input::mouse_coordinator().motion(request, None, receiver, notify)
+  }
+
+  /// Composes button press, sampled motion, and release under one admission.
+  pub fn drag_mouse(&self, request: auv_driver_common::MoveMouseRequest, button: MouseButton) -> DriverResult<(Point, InputActionResult)> {
+    let receiver = self.pointer_backend(request.target.as_ref())?;
+    auv_driver_common::mouse_input::mouse_coordinator().motion(request, Some(button), receiver, |_| true)
+  }
+
+  pub fn hold_mouse(
+    &self,
+    target: &InputTarget,
+    mouse: u64,
+    point: Point,
+    button: MouseButton,
+    duration: Duration,
+  ) -> DriverResult<InputActionResult> {
+    auv_driver_common::mouse_input::mouse_coordinator().hold(mouse, point, button, duration, self.pointer_backend(Some(target))?)
+  }
+
+  pub fn create_mouse(&self) -> DriverResult<u64> {
+    auv_driver_common::mouse_input::mouse_coordinator().create_mouse()
+  }
+
+  pub fn remove_mouse(&self, mouse: u64) -> DriverResult<InputActionResult> {
+    auv_driver_common::mouse_input::mouse_coordinator().remove_mouse(mouse)
+  }
+
+  pub fn mouse_down(
+    &self,
+    target: &InputTarget,
+    mouse: u64,
+    point: Point,
+    button: MouseButton,
+    timeout: Duration,
+  ) -> DriverResult<InputActionResult> {
+    auv_driver_common::mouse_input::mouse_coordinator().down(mouse, point, button, timeout, self.pointer_backend(Some(target))?)
+  }
+
+  pub fn mouse_up(&self, mouse: u64) -> DriverResult<InputActionResult> {
+    auv_driver_common::mouse_input::mouse_coordinator().up(mouse)
+  }
+
+  pub fn move_mouse_to(&self, mouse: u64, point: Point) -> DriverResult<InputActionResult> {
+    auv_driver_common::mouse_input::mouse_coordinator().move_to(mouse, point, Arc::new(X11MouseBackend::new(self.session.clone())))
+  }
+
+  fn pointer_backend(&self, target: Option<&InputTarget>) -> DriverResult<Arc<dyn MouseBackend>> {
+    match target {
+      None | Some(InputTarget::Foreground) => Ok(Arc::new(X11MouseBackend::new(self.session.clone()))),
+      Some(InputTarget::Window(_)) => Err(DriverError::unsupported("X11 window-targeted mouse input")),
+      Some(InputTarget::Application { .. }) => Err(DriverError::unsupported("mouse input requires a window or foreground target")),
+    }
   }
   /// Left-clicks at a root coordinate with modifiers released after the action.
   pub fn click_at(&self, point: Point, click: Click, modifiers: ClickModifiers) -> DriverResult<InputActionResult> {
@@ -185,6 +279,76 @@ impl InputApi<'_> {
   }
 }
 
+struct HeldKeyboardBackend {
+  session: X11DriverSession,
+  keys: Vec<Key>,
+}
+
+impl KeyboardBackend for HeldKeyboardBackend {
+  fn key_count(&self) -> usize {
+    self.keys.len()
+  }
+
+  fn key(&self, index: usize, down: bool) -> DriverResult<()> {
+    self
+      .session
+      .lock_input()?
+      .key(
+        self.keys[index],
+        if down {
+          Direction::Press
+        } else {
+          Direction::Release
+        },
+      )
+      .map_err(backend)
+  }
+
+  fn result(&self) -> InputActionResult {
+    delivered(false)
+  }
+}
+
+struct X11MouseBackend {
+  session: X11DriverSession,
+}
+
+impl X11MouseBackend {
+  fn new(session: X11DriverSession) -> Self {
+    Self { session }
+  }
+}
+
+impl MouseBackend for X11MouseBackend {
+  fn current_position(&self) -> DriverResult<Point> {
+    let (x, y) = self.session.lock_input()?.location().map_err(backend)?;
+    Ok(Point::new(f64::from(x), f64::from(y)))
+  }
+
+  fn move_to(&self, point: Point, _held: Option<MouseButton>) -> DriverResult<InputActionResult> {
+    let (x, y) = coordinates(point)?;
+    self.session.lock_input()?.move_mouse(x, y, Coordinate::Abs).map_err(backend)?;
+    Ok(delivered(true))
+  }
+
+  fn button(&self, point: Point, button: MouseButton, down: bool) -> DriverResult<InputActionResult> {
+    let (x, y) = coordinates(point)?;
+    let mut input = self.session.lock_input()?;
+    input.move_mouse(x, y, Coordinate::Abs).map_err(backend)?;
+    input
+      .button(
+        mouse_button(button),
+        if down {
+          Direction::Press
+        } else {
+          Direction::Release
+        },
+      )
+      .map_err(backend)?;
+    Ok(delivered(true))
+  }
+}
+
 #[derive(Debug)]
 enum KeyboardPlan {
   Press {
@@ -256,6 +420,16 @@ fn validate_text(text: &str, options: TypeTextOptions) -> DriverResult<()> {
   }
   if text.contains('\0') {
     return Err(invalid("text cannot contain NUL"));
+  }
+  Ok(())
+}
+
+fn validate_foreground(target: &InputTarget, policy: InputPolicy, unsupported: &'static str) -> DriverResult<()> {
+  if !matches!(target, InputTarget::Foreground) {
+    return Err(DriverError::unsupported(unsupported));
+  }
+  if policy != InputPolicy::ForegroundPreferred {
+    return Err(invalid("background input requires supported targeted delivery"));
   }
   Ok(())
 }

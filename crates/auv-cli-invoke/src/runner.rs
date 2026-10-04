@@ -373,6 +373,23 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
       .await
     }
     "input.clickPoint" => selected_click_point(&input, &runner).await,
+    "input.scrollPoint" => {
+      async {
+        let (point, scroll, settle) = crate::commands::input::decode_scroll(&input)?;
+        let response = runner
+          .input()
+          .scroll_screen_point(point, scroll, settle)
+          .await
+          .map_err(|status| format!("InputService/ScrollScreenPoint failed: {status}"))?;
+        crate::emit_input_action_result(&response.action);
+        crate::commands::input::scroll_point_output(crate::commands::input::ScrollPointResult {
+          point: auv_driver::ScreenPoint::new(response.point.x, response.point.y),
+          scroll,
+          action: Some(response.action),
+        })
+      }
+      .await
+    }
     _ => unreachable!("typed Runner adapter was selected above"),
   };
   result.map_err(Into::into)

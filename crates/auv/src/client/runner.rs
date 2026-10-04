@@ -116,6 +116,15 @@ pub struct ScreenPointClick {
   pub action: auv_driver::InputActionResult,
 }
 
+/// Typed result of foreground wheel delivery at a screen point.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScreenPointScroll {
+  /// Delivered screen point.
+  pub point: auv_driver::Point,
+  /// Typed input-delivery evidence.
+  pub action: auv_driver::InputActionResult,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum MouseMotionEvent {
   Started {
@@ -1236,6 +1245,33 @@ impl InputClient {
     Ok(ScreenPointClick {
       point: auv_driver::Point::new(point.x, point.y),
       action: input_action_result_from_proto(required(response.action, "ClickScreenPoint response omitted InputActionResult")?)?,
+    })
+  }
+
+  /// Delivers foreground wheel detents at a screen coordinate.
+  pub async fn scroll_screen_point(
+    &self,
+    point: auv_driver::Point,
+    scroll: auv_driver::Scroll,
+    settle: std::time::Duration,
+  ) -> Result<ScreenPointScroll, CapabilityError> {
+    let response = proto::input_service_client::InputServiceClient::new(self.runner.transport()?)
+      .scroll_screen_point(proto::ScrollScreenPointRequest {
+        point: Some(proto::ScreenPoint {
+          x: point.x,
+          y: point.y,
+        }),
+        delta_x: scroll.delta_x,
+        delta_y: scroll.delta_y,
+        settle: Some(duration_to_proto(settle)?),
+      })
+      .await
+      .map_err(capability_status)?
+      .into_inner();
+    let point = required(response.point, "ScrollScreenPoint response omitted ScreenPoint")?;
+    Ok(ScreenPointScroll {
+      point: auv_driver::Point::new(point.x, point.y),
+      action: input_action_result_from_proto(required(response.action, "ScrollScreenPoint response omitted InputActionResult")?)?,
     })
   }
 

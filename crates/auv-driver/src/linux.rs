@@ -75,14 +75,14 @@ impl InputApi<'_> {
   ) -> DriverResult<auv_driver_common::KeyboardHold> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().key_down(target, keys, policy, timeout),
-      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held keyboard input")),
+      LocalDriverSession::LinuxX11(session) => session.input().key_down(target, keys, policy, timeout),
     }
   }
 
   pub fn key_up(&self, hold: auv_driver_common::KeyboardHoldId) -> DriverResult<InputActionResult> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().key_up(hold),
-      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held keyboard input")),
+      LocalDriverSession::LinuxX11(session) => session.input().key_up(hold),
     }
   }
 
@@ -95,7 +95,7 @@ impl InputApi<'_> {
   ) -> DriverResult<InputActionResult> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().hold_keys(target, keys, policy, duration),
-      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held keyboard input")),
+      LocalDriverSession::LinuxX11(session) => session.input().hold_keys(target, keys, policy, duration),
     }
   }
 
@@ -114,7 +114,7 @@ impl InputApi<'_> {
   pub fn drag_mouse(&self, request: auv_driver_common::MoveMouseRequest, button: MouseButton) -> DriverResult<(Point, InputActionResult)> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().drag_mouse(request, button),
-      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 sampled mouse drag")),
+      LocalDriverSession::LinuxX11(session) => session.input().drag_mouse(request, button),
     }
   }
 
@@ -125,7 +125,7 @@ impl InputApi<'_> {
   ) -> DriverResult<(Point, InputActionResult)> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().move_mouse(request, notify),
-      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 sampled mouse movement")),
+      LocalDriverSession::LinuxX11(session) => session.input().move_mouse(request, notify),
     }
   }
 
@@ -139,21 +139,21 @@ impl InputApi<'_> {
   ) -> DriverResult<InputActionResult> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().hold_mouse(target, mouse, point, button, duration),
-      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held mouse input")),
+      LocalDriverSession::LinuxX11(session) => session.input().hold_mouse(target, mouse, point, button, duration),
     }
   }
 
   pub fn create_mouse(&self) -> DriverResult<u64> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().create_mouse(),
-      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 logical mouse input")),
+      LocalDriverSession::LinuxX11(session) => session.input().create_mouse(),
     }
   }
 
   pub fn remove_mouse(&self, mouse: u64) -> DriverResult<InputActionResult> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().remove_mouse(mouse),
-      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 logical mouse input")),
+      LocalDriverSession::LinuxX11(session) => session.input().remove_mouse(mouse),
     }
   }
 
@@ -167,21 +167,21 @@ impl InputApi<'_> {
   ) -> DriverResult<InputActionResult> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().mouse_down(target, mouse, point, button, timeout),
-      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held mouse input")),
+      LocalDriverSession::LinuxX11(session) => session.input().mouse_down(target, mouse, point, button, timeout),
     }
   }
 
   pub fn mouse_up(&self, mouse: u64) -> DriverResult<InputActionResult> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().mouse_up(mouse),
-      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held mouse input")),
+      LocalDriverSession::LinuxX11(session) => session.input().mouse_up(mouse),
     }
   }
 
   pub fn move_mouse_to(&self, mouse: u64, point: Point) -> DriverResult<InputActionResult> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().move_mouse_to(mouse, point),
-      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 logical mouse input")),
+      LocalDriverSession::LinuxX11(session) => session.input().move_mouse_to(mouse, point),
     }
   }
 
