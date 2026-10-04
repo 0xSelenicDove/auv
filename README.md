@@ -111,6 +111,31 @@ auv --version
 >
 > Linux musl is not supported. (But PRs are welcomed!)
 
+### Install with Nix
+
+Install [Nix](https://nixos.org/download/) 2.27 or later and enable the
+`nix-command` and `flakes` experimental features. On macOS, install Apple's
+build tools first:
+
+```sh
+xcode-select --install
+```
+
+Then install the default AUV package from this repository:
+
+```sh
+nix profile install 'git+https://github.com/moeru-ai/auv#default'
+auv --version
+```
+
+The `git+https` transport is required so Nix fetches AUV's Git submodules. The
+flake defines source-built packages for Apple Silicon and Intel macOS and for
+x86-64 and ARM64 Linux. The package does not support Windows or Linux musl.
+
+The Nix package does not embed the signed `AUV Helper.app`. On macOS, use
+Homebrew, proto, or a direct release download if you need to run
+`auv setup macos-helper install` with the official helper.
+
 ### Install with Cargo
 
 Prerequisites: [Rust](https://www.rust-lang.org/tools/install) and the platform
