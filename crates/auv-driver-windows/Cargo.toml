@@ -3,6 +3,7 @@ name = "auv-driver-windows"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+autobins = false
 publish = true
 readme.workspace = true
 license.workspace = true
