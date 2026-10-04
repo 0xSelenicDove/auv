@@ -57,19 +57,23 @@ brew install moeru-ai/tap/auv
 auv --version
 ```
 
+Alternatively, without [Homebrew](https://brew.sh/):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/moeru-ai/auv/main/install/install.sh | sh
+```
+
 #### Linux
 
-##### x86-64
-
 ```sh
-mkdir -p "${HOME}/.local/bin" && curl -fsSL "https://github.com/moeru-ai/auv/releases/latest/download/auv-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C "${HOME}/.local/bin"
+curl -fsSL https://raw.githubusercontent.com/moeru-ai/auv/main/install/install.sh | sh
+auv --version
 ```
 
-##### ARM64
-
-```sh
-mkdir -p "${HOME}/.local/bin" && curl -fsSL "https://github.com/moeru-ai/auv/releases/latest/download/auv-aarch64-unknown-linux-gnu.tar.gz" | tar -xz -C "${HOME}/.local/bin"
-```
+> [!NOTE]
+>
+> Set `AUV_VERSION` or `AUV_INSTALL_DIR` to change the release version or the
+> install directory (default: `~/.local/bin`).
 
 #### Windows
 
