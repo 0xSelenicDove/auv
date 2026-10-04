@@ -73,6 +73,7 @@ fn validate_options(options: &CaptureOptions) -> DriverResult<()> {
 
 fn capture(image: image::RgbaImage, bounds: Rect) -> Capture {
   Capture {
+    origin: Some(auv_driver_common::Position::in_screen(auv_driver_common::ScreenPoint::from(bounds.origin))),
     image,
     bounds,
     scale_factor: 1.0,
@@ -155,6 +156,14 @@ fn contains(frame: Rect, region: Rect) -> bool {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn capture_binds_pixels_to_the_x11_root_screen() {
+    let bounds = Rect::new(-1920.0, 10.0, 4.0, 3.0);
+    let capture = capture(image::RgbaImage::new(4, 3), bounds);
+    assert_eq!(capture.origin, Some(auv_driver_common::Position::in_screen(auv_driver_common::ScreenPoint::from(bounds.origin))));
+  }
+
   #[test]
   fn region_validation_rejects_lossy_or_empty_crops() {
     for region in [

@@ -66,6 +66,39 @@ pub struct InputApi<'a> {
 }
 
 impl InputApi<'_> {
+  pub fn key_down(
+    &self,
+    target: &InputTarget,
+    keys: Vec<String>,
+    policy: InputPolicy,
+    timeout: std::time::Duration,
+  ) -> DriverResult<auv_driver_common::KeyboardHold> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.input().key_down(target, keys, policy, timeout),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held keyboard input")),
+    }
+  }
+
+  pub fn key_up(&self, hold: auv_driver_common::KeyboardHoldId) -> DriverResult<InputActionResult> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.input().key_up(hold),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held keyboard input")),
+    }
+  }
+
+  pub fn hold_keys(
+    &self,
+    target: &InputTarget,
+    keys: Vec<String>,
+    policy: InputPolicy,
+    duration: std::time::Duration,
+  ) -> DriverResult<InputActionResult> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.input().hold_keys(target, keys, policy, duration),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held keyboard input")),
+    }
+  }
+
   pub fn input_keyboard(
     &self,
     target: &InputTarget,
@@ -75,6 +108,80 @@ impl InputApi<'_> {
     match self.session {
       LocalDriverSession::Linux(session) => session.input().input_keyboard(target, inputs, dry_run),
       LocalDriverSession::LinuxX11(session) => session.input().input_keyboard(target, inputs, dry_run),
+    }
+  }
+
+  pub fn drag_mouse(&self, request: auv_driver_common::MoveMouseRequest, button: MouseButton) -> DriverResult<(Point, InputActionResult)> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.input().drag_mouse(request, button),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 sampled mouse drag")),
+    }
+  }
+
+  pub fn move_mouse(
+    &self,
+    request: auv_driver_common::MoveMouseRequest,
+    notify: impl FnMut(auv_driver_common::mouse_input::MotionEvent) -> bool,
+  ) -> DriverResult<(Point, InputActionResult)> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.input().move_mouse(request, notify),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 sampled mouse movement")),
+    }
+  }
+
+  pub fn hold_mouse(
+    &self,
+    target: &InputTarget,
+    mouse: u64,
+    point: Point,
+    button: MouseButton,
+    duration: std::time::Duration,
+  ) -> DriverResult<InputActionResult> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.input().hold_mouse(target, mouse, point, button, duration),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held mouse input")),
+    }
+  }
+
+  pub fn create_mouse(&self) -> DriverResult<u64> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.input().create_mouse(),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 logical mouse input")),
+    }
+  }
+
+  pub fn remove_mouse(&self, mouse: u64) -> DriverResult<InputActionResult> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.input().remove_mouse(mouse),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 logical mouse input")),
+    }
+  }
+
+  pub fn mouse_down(
+    &self,
+    target: &InputTarget,
+    mouse: u64,
+    point: Point,
+    button: MouseButton,
+    timeout: std::time::Duration,
+  ) -> DriverResult<InputActionResult> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.input().mouse_down(target, mouse, point, button, timeout),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held mouse input")),
+    }
+  }
+
+  pub fn mouse_up(&self, mouse: u64) -> DriverResult<InputActionResult> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.input().mouse_up(mouse),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 held mouse input")),
+    }
+  }
+
+  pub fn move_mouse_to(&self, mouse: u64, point: Point) -> DriverResult<InputActionResult> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.input().move_mouse_to(mouse, point),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 logical mouse input")),
     }
   }
 
@@ -92,10 +199,10 @@ impl InputApi<'_> {
     }
   }
 
-  pub fn click_at(&self, point: Point, click: Click, modifiers: ClickModifiers) -> DriverResult<InputActionResult> {
+  pub fn click_at(&self, point: Point, button: MouseButton, click: Click, modifiers: ClickModifiers) -> DriverResult<InputActionResult> {
     match self.session {
-      LocalDriverSession::Linux(session) => session.input().click_at(point, click, modifiers),
-      LocalDriverSession::LinuxX11(session) => session.input().click_at(point, click, modifiers),
+      LocalDriverSession::Linux(session) => session.input().click_at(point, button, click, modifiers),
+      LocalDriverSession::LinuxX11(session) => session.input().click_button_at(point, button, click, modifiers),
     }
   }
 
@@ -107,8 +214,7 @@ impl InputApi<'_> {
     modifiers: ClickModifiers,
   ) -> DriverResult<InputActionResult> {
     match self.session {
-      LocalDriverSession::Linux(session) if button == MouseButton::Left => session.input().click_at(point, click, modifiers),
-      LocalDriverSession::Linux(_) => Err(DriverError::unsupported("Linux Wayland non-left screen click")),
+      LocalDriverSession::Linux(session) => session.input().click_at(point, button, click, modifiers),
       LocalDriverSession::LinuxX11(session) => session.input().click_button_at(point, button, click, modifiers),
     }
   }
@@ -265,6 +371,19 @@ impl WindowInput for WindowApi<'_> {
     match self.session {
       LocalDriverSession::Linux(session) => session.window().scroll(window, point, scroll, options),
       LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 window.scroll")),
+    }
+  }
+
+  fn drag(
+    &self,
+    window: &Window,
+    movement: auv_driver_common::MoveMouseRequest,
+    button: MouseButton,
+    policy: InputPolicy,
+  ) -> DriverResult<(Point, InputActionResult)> {
+    match self.session {
+      LocalDriverSession::Linux(session) => session.window().drag(window, movement, button, policy),
+      LocalDriverSession::LinuxX11(_) => Err(DriverError::unsupported("X11 window.drag")),
     }
   }
 }
@@ -456,7 +575,25 @@ mod tests {
     let _ = session.window().to_window_point(window, ScreenPoint::new(0.0, 0.0));
     let _ = session.input().current_position();
     let _ = session.input().move_to(Point::new(0.0, 0.0));
-    let _ = session.input().click_at(Point::new(0.0, 0.0), Click::Single, ClickModifiers::default());
+    let _ = session.input().click_at(Point::new(0.0, 0.0), MouseButton::Left, Click::Single, ClickModifiers::default());
+    let _ = session.input().key_down(
+      &InputTarget::Foreground,
+      vec!["A".into()],
+      InputPolicy::ForegroundPreferred,
+      std::time::Duration::from_secs(1),
+    );
+    let _ = session.input().key_up(1);
+    let _ =
+      session.input().hold_keys(&InputTarget::Foreground, vec!["A".into()], InputPolicy::ForegroundPreferred, std::time::Duration::ZERO);
+    let _ = session.input().drag_mouse(auv_driver_common::MoveMouseRequest::direct(Point::new(0.0, 0.0)), MouseButton::Left);
+    let _ = session.input().move_mouse(auv_driver_common::MoveMouseRequest::direct(Point::new(0.0, 0.0)), |_| true);
+    let _ = session.input().create_mouse();
+    let _ = session.input().remove_mouse(1);
+    let _ =
+      session.input().mouse_down(&InputTarget::Foreground, 1, Point::new(0.0, 0.0), MouseButton::Left, std::time::Duration::from_secs(1));
+    let _ = session.input().mouse_up(1);
+    let _ = session.input().move_mouse_to(1, Point::new(0.0, 0.0));
+    let _ = session.input().hold_mouse(&InputTarget::Foreground, 1, Point::new(0.0, 0.0), MouseButton::Left, std::time::Duration::ZERO);
     let _ = session.input().scroll_at(Point::new(0.0, 0.0), Scroll::new(0.0, 1.0), std::time::Duration::ZERO);
     let _ = session.input().type_text("text", TypeTextOptions::default());
     let _ = session.input().press_key(KeyPressOptions::default());
