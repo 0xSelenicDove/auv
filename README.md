@@ -57,19 +57,23 @@ brew install moeru-ai/tap/auv
 auv --version
 ```
 
+Alternatively, without [Homebrew](https://brew.sh/):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/moeru-ai/auv/main/install/install.sh | sh
+```
+
 #### Linux
 
-##### x86-64
-
 ```sh
-mkdir -p "${HOME}/.local/bin" && curl -fsSL "https://github.com/moeru-ai/auv/releases/latest/download/auv-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C "${HOME}/.local/bin"
+curl -fsSL https://raw.githubusercontent.com/moeru-ai/auv/main/install/install.sh | sh
+auv --version
 ```
 
-##### ARM64
-
-```sh
-mkdir -p "${HOME}/.local/bin" && curl -fsSL "https://github.com/moeru-ai/auv/releases/latest/download/auv-aarch64-unknown-linux-gnu.tar.gz" | tar -xz -C "${HOME}/.local/bin"
-```
+> [!NOTE]
+>
+> Set `AUV_VERSION` or `AUV_INSTALL_DIR` to change the release version or the
+> install directory (default: `~/.local/bin`).
 
 #### Windows
 
@@ -90,6 +94,51 @@ Download the archive for your architecture:
 
 Extract the archive to a permanent directory. Add that directory to your user
 `PATH`. Keep `auv.exe` and `auv-helper.exe` in the same directory.
+
+### Install with proto
+
+Install and configure [proto](https://moonrepo.dev/docs/proto) first. Then add
+the AUV plugin and install the latest release:
+
+```sh
+proto plugin add auv "https://raw.githubusercontent.com/moeru-ai/auv/main/toolchain/proto/auv.toml" --to global
+proto install auv latest --config-mode global --pin global
+auv --version
+```
+
+> [!NOTE]
+>
+> `AUV Helper.app` for macOS and `auv-helper.exe` for Windows are included in
+> the `proto` installation.
+
+> [!WARNING]
+>
+> Linux musl is not supported. (But PRs are welcomed!)
+
+### Install with Nix
+
+Install [Nix](https://nixos.org/download/) 2.27 or later and enable the
+`nix-command` and `flakes` experimental features. On macOS, install Apple's
+build tools first:
+
+```sh
+xcode-select --install
+```
+
+Then install the default AUV package from this repository:
+
+```sh
+nix profile install 'git+https://github.com/moeru-ai/auv#default'
+auv --version
+```
+
+The `git+https` transport is required so Nix fetches AUV's Git submodules. The
+flake defines source-built packages for Apple Silicon and Intel macOS and for
+x86-64 and ARM64 Linux. The package does not support Windows or Linux musl.
+
+The Nix package does not embed the signed `AUV Helper.app`. On macOS, use
+Homebrew, proto, or a direct release download if you need to run
+`auv setup macos-helper install` with the official helper.
 
 ### Install with Cargo
 
