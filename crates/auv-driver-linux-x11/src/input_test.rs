@@ -161,6 +161,21 @@ fn rejects_lossy_coordinates_and_invalid_text_before_mutation() {
 }
 
 #[test]
+fn sampled_motion_rounds_subpixel_path_points_to_x11_root_pixels() {
+  // ROOT CAUSE:
+  //
+  // If a drag path crossed more than one pixel, shared path interpolation
+  // produced fractional intermediate points even when both endpoints were
+  // integral. Before the fix, X11 rejected the first fractional sample and no
+  // OSWorld-style drag could complete. Motion now projects samples onto the
+  // nearest X11 root pixel while direct click/scroll validation stays strict.
+  assert_eq!(motion_coordinates(Point::new(100.49, 200.5)).unwrap(), (100, 201));
+  assert_eq!(motion_coordinates(Point::new(-10.5, -20.49)).unwrap(), (-11, -20));
+  assert!(motion_coordinates(Point::new(f64::NAN, 0.0)).is_err());
+  assert!(motion_coordinates(Point::new(32768.0, 0.0)).is_err());
+}
+
+#[test]
 fn delivery_does_not_claim_semantic_success_or_clipboard_changes() {
   let result = delivered(true);
   assert!(!result.verified);

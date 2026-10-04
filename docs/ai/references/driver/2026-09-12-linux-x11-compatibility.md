@@ -48,6 +48,13 @@ schema change is additive. This closes the missing OSWorld action primitives;
 cursor compositing, an OSWorld action adapter, benchmark VM reset/setup, and
 semantic task evaluation remain separate work.
 
+The follow-up Kubernetes live validation is recorded in
+[`../ops/2026-10-05-osworld-kubernetes-x11-evidence.md`](../ops/2026-10-05-osworld-kubernetes-x11-evidence.md).
+It exercises paired HTTP control and co-located Unix/X11 socket sharing against
+an independent receiver. That run found and fixed fractional sampled-drag
+points being rejected by the integral XTEST coordinate boundary; both
+topologies then completed sampled drags with receiver-observed endpoints.
+
 ### 2026-10-04 facade and Runner integration
 
 Evidence level: **live-validated for the named environment**, not a general

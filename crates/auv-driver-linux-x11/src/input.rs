@@ -326,7 +326,7 @@ impl MouseBackend for X11MouseBackend {
   }
 
   fn move_to(&self, point: Point, _held: Option<MouseButton>) -> DriverResult<InputActionResult> {
-    let (x, y) = coordinates(point)?;
+    let (x, y) = motion_coordinates(point)?;
     self.session.lock_input()?.move_mouse(x, y, Coordinate::Abs).map_err(backend)?;
     Ok(delivered(true))
   }
@@ -443,6 +443,29 @@ fn integral(value: f64) -> DriverResult<i32> {
 fn coordinates(point: Point) -> DriverResult<(i32, i32)> {
   let x = integral(point.x)?;
   let y = integral(point.y)?;
+  xtest_coordinates(x, y)
+}
+
+/// Projects sampled logical motion onto the integral X11 root pixel grid.
+///
+/// Shared mouse paths interpolate in logical coordinates and can therefore
+/// contain fractional intermediate points even when both endpoints are whole
+/// pixels. XTEST has no subpixel motion representation, so each motion sample
+/// uses the nearest root pixel while direct click and scroll coordinates keep
+/// their stricter lossless validation.
+fn motion_coordinates(point: Point) -> DriverResult<(i32, i32)> {
+  if !point.x.is_finite() || !point.y.is_finite() {
+    return Err(invalid("X11 pointer motion requires finite coordinates"));
+  }
+  let x = point.x.round();
+  let y = point.y.round();
+  if x < f64::from(i32::MIN) || x > f64::from(i32::MAX) || y < f64::from(i32::MIN) || y > f64::from(i32::MAX) {
+    return Err(invalid("X11 pointer motion coordinates exceed signed 32-bit range"));
+  }
+  xtest_coordinates(x as i32, y as i32)
+}
+
+fn xtest_coordinates(x: i32, y: i32) -> DriverResult<(i32, i32)> {
   // XTEST motion fields are signed 16-bit, even though Enigo accepts i32.
   if i16::try_from(x).is_err() || i16::try_from(y).is_err() {
     return Err(invalid("XTEST coordinates exceed signed 16-bit range"));
