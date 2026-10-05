@@ -520,6 +520,59 @@ than `spec.nodeName` while its `WaitForFirstConsumer` PVC is unbound, otherwise
 the scheduler cannot supply the selected-node annotation and the PVC remains
 Pending.
 
+## 2026-10-06 current-AUV action baseline in official guests
+
+This rerun used the official V1 and V2.1 Ubuntu 22.04.3/Xorg guests on
+`liet-gpu-1`, with runtime image
+`happysixd/osworld-docker@sha256:0e6497a9295647cf05bf2b2af522fdd79bdeba2737595259cab310a3bcf6baa9`.
+Both hot image PVCs were mounted read-only. The installed Ubuntu AUV 0.0.28
+binary was built from `eee4e3c01e2f29f7582f834b6e2de87577cf7723` and
+has SHA256 `c9ca279e3dfb9847915abbbe289dfd9326d7527f1e6d5ca6ff70133991f05e38`.
+The `auv-osworld-evals` test executable has SHA256
+`169344db871d53638ad068f5d6cf12d52750d2cc173b996c8dd1d4a69914b0c3`.
+The later PR commit `6b002484` changes only TOML formatting, not Rust behavior.
+
+In each guest, the installed AUV daemon's owner Unix socket passed the public
+`ActionExecutor` Runner integration episode (V1 1/1 in 0.30s; V2.1 1/1 in
+0.28s). An independent Tk receiver saw the rounded pointer move, Button1
+down/move/up, Shift-held `A`, Button5 scrolling with `yview` increasing from
+0 to 0.005882, right click, and error-path hold release. AUV CLI probes in
+both guests additionally produced raw `xev` Button6/7 horizontal wheel events,
+Button2, double/triple clicks, a 400 ms Button1-held drag with at least 24
+motion samples, `abc猫Z界` text, F13, Ctrl+Shift+F13, 500 ms overlapping
+Ctrl/Shift holds, and reverse vertical scroll returning Tk `yview` to 0.
+These extra CLI probes validate the installed AUV primitives, not every
+`ActionExecutor` variant end-to-end.
+
+| Guest | AUV display/capture evidence | Independent receiver files |
+| --- | --- | --- |
+| V1 | `display.list` Run `01a10dc3-82e3-71ee-b71d-aa26bbd420f2`; capture Run `01a10dc3-9742-7581-8127-095913b28bb0`, PNG SHA256 `82d06b2f57c1d6046ceae8e754ae4682a4825dcd68fc77e37ed7e1ab0b16cc9c` | Tk SHA256 `4506f932a9ecbb85942540bb334e07ff69b6f9d27d4bbf8e8d1450617f873ad1`; xev SHA256 `2072f603516aa8307d561a5171c84be2cde2bdcd3e7f3f136c8cc9740ae6a479` |
+| V2.1 | `display.list` Run `01a10dcb-ee4a-7108-a4a5-588a429f84e2`; capture Run `01a10dcc-0591-7048-a370-58db408f980f`, PNG SHA256 `47e63ee098417f233d99ce2793cb617fe5f8ff3fa01eea3cf223e2481c927886` | Tk SHA256 `e699c3bf087f594347e56106e7c2895efdf6dea87167a3bcc3b2204cc31897c3`; xev SHA256 `b37d359fb7007f05bfc05f1debaeb13295b2cc07a3b2e57b4e8be6a60dfd4d70` |
+
+The paired Mac→V2.1 path used `serve --listen` with a token created through
+the guest owner Unix socket. The external AUV observed `Virtual-1` 1920×1080
+(`display.list` Run `4bd74939-472e-dfe7-e5e3-d59de641906c`), captured
+the guest display (Run `40f9f437-0b71-38be-f2c1-fc567666773c`, PNG SHA256
+`815e81d570a9c4822467daec09bc8e34e67bab607f851de71f58822a130db9a4`),
+and sent `input.clickPoint 322 234` (Run
+`8d6513f1-c1f3-06a1-8ccc-e34923b0913a`). The guest Tk receiver recorded
+Button1 press/release at (322,234). This proves remote observation and input,
+but the remote `ActionExecutor` integration episode itself was not rerun.
+
+Raw local evidence is under `/tmp/auv-osworld-gate-20261006/` on the task
+host, including `v1-{tk-receiver.jsonl,xev.log,auv-capture.png}` and the
+corresponding `v2-` files. This scratch directory is not a durable CI artifact.
+All task-owned build/VM/proxy/cleanup Pods, Services, port-forward, local
+paired profile, and task-owned build directories were removed after capture;
+the retained PVCs were not changed. The old `auv-osworld-x11` Pod is Evicted
+and remains `ContainerStatusUnknown`; it must not be cited as current live
+evidence.
+
+This is an action-level baseline, not an OSWorld evaluator result, completion
+rate, GPU/DRA test, or full paired-runner test. In particular, a checked
+`InputActionResult` does not replace application-state or task-evaluator
+verification. A batch agent/harness run remains the next separate gate.
+
 ## Recommended harness boundary
 
 Treat infrastructure, benchmark control, and computer use as different
@@ -570,8 +623,9 @@ the separate semantic authority.
 ## Cluster state after validation
 
 The disposable V1/V2 QEMU runtime Pods, TCP proxy, and Services were deleted
-after evidence capture. The fast `auv-osworld-x11` fixture remains running on
-`neko-gpu-1`. Four image PVCs were retained for reviewer reruns:
+after evidence capture. The old fast `auv-osworld-x11` fixture on `neko-gpu-1`
+was later Evicted for ephemeral-storage pressure; do not reuse it as a live
+receiver. Four image PVCs were retained for reviewer reruns:
 
 | PVC | Class | Capacity | Purpose |
 | --- | --- | --- | --- |

@@ -162,10 +162,10 @@ event; PyAutoGUI's X11 backend emits one such event per integer step. The
 event-equivalent adapter mapping is `auv_dx = 120 * osworld_dx` and
 `auv_dy = -120 * osworld_dy`. Preserve the official horizontal-before-vertical
 order when sending separate calls. This does not establish exact displacement
-in a particular application's viewport or a current official-guest result;
-those remain item 3 receiver gates.
+in a particular application's viewport; the later official-guest receiver
+rerun is recorded under item 3.
 
-### 3. Re-run capability gates in both official guests — pending
+### 3. Re-run capability gates in both official guests — baseline passed, coverage remains
 
 Build an Ubuntu 22.04-compatible AUV from the aligned branch and install it
 into fresh V1 and V2.1 overlays. In each image, test the typed action adapter
@@ -176,6 +176,19 @@ cleanup after failure. Record binary/image revisions, run IDs, receiver logs,
 and screenshot digests. Run both guest-local shared-socket and paired remote
 topologies with the current `serve --listen` authentication flow. A returned
 delivery result is not enough without receiver or semantic observation.
+
+The 2026-10-06 rerun passed the public `ActionExecutor` stateful episode in
+both installed official Xorg guests through their owner Unix sockets. Tk and
+`xev` independently confirmed the stateful subset and separate AUV CLI probes
+for both wheel axes, mouse buttons/counts, held drag, Unicode text, F13, and
+overlapping modifiers. A paired Mac→V2.1 route also passed authenticated
+remote AUV display capture and a click received by guest Tk. Exact binary
+hashes, image digest, Run IDs, receiver-log hashes, and limits are in the
+[evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md). The extra
+primitive probes were not all submitted through `ActionExecutor`; the paired
+remote route did not run the full persistent episode; V1 paired remote was not
+rerun. Those are coverage gaps, not hidden passes. No evaluator score or
+GPU/DRA behavior follows from this baseline.
 
 ### 4. Batch scheduler and evaluator pilot — pending
 
