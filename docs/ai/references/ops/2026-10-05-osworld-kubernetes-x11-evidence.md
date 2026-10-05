@@ -600,6 +600,35 @@ and installed Linux AUV binary SHA256 was
 The task-owned container was removed afterward. This confirms the adapter's
 local X11 action delivery, not an official guest, evaluator, or task score.
 
+### Complete adapter action matrix in official V1 and V2.1 guests
+
+The same test-only matrix was then built for Ubuntu 22.04 from PR commit
+`4b12d87d` and run through the installed AUV daemon's owner Unix socket in
+each fresh official guest. The test executable SHA256 was
+`71738202b94f59c7430a643f9e507905adad1b4e42f5d2c23af455f96bf7267c`;
+the installed AUV binary SHA256 was
+`c9ca279e3dfb9847915abbbe289dfd9326d7527f1e6d5ca6ff70133991f05e38`.
+Both guests ran Ubuntu 22.04.3, Xorg `Virtual-1` at 1920×1080, under the
+pinned runtime image digest above. Their hot qcow2 PVCs were read-only.
+Independent Tk and `xev` receivers, not AUV's delivery result alone, checked
+the actual X11 events. The matrix passed 1/1 in V1 (2.65 s) and 1/1 in V2.1
+(2.71 s). V1 `display.list` Run was
+`01a10df4-0b6b-7394-8c4b-f6db557524bd`; V2.1 Run was
+`01a10df7-46b7-7013-8c77-025f1aa0bbcc`.
+
+The structured test results are
+`/tmp/auv-osworld-gate-20261006/v1-matrix-result.json` (SHA256
+`f55f9f720598457ee558cf3719c3356531718ec9a5950d3b4da894d2a89199a2`)
+and `v2-matrix-result.json` (SHA256
+`93322d1d946c372bc35244c003197af865cf233e1666df0bd04d2db6e549a050`).
+These files are task-host scratch evidence, not durable CI artifacts. This
+closes the guest-local **adapter delivery** gate. It does not establish an
+evaluator score, a full remote-paired action episode, or task completion.
+The task-owned build, V1/V2.1 runtime, proxy, and cleanup Pods; two task-owned
+Services; port-forward; temporary manifests; and 1.9 GiB of task-owned build
+directories were removed afterward. The retained PVCs remained Bound; the
+pre-existing Evicted `auv-osworld-x11` Pod was untouched.
+
 ## Recommended harness boundary
 
 Treat infrastructure, benchmark control, and computer use as different

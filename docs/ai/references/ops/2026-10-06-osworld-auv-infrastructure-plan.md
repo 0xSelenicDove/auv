@@ -176,7 +176,7 @@ order when sending separate calls. This does not establish exact displacement
 in a particular application's viewport; the later official-guest receiver
 rerun is recorded under item 3.
 
-### 3. Re-run capability gates in both official guests — baseline passed, coverage remains
+### 3. Re-run capability gates in both official guests — guest-local action matrix passed
 
 Build an Ubuntu 22.04-compatible AUV from the aligned branch and install it
 into fresh V1 and V2.1 overlays. In each image, test the typed action adapter
@@ -201,6 +201,12 @@ remote route did not run the full persistent episode; V1 paired remote was not
 rerun. Those are coverage gaps, not hidden passes. No evaluator score or
 GPU/DRA behavior follows from this baseline.
 
+The later complete `ActionExecutor` matrix also passed 1/1 through installed
+AUV and independent Tk/`xev` receivers in **each** official guest (V1 2.65 s,
+V2.1 2.71 s). Exact test executable, binary, and result hashes are in the
+evidence note. This closes the guest-local adapter-delivery gate, not a full
+paired-remote episode or a task-evaluator gate.
+
 ### 4. Batch scheduler and evaluator pilot — pending
 
 Only after action gates pass, run a small, reproducible official-task batch on
@@ -211,6 +217,19 @@ families, not only the existing GIMP setting task. Report pass/fail/blocked
 and denominator explicitly; distinguish environment failure, adapter failure,
 agent failure, and evaluator failure. Confirm OSWorld-V2 dataset access before
 promising a full 108-task run.
+
+The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
+Initially the task dataset returned `Access denied. This repository requires
+approval.` After the owner approved access, read-only dry-runs at revision
+`osworld-v2.1` enumerated 147 task-repository files and 1084 gated asset files.
+The 108 release-matched task classes were subsequently downloaded to a
+task-owned scratch directory, and every file matched the SHA256 in the pinned
+`osworld-v2.1.task_hashes.json` (manifest SHA256
+`c54d428329be5ca72742a6becd49ee83cf739df5dea429bba182e1f3f21badfb`).
+The 1084-file gated asset snapshot has **not** been downloaded or verified
+locally; required assets and task setup/evaluator behavior must still be
+checked before official V2.1 task evaluation. See the
+[official V2.1 guide](https://github.com/xlang-ai/OSWorld-V2/blob/osworld-v2.1/docs/PUBLIC_EVALUATION_GUIDELINE_v2.1.md#21-download-v2-task-classes-and-assets).
 
 Task setup and evaluator code need their own input audit before batch execution.
 At the pinned V1 revision, the known
@@ -224,6 +243,21 @@ and invoke the release-matched evaluator without the original GUI delivery,
 or select tasks whose setup and evaluator are input-free. Record every such
 deviation from upstream execution; do not report it as an unmodified official
 benchmark score.
+
+Two candidate V1 pilot tasks at the pinned checkout avoid explicit PyAutoGUI
+commands in both setup and evaluator:
+
+- [Chrome bookmark-bar folder](https://github.com/xlang-ai/OSWorld/blob/b138d348256078fa634fc3b73567a7337c793e6b/evaluation_examples/examples/chrome/2ad9387a-65d8-4e33-ad5b-7580065a27ca.json):
+  setup launches Chrome and `socat`; evaluation restarts Chrome and checks its
+  bookmark data for a folder named `Favorites`.
+- [VLC play-and-exit setting](https://github.com/xlang-ai/OSWorld/blob/b138d348256078fa634fc3b73567a7337c793e6b/evaluation_examples/examples/vlc/5ac2891a-eacd-4954-b339-98abba077adb.json):
+  setup launches VLC and writes `play-and-exit=1`; evaluation reads `vlcrc`
+  and expects `0`.
+
+These are candidates, not evaluated results. Before selecting them, inspect
+their release-matched setup/evaluator implementation for indirect GUI actions
+and dependencies, then run each in a fresh overlay. A fixed AUV action script
+may test the scheduler/evaluator plumbing, but its score is not an agent score.
 
 ### 5. Agent/harness evaluation — pending
 
