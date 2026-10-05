@@ -629,6 +629,42 @@ Services; port-forward; temporary manifests; and 1.9 GiB of task-owned build
 directories were removed afterward. The retained PVCs remained Bound; the
 pre-existing Evicted `auv-osworld-x11` Pod was untouched.
 
+### V2.1 Task099 setup/evaluator negative control
+
+A separate task-owned fresh overlay on `liet-gpu-1` used the pinned V2.1 code
+checkout `3d778a3c9a34a079316f70df023b166700445792`, the same runtime
+image digest, and a writable `/boot.qcow2` backed by the read-only retained
+`osworld-v2-hot/System.qcow2`. The release-matched `task_099.py` SHA256
+`58c460fdfecf518f64714fdc21933b60818d8cf28ec02f9fa15a10e56ef02e32`
+matched the task manifest. Its sole gated asset, `task_099/my_image.png`,
+matched SHA256 `6c99998e7275e2132c6e27d01f212eaabfbf1c10b0e9405d11aa125eb94a16c1`
+on both the task host and guest Desktop.
+
+The exact pinned task `setup()` and `evaluate()` methods and original
+`get_vm_file` getter ran through a task-owned minimal HTTP file-transport
+adapter, **not** the full upstream runner. Setup reported `File Uploaded:
+1851281 bytes`. With no `position.txt` submitted, evaluation correctly
+returned `0.0`; the result is
+`/tmp/auv-task099-infra-20261006-evaluator.json` (SHA256
+`58588ffa0ad48f29ee6d0caf3ca4dc8530b2019d967f4a5888a0d5750ac45e10`).
+The transport adapter SHA256 was
+`c706c1b811ec31f07a50e379f699142c439ff723f9693543ba4938b2ffab1573`.
+
+Installed AUV 0.0.27 (binary SHA256
+`7bc1f4256fa903d1bb660f73901d34c8aa2c0c85ed948473b9f8809b049cdc26`)
+listed `Virtual-1` 1920×1080 (Run
+`01a10e01-4459-70d2-b6d2-4b80b569ce00`). AUV click, Ctrl+L, text, and
+Return Runs opened Google Maps in Chrome; final AUV capture Run
+`01a10e03-b6b8-76e2-af1d-fe67ed9d458a` produced
+`/tmp/auv-task099-maps-20261006.png` (SHA256
+`ce78f2864378296828c46370f574b32b1b14c2a764846f83a0468920d32d08f8`),
+visually showing loaded map tiles and search UI. The AUV source commit for
+this older Jammy validation binary cannot be independently established; do
+**not** attribute this trial to current PR head. No geolocation agent ran,
+no coordinates were submitted, and `0.0` is a negative control, not a task
+performance result. The task-owned VM Pod, proxy Pod, Service, and
+port-forward were removed; `osworld-v2-hot` remained Bound.
+
 ## Recommended harness boundary
 
 Treat infrastructure, benchmark control, and computer use as different

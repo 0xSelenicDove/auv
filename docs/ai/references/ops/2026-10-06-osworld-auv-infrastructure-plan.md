@@ -269,8 +269,14 @@ The guest still needs Google Maps access, and a future agent must receive
 only the task instruction and AUV observations, **not** task source or
 evaluator ground truth. `Task100` is a better mouse-heavy second pilot, but
 requires a self-hosted SlidePuzzle backend; official setup uses CDP to open
-its initial page and its evaluator rejects agent CDP use. Neither task has
-been executed here, so no V2.1 task score follows from this selection.
+its initial page and its evaluator rejects agent CDP use. A separate Task099
+infrastructure negative control later ran exact pinned `setup()`/`evaluate()`
+methods through a minimal file-transport adapter on a fresh official V2.1
+guest. The image arrived byte-for-byte, Google Maps loaded through AUV input,
+and the evaluator returned the expected `0.0` with no answer file. That run
+used an older AUV 0.0.27 binary of unproven source identity, not the current
+PR head; no agent attempted the task. See the evidence note. A blinded agent
+trial and full upstream runner integration remain pending.
 
 ### 5. Agent/harness evaluation — pending
 
