@@ -20,6 +20,8 @@ export type {
   RunnerRouteOptions,
   ScrollStreamBegin,
   ScrollStreamController,
+  ScrollUntilCallOptions,
+  ScrollUntilOptions,
   ScrollWithStep,
   WindowClient,
 } from './driver'

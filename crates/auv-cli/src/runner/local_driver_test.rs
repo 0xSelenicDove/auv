@@ -998,6 +998,154 @@ fn scroll_motion_rpc_decodes_timing_and_rejects_invalid_plans_before_delivery() 
 }
 
 #[test]
+fn scroll_until_rpc_decodes_step_condition_and_region() {
+  let request = scroll_until_request_from_proto(proto::ScrollUntilBegin {
+    step: Some(proto::scroll_until_begin::Step::Instant(proto::Scroll {
+      delta_x: 0.0,
+      delta_y: 600.0,
+    })),
+    condition: Some(proto::scroll_until_begin::Condition::TextVisible(proto::ScrollUntilTextVisible {
+      query: "Load more".to_string(),
+    })),
+    max_steps: 40,
+    settle: Some(prost_types::Duration {
+      seconds: 0,
+      nanos: 400_000_000,
+    }),
+    no_motion_confirmations: 2,
+    motion_region: Some(auv_api_proto::auv::api::image::v1::NormalizedRect {
+      x: 0.0,
+      y: 0.1,
+      width: 1.0,
+      height: 0.8,
+    }),
+    ..Default::default()
+  })
+  .unwrap();
+  assert_eq!(
+    request.step,
+    auv_scan::ScrollUntilStep::Instant {
+      delta: auv_driver::Scroll::new(0.0, 600.0)
+    }
+  );
+  assert_eq!(
+    request.condition,
+    auv_scan::ScrollUntilCondition::TextVisible {
+      query: "Load more".to_string()
+    }
+  );
+  assert_eq!(request.settle, std::time::Duration::from_millis(400));
+  assert_eq!(request.motion_region, Some(auv_driver::RatioRect::new(0.0, 0.1, 1.0, 0.8)));
+  assert_eq!(
+    request.observe,
+    auv_scan::ScrollUntilObserve {
+      capture: true,
+      text: true
+    },
+    "payloads are opt-out"
+  );
+  assert!(request.validate().is_ok());
+
+  let opted_out = scroll_until_request_from_proto(proto::ScrollUntilBegin {
+    step: Some(proto::scroll_until_begin::Step::Instant(proto::Scroll {
+      delta_x: 0.0,
+      delta_y: 10.0,
+    })),
+    condition: Some(proto::scroll_until_begin::Condition::End(proto::ScrollUntilEnd {})),
+    observe: Some(proto::ScrollUntilObserve {
+      omit_capture: true,
+      omit_text: false,
+    }),
+    ..Default::default()
+  })
+  .unwrap();
+  assert_eq!(
+    opted_out.observe,
+    auv_scan::ScrollUntilObserve {
+      capture: false,
+      text: true
+    }
+  );
+
+  for malformed in [
+    proto::ScrollUntilBegin {
+      condition: Some(proto::scroll_until_begin::Condition::End(proto::ScrollUntilEnd {})),
+      ..Default::default()
+    },
+    proto::ScrollUntilBegin {
+      step: Some(proto::scroll_until_begin::Step::Instant(proto::Scroll {
+        delta_x: 0.0,
+        delta_y: 10.0,
+      })),
+      ..Default::default()
+    },
+    proto::ScrollUntilBegin {
+      step: Some(proto::scroll_until_begin::Step::Instant(proto::Scroll {
+        delta_x: 0.0,
+        delta_y: 10.0,
+      })),
+      condition: Some(proto::scroll_until_begin::Condition::End(proto::ScrollUntilEnd {})),
+      motion_region: Some(auv_api_proto::auv::api::image::v1::NormalizedRect {
+        x: 0.5,
+        y: 0.0,
+        width: 0.6,
+        height: 1.0,
+      }),
+      ..Default::default()
+    },
+  ] {
+    assert_eq!(scroll_until_request_from_proto(malformed).unwrap_err().code(), tonic::Code::InvalidArgument);
+  }
+}
+
+#[test]
+fn scroll_until_observation_carries_capture_text_and_stop_reason() {
+  let observation = auv_scan::ScrollUntilObservation {
+    steps: 3,
+    delivered: auv_driver::Scroll::new(0.0, 1500.0),
+    motion: Some(auv_scan::ViewportPixelMotion {
+      estimated_shift: 0,
+      normalized_diff: 0.0,
+      no_motion: true,
+    }),
+    no_motion_streak: 2,
+    capture: Some(auv_driver::Capture {
+      origin: None,
+      image: image::RgbaImage::new(2, 1),
+      bounds: auv_driver::Rect::new(10.0, 20.0, 2.0, 1.0),
+      scale_factor: 1.0,
+      backend: "test".to_string(),
+      fallback_reason: None,
+    }),
+    text: Some(auv_driver::TextRecognition {
+      origin: None,
+      text: "END OF FEED".to_string(),
+      regions: Vec::new(),
+    }),
+    stop: Some(auv_scan::ScrollUntilStopReason::EndByNoVisualProgress),
+  };
+  let proto = scroll_until_observation_to_proto(observation, false);
+  assert_eq!((proto.steps, proto.no_motion_streak), (3, 2));
+  assert_eq!(proto.stop, proto::ScrollUntilStopReason::EndByNoVisualProgress as i32);
+  assert_eq!(proto.capture.and_then(|capture| capture.image).map(|image| image.data.len()), Some(8));
+  assert_eq!(proto.text.map(|text| text.text).as_deref(), Some("END OF FEED"));
+  assert!(!proto.awaiting_decision);
+
+  let pending = auv_scan::ScrollUntilObservation {
+    steps: 0,
+    delivered: auv_driver::Scroll::new(0.0, 0.0),
+    motion: None,
+    no_motion_streak: 0,
+    capture: None,
+    text: None,
+    stop: None,
+  };
+  let proto = scroll_until_observation_to_proto(pending, true);
+  assert_eq!(proto.stop, proto::ScrollUntilStopReason::Unspecified as i32);
+  assert!(proto.awaiting_decision && proto.capture.is_none() && proto.text.is_none());
+}
+
+#[test]
 fn malformed_position_is_an_invalid_argument() {
   let error = position_from_proto(proto::Position::default()).unwrap_err();
   assert_eq!(error.code(), tonic::Code::InvalidArgument);

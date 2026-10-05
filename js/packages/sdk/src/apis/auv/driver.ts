@@ -22,6 +22,9 @@ import type {
   ScrollMotionSchema,
   ScrollOptionsSchema,
   ScrollSchema,
+  ScrollUntilBeginSchema,
+  ScrollUntilCompleted,
+  ScrollUntilObservation,
   ScrollVelocitySchema,
   ScrollWindowPointMotionResponse,
   StreamScrollBeginSchema,
@@ -129,6 +132,24 @@ export interface ScrollStreamController {
   stop: () => Promise<void>
 }
 
+export interface ScrollUntilCallOptions extends OperationOptions {
+  /** Receives every observation in order, including the last one. */
+  onObservation?: (observation: ScrollUntilObservation) => Promise<void> | void
+  /**
+   * Client-side stop predicate. Returning `true` stops the loop with reason
+   * `predicateSatisfied`. The Runner waits for each answer, and does not ask
+   * about observations it already ends itself (`observation.stop`).
+   */
+  until?: (observation: ScrollUntilObservation) => boolean | Promise<boolean>
+}
+
+/**
+ * `scrollUntil` begin fields; the window, point, and decision mode come from
+ * the call. Without a `condition`, the loop stops at the end (no visual motion).
+ * Observations carry the capture and recognized text unless `observe` opts out.
+ */
+export type ScrollUntilOptions = InputFields<typeof ScrollUntilBeginSchema, 'awaitDecisions' | 'point' | 'window'>
+
 /** One generator step for `scrollWith`. Velocities are logical px/s. */
 export interface ScrollWithStep {
   holdMs?: number
@@ -161,6 +182,14 @@ export interface WindowClient {
    * completes. Aborting `options.signal` disconnects and stops delivery.
    */
   scrollStream: (begin: ScrollStreamBegin, options?: OperationOptions) => Promise<ScrollStreamController>
+  /**
+   * Scrolls in steps and observes after each step on the Runner until no
+   * visual motion remains, the query text appears (`condition.case ===
+   * 'textVisible'`), `options.until` returns `true`, or `maxSteps` runs out.
+   * Resolves with the completion. An end stop means no visual progress was
+   * observed, not proof that no more content exists.
+   */
+  scrollUntil: (point: Init<typeof WindowPointSchema>, request: ScrollUntilOptions, options?: ScrollUntilCallOptions) => Promise<ScrollUntilCompleted>
   /**
    * Drives a live scroll stream from a (possibly async) generator. Each yielded
    * step sets the velocity and holds it for `holdMs` (default 100), renewing the
@@ -255,6 +284,28 @@ export function createRunnerClient(connection: AuvConnection, route: RunnerRoute
       window: { windowId: id },
     }, options),
     scrollStream: (begin, options) => openScrollStream(id, begin, options),
+    scrollUntil: async (point, request, options = {}) => {
+      const { onObservation, until, ...operation } = options
+      const call = await duplex(InputService.method.scrollUntil, operation)
+      const condition = request.condition?.case === undefined ? { case: 'end' as const, value: {} } : request.condition
+      await call.send({
+        event: {
+          case: 'begin',
+          value: { ...request, awaitDecisions: until !== undefined, condition, point, window: { windowId: id } },
+        },
+      })
+      for await (const response of call.responses) {
+        const event = response.event
+        if (event.case === 'completed')
+          return event.value
+        if (event.case !== 'observation')
+          continue
+        await onObservation?.(event.value)
+        if (event.value.awaitingDecision)
+          await call.send({ event: { case: 'decision', value: { stop: await until?.(event.value) ?? true } } })
+      }
+      throw new Error('ScrollUntil ended without a completion event')
+    },
     scrollWith: async (steps, begin, options) => {
       const controller = await openScrollStream(id, begin, options)
       const completion = (async () => {

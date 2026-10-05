@@ -247,6 +247,44 @@ impl ScrollStreamSession {
   }
 }
 
+/// One event from a scroll-until operation.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ScrollUntilEvent {
+  /// One observation, in order. When `awaiting_decision` is set, the Runner
+  /// waits for [`ScrollUntilSession::decide`] before continuing.
+  Observation {
+    observation: auv_scan::ScrollUntilObservation,
+    awaiting_decision: bool,
+  },
+  Completed(auv_scan::ScrollUntilResult),
+}
+
+/// Caller side of a scroll-until operation. Dropping the session disconnects;
+/// a Runner waiting for a decision then stops.
+pub struct ScrollUntilSession {
+  requests: tokio::sync::mpsc::Sender<proto::ScrollUntilRequest>,
+  responses: tonic::Streaming<proto::ScrollUntilResponse>,
+}
+
+impl ScrollUntilSession {
+  pub async fn next(&mut self) -> Result<Option<ScrollUntilEvent>, CapabilityError> {
+    self.responses.message().await.map_err(capability_status)?.map(scroll_until_event_from_proto).transpose()
+  }
+
+  /// Answers the latest observation that is awaiting a decision.
+  pub async fn decide(&self, decision: auv_scan::ScrollUntilDecision) -> Result<(), CapabilityError> {
+    self
+      .requests
+      .send(proto::ScrollUntilRequest {
+        event: Some(proto::scroll_until_request::Event::Decision(proto::ScrollUntilDecision {
+          stop: decision == auv_scan::ScrollUntilDecision::Stop,
+        })),
+      })
+      .await
+      .map_err(|_| CapabilityError::InvalidResponse("ScrollUntil request stream closed".into()))
+  }
+}
+
 pub struct MouseMotionSession {
   requests: tokio::sync::mpsc::Sender<proto::StreamMouseMotionRequest>,
   responses: tonic::Streaming<proto::StreamMouseMotionResponse>,
@@ -868,6 +906,73 @@ impl WindowClient {
       requests,
       responses,
     })
+  }
+
+  /// Scrolls in steps at a window-local point, observing after each step on
+  /// the Runner, until the end, visible text, the caller's decision, or the
+  /// step budget. With `await_decisions`, answer each observation that awaits
+  /// a decision through [`ScrollUntilSession::decide`].
+  pub async fn scroll_until(
+    &self,
+    point: auv_driver::WindowPoint,
+    request: auv_scan::ScrollUntilRequest,
+    options: auv_driver::ScrollOptions,
+    await_decisions: bool,
+  ) -> Result<ScrollUntilSession, CapabilityError> {
+    let (requests, receiver) = tokio::sync::mpsc::channel(4);
+    requests
+      .send(proto::ScrollUntilRequest {
+        event: Some(proto::scroll_until_request::Event::Begin(scroll_until_begin_to_proto(
+          self.window_ref.clone(),
+          point,
+          request,
+          options,
+          await_decisions,
+        )?)),
+      })
+      .await
+      .map_err(|_| CapabilityError::InvalidResponse("ScrollUntil request stream failed to open".into()))?;
+    let responses = proto::input_service_client::InputServiceClient::new(self.runner.transport()?)
+      .max_decoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
+      .scroll_until(tokio_stream::wrappers::ReceiverStream::new(receiver))
+      .await
+      .map_err(capability_status)?
+      .into_inner();
+    Ok(ScrollUntilSession {
+      requests,
+      responses,
+    })
+  }
+
+  /// Runs [`Self::scroll_until`] with a client-side predicate: returning
+  /// `true` for an observation stops the loop as `predicate_satisfied`.
+  /// Observations the Runner already ends are not passed to `predicate`.
+  pub async fn scroll_until_with(
+    &self,
+    point: auv_driver::WindowPoint,
+    request: auv_scan::ScrollUntilRequest,
+    options: auv_driver::ScrollOptions,
+    mut predicate: impl FnMut(&auv_scan::ScrollUntilObservation) -> bool,
+  ) -> Result<auv_scan::ScrollUntilResult, CapabilityError> {
+    let mut session = self.scroll_until(point, request, options, true).await?;
+    while let Some(event) = session.next().await? {
+      match event {
+        ScrollUntilEvent::Observation {
+          observation,
+          awaiting_decision: true,
+        } => {
+          let decision = if predicate(&observation) {
+            auv_scan::ScrollUntilDecision::Stop
+          } else {
+            auv_scan::ScrollUntilDecision::Continue
+          };
+          session.decide(decision).await?;
+        }
+        ScrollUntilEvent::Observation { .. } => {}
+        ScrollUntilEvent::Completed(result) => return Ok(result),
+      }
+    }
+    Err(CapabilityError::InvalidResponse("ScrollUntil ended without a completed event".into()))
   }
 
   /// Delivers a wheel scroll at a window-local point.
@@ -1926,6 +2031,107 @@ fn scroll_stream_event_from_proto(value: proto::StreamScrollResponse) -> Result<
       },
       elapsed: duration_from_proto(required(value.elapsed, "scroll stream completed event omitted elapsed")?, "scroll stream elapsed")?,
     }),
+  }
+}
+
+fn scroll_until_begin_to_proto(
+  window: proto::WindowRef,
+  point: auv_driver::WindowPoint,
+  request: auv_scan::ScrollUntilRequest,
+  options: auv_driver::ScrollOptions,
+  await_decisions: bool,
+) -> Result<proto::ScrollUntilBegin, CapabilityError> {
+  let step = match request.step {
+    auv_scan::ScrollUntilStep::Instant { delta } => proto::scroll_until_begin::Step::Instant(proto::Scroll {
+      delta_x: delta.delta_x,
+      delta_y: delta.delta_y,
+    }),
+    auv_scan::ScrollUntilStep::Motion { motion } => proto::scroll_until_begin::Step::Motion(scroll_motion_to_proto(motion)?),
+  };
+  let condition = match request.condition {
+    auv_scan::ScrollUntilCondition::End => proto::scroll_until_begin::Condition::End(proto::ScrollUntilEnd {}),
+    auv_scan::ScrollUntilCondition::TextVisible { query } => {
+      proto::scroll_until_begin::Condition::TextVisible(proto::ScrollUntilTextVisible { query })
+    }
+  };
+  Ok(proto::ScrollUntilBegin {
+    window: Some(window),
+    point: Some(proto::WindowPoint {
+      x: point.point().x,
+      y: point.point().y,
+    }),
+    step: Some(step),
+    condition: Some(condition),
+    max_steps: request.max_steps,
+    settle: Some(duration_to_proto(request.settle)?),
+    no_motion_confirmations: request.no_motion_confirmations,
+    motion_region: request.motion_region.map(|region| auv_api_proto::auv::api::image::v1::NormalizedRect {
+      x: region.x,
+      y: region.y,
+      width: region.width,
+      height: region.height,
+    }),
+    options: Some(scroll_options_to_proto(options)?),
+    observe: Some(proto::ScrollUntilObserve {
+      omit_capture: !request.observe.capture,
+      omit_text: !request.observe.text,
+    }),
+    await_decisions,
+  })
+}
+
+fn scroll_until_stop_reason_from_proto(value: i32) -> Result<Option<auv_scan::ScrollUntilStopReason>, CapabilityError> {
+  Ok(match proto::ScrollUntilStopReason::try_from(value) {
+    Ok(proto::ScrollUntilStopReason::Unspecified) => None,
+    Ok(proto::ScrollUntilStopReason::EndByNoVisualProgress) => Some(auv_scan::ScrollUntilStopReason::EndByNoVisualProgress),
+    Ok(proto::ScrollUntilStopReason::TextVisible) => Some(auv_scan::ScrollUntilStopReason::TextVisible),
+    Ok(proto::ScrollUntilStopReason::BudgetExhausted) => Some(auv_scan::ScrollUntilStopReason::BudgetExhausted),
+    Ok(proto::ScrollUntilStopReason::PredicateSatisfied) => Some(auv_scan::ScrollUntilStopReason::PredicateSatisfied),
+    Err(_) => return Err(CapabilityError::InvalidResponse("scroll-until reported an unknown stop reason".into())),
+  })
+}
+
+fn scroll_until_event_from_proto(value: proto::ScrollUntilResponse) -> Result<ScrollUntilEvent, CapabilityError> {
+  use proto::scroll_until_response::Event;
+  let scroll = |value: Option<proto::Scroll>, message: &'static str| {
+    required(value, message).map(|scroll| auv_driver::Scroll::new(scroll.delta_x, scroll.delta_y))
+  };
+  let motion = |value: proto::ViewportPixelMotion| auv_scan::ViewportPixelMotion {
+    estimated_shift: value.estimated_shift,
+    normalized_diff: value.normalized_diff,
+    no_motion: value.no_motion,
+  };
+  match required(value.event, "ScrollUntil response omitted event")? {
+    Event::Observation(value) => Ok(ScrollUntilEvent::Observation {
+      observation: auv_scan::ScrollUntilObservation {
+        steps: value.steps,
+        delivered: scroll(value.delivered, "scroll-until observation omitted delivered")?,
+        motion: value.motion.map(motion),
+        no_motion_streak: value.no_motion_streak,
+        capture: value.capture.map(capture_from_proto).transpose()?,
+        text: value.text.map(text_recognition_from_proto).transpose()?,
+        stop: scroll_until_stop_reason_from_proto(value.stop)?,
+      },
+      awaiting_decision: value.awaiting_decision,
+    }),
+    Event::Completed(value) => Ok(ScrollUntilEvent::Completed(auv_scan::ScrollUntilResult {
+      reason: scroll_until_stop_reason_from_proto(value.reason)?
+        .ok_or_else(|| CapabilityError::InvalidResponse("scroll-until completed without a stop reason".into()))?,
+      steps: value.steps,
+      delivered: scroll(value.delivered, "scroll-until completion omitted delivered")?,
+      action: value.action.map(input_action_result_from_proto).transpose()?,
+      text_match: value
+        .text_match
+        .map(|matched| {
+          let bounds = required(matched.bounds, "scroll-until text match omitted bounds")?;
+          Ok::<_, CapabilityError>(auv_scan::ScrollUntilTextMatch {
+            text: matched.text,
+            bounds: auv_driver::Rect::new(bounds.x, bounds.y, bounds.width, bounds.height),
+          })
+        })
+        .transpose()?,
+      last_motion: value.last_motion.map(motion),
+    })),
   }
 }
 
