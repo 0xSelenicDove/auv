@@ -999,6 +999,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "auv-osworld-evals"
+version = "0.0.28"
+dependencies = [
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "auv-qqmusic"
 version = "0.0.28"
 dependencies = [

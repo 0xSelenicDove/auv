@@ -97,6 +97,15 @@ Noop/NotFound result semantics. The adapter must still own these IDs and
 explicitly release them; the client does not provide an automatic release
 guard.
 
+The parser subtask is also implemented under `evals/osworld/`. It accepts the
+pinned V1/V2.1 structured actions in flat or nested form, validates defaults
+and bounds, and rejects free-form code and V2 `EXECUTE`. It retains raw signed
+wheel steps. Upstream `ACTION_SPACE` labels both scroll axes required, but its
+`execute_action` implementation permits either axis alone; the parser follows
+the executable behavior and normalizes the omitted axis to zero. Passing this
+parser is not evidence that an AUV/X11 backend can deliver every upstream key
+name. The persistent-session executor and live receipt gates remain pending.
+
 Placement proposal for review: use a separate `evals/osworld/` harness area.
 `evals/auv-base/` currently documents Python-free, application-receiver
 evaluations and reserves its Linux platform directory for those tasks. The
