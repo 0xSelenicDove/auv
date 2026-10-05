@@ -28,8 +28,8 @@ and guest installation route.
 
 - PR #233 contains the X11 driver, `input.scrollPoint`, pointer-position read,
   and disjoint X11 key holds. The baseline exposed F13 rejection; a later
-  direct-Xorg receiver test verified the fix. These repairs have not yet been
-  rerun in the official V1/V2.1 guest images.
+  direct-Xorg receiver test verified the fix. The 2026-10-06 official V1/V2.1
+  guest rerun also observed F13 through installed AUV.
 - Current `main` adds a shared scroll contract: positive `delta_y` moves the
   viewport down and deltas are logical pixels, plus window-targeted
   `input.scroll`/`ScrollWindowPoint`. See
@@ -37,9 +37,9 @@ and guest installation route.
   X11 screen-point scrolling must keep that contract and be tested against an
   observed scroll position. A wheel event alone is weaker evidence.
 - Current `main` changes listener authentication and pairing. `listen` is a
-  `serve --listen URI` option, not a separate command. The next paired test
-  must use the new registration/authentication flow instead of relying on a
-  daemon created from the older PR head.
+  `serve --listen URI` option, not a separate command. The 2026-10-06 paired
+  Mac→V2.1 test used the owner Unix socket to create a token and the current
+  authenticated HTTP route.
 - The initial merge-tree check predicted two content conflicts
   (`crates/auv-driver/Cargo.toml` and `proto/auv/api/driver/v1/input.proto`).
   Both were resolved in merge commit `875e259e`; use the actual merged source
@@ -49,8 +49,9 @@ and guest installation route.
   both containers are `ContainerStatusUnknown`. The node itself is Ready and
   the retained PVCs remain Bound. This Pod is not a live receiver and must not
   be used to claim a current X11 result. Recreate a task-owned fixture with
-  measured storage requests or use an isolated Linux/Xvfb receiver before the
-  official-guest rerun; preserve the existing PVCs.
+  measured storage requests or use an isolated Linux/Xvfb receiver for future
+  probes; preserve the existing PVCs. The official-guest rerun used separate
+  task-owned Pods, which were cleaned after evidence capture.
 
 ## Ordered TODO and acceptance gates
 
@@ -71,11 +72,11 @@ screen-point deltas now use logical pixels, and the runbook uses the current
 listener syntax. Targeted Rust/Buf/SDK checks, X11 unit tests (17/17), and an
 Xvfb integration test (1/1) passed. The Tk receiver's `yview` increased after
 `+120`, proving downward motion but not an exact 120 px displacement. The
-existing window-scroll live evidence belongs to `main`; this merge did not
-repeat it. The PR disclosure and current guest revalidation are separate
-follow-ups.
+  existing window-scroll live evidence belongs to `main`; this merge did not
+  repeat it. The PR disclosure and official-guest screen-point rerun were
+  subsequently completed, as recorded in the evidence note.
 
-### 2. Build a typed OSWorld action adapter — code complete, guest gate pending
+### 2. Build a typed OSWorld action adapter — local full-action gate passed
 
 Make one harness-side consumer that maps the official structured action set to
 existing AUV Driver/Runner capabilities. Reuse one persistent Runner/session
@@ -125,11 +126,21 @@ semantic verification unset. Simultaneous mouse-button chords are explicitly
 unsupported because the current MouseCoordinator permits one held button per
 desktop. The executor rejects key spellings without an exact X11 mapping;
 holds are bounded by the Runner's 30-second limit rather than silently
-extended. `cargo test -p auv-osworld-evals --lib` passed 8 unit tests; the
-public-Runner Xorg integration test is present but ignored until an isolated
-daemon is available. This is a code-level gate, not official-guest receiver
-evidence or a benchmark score. Item 3 must run the integration test and inspect
-independent desktop state in both official images.
+extended. `cargo test -p auv-osworld-evals --lib` passed 8 unit tests. The
+ignored public-Runner Xorg integration test was later run explicitly against
+the installed AUV daemon in each official guest and passed 1/1 in both, with
+independent receiver evidence. It covers a stateful subset; separate AUV CLI
+probes confirmed additional primitives, but those do not prove that every
+`ActionExecutor` variant passed end-to-end. This is not a benchmark score.
+
+A later test-only Xorg action matrix submitted every supported structured GUI
+action family through `ActionExecutor` on an isolated Docker/Xvfb desktop. The
+independent Tk receiver checked mouse/key/text/cleanup; a raw `xev` window
+checked both scroll axes and delivery order. The final matrix passed 1/1 after
+adding an exact no-coordinate-click receiver assertion. See the
+[evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md) for image,
+binary, and test hashes. This completes the local adapter-delivery gate while
+leaving the official guest full-matrix rerun and benchmark evaluator separate.
 
 Placement proposal for review: use a separate `evals/osworld/` harness area.
 `evals/auv-base/` currently documents Python-free, application-receiver
@@ -200,6 +211,19 @@ families, not only the existing GIMP setting task. Report pass/fail/blocked
 and denominator explicitly; distinguish environment failure, adapter failure,
 agent failure, and evaluator failure. Confirm OSWorld-V2 dataset access before
 promising a full 108-task run.
+
+Task setup and evaluator code need their own input audit before batch execution.
+At the pinned V1 revision, the known
+[GIMP theme task](https://github.com/xlang-ai/OSWorld/blob/b138d348256078fa634fc3b73567a7337c793e6b/evaluation_examples/examples/gimp/7767eef2-56a3-4cea-8c9f-48c070c7d65b.json)
+uses a PyAutoGUI Ctrl+Q in evaluator `postconfig`, while the
+[volume task](https://github.com/xlang-ai/OSWorld/blob/b138d348256078fa634fc3b73567a7337c793e6b/evaluation_examples/examples/os/28cc3b7e-b194-4bc9-8353-d04c0f4d56d2.json)
+uses a PyAutoGUI click during setup. Running either unmodified would violate
+the AUV-only GUI-input rule even if the agent itself uses AUV. The pilot must
+either reproduce those preparatory GUI actions through AUV at the same phase
+and invoke the release-matched evaluator without the original GUI delivery,
+or select tasks whose setup and evaluator are input-free. Record every such
+deviation from upstream execution; do not report it as an unmodified official
+benchmark score.
 
 ### 5. Agent/harness evaluation — pending
 

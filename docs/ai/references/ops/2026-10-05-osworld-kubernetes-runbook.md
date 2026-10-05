@@ -426,7 +426,7 @@ or other mocked sites also require a self-hosted
 This runbook reproduces the infrastructure and both AUV control topologies. It
 does not yet provide:
 
-- a typed adapter for every OSWorld action;
+- an unattended official-guest run of the complete typed action matrix;
 - unattended iteration over 369 V1 or 108 V2.1 tasks;
 - V2 mocked-site and GitLab deployment;
 - per-task scheduling, timeout, reset, and result aggregation;
@@ -435,6 +435,21 @@ does not yet provide:
 Until those pieces exist, run a small task subset, record the task ID, release,
 qcow2 and runtime digest, AUV Device ID, topology, Run IDs, capture artifacts,
 and official evaluator output for each episode.
+
+For an isolated Xorg desktop with a running AUV owner-socket daemon, the
+test-only public Runner action matrix can be invoked from the matching Linux
+checkout. It starts independent Tk and raw `xev` receiver windows; these
+observe but never inject GUI input:
+
+```bash
+DISPLAY=:99 XDG_SESSION_TYPE=x11 AUV_OSWORLD_TEST_DAEMON=unix:///tmp/auv-actions-gate/auv.sock \
+  cargo test -p auv-osworld-evals --test xorg_actions -- --ignored --nocapture
+```
+
+Replace the display and socket with the task-owned fixture's actual values.
+Run this only on a disposable Xorg desktop: the test moves the pointer, sends
+clicks/keys/text, and creates/cleans held input through AUV. A passing action
+matrix is still separate from an OSWorld task evaluator result.
 
 ## Failure guide
 

@@ -573,6 +573,33 @@ rate, GPU/DRA test, or full paired-runner test. In particular, a checked
 `InputActionResult` does not replace application-state or task-evaluator
 verification. A batch agent/harness run remains the next separate gate.
 
+### Complete adapter action matrix on isolated Xvfb
+
+The later test-only `evals/osworld/tests/xorg_actions.rs` exercises the public
+`ActionExecutor` across every currently supported structured GUI action family.
+On the task-owned Docker/Xvfb display `:99`, the installed AUV daemon and
+independent Tk receiver verified pointer rounding, button/count clicks
+(including no-coordinate click at the current pointer), held move/drag,
+ASCII/Unicode text, F13, single and overlapping modifier holds, hotkey,
+control signals that emit no GUI input, and error/finish cleanup. A separate
+raw `xev` window observed the mixed-axis scroll ButtonPress sequences
+`[7,7,5,5,5]` and `[6,4]`; Tk's generic binding folds horizontal wheel
+events into its vertical binding on this image, so its log is not used for
+horizontal-wheel claims.
+
+The final receiver assertion for no-coordinate click saw Button1 press and
+release at (640,440) after `MOVE_TO`; the updated live test passed 1/1 in
+2.55 seconds. Source base was `41cc965f` plus the test-only diff; the test
+file SHA256 was `172d9563dffb06b22268d66fe17a747fe0c810ba303801dd20501db16046ef08`,
+and the Tk receiver script SHA256 was
+`00f123e99d8b3486ec5fedba0a4587ac4f3ab6dce6f06aac6a843bef0101e344`.
+The fixture image ID was
+`sha256:b08b6cefceb848bbe2e42818fd7d4bead6502b37716ce5489fe897a398897c99`
+and installed Linux AUV binary SHA256 was
+`b3587932771b2c50316fd650e3415bd6f07d34dcc1a9e1f6743ea458231b2d23`.
+The task-owned container was removed afterward. This confirms the adapter's
+local X11 action delivery, not an official guest, evaluator, or task score.
+
 ## Recommended harness boundary
 
 Treat infrastructure, benchmark control, and computer use as different
