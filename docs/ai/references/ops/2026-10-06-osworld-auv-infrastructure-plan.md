@@ -218,6 +218,34 @@ and denominator explicitly; distinguish environment failure, adapter failure,
 agent failure, and evaluator failure. Confirm OSWorld-V2 dataset access before
 promising a full 108-task run.
 
+For the first two-episode V1 pilot, fix the **action phase** at 10 minutes per
+task. Give boot, installation, setup, and evaluation their own bounded
+deadlines; they do not consume the action budget. Enforce deadlines with a
+monotonic clock and record UTC start/end times for review. Start each task
+from a fresh writable overlay backed by the same read-only pinned qcow2.
+Do not extend a running episode after seeing partial progress. This is an
+exploratory pilot policy, not a claim that the official benchmark uses the
+same timeout.
+
+The batch ledger must keep an evaluator score separate from execution status:
+
+| Field group | Required evidence |
+| --- | --- |
+| Identity | batch/episode ID, pinned benchmark/task revision and task hash, topology, runtime image and qcow2 identity, installed AUV source and binary SHA |
+| Phases | boot/install/setup/action/evaluate/reset UTC boundaries, action budget and terminal reason |
+| AUV | device/Runner identity, action Run IDs, final screenshot artifact and digest |
+| Outcome | raw evaluator output and score **only if evaluation ran**; otherwise a named failure layer and no invented `0.0` |
+| Cleanup | exact task-owned resources removed, retained PVCs verified, cleanup failure if any |
+
+Count all two scheduled tasks in the pilot denominator, including blocked and
+timed-out episodes; report their status individually. An evaluator-returned
+`0.0`, an absent answer file, a setup failure, and an unavailable evaluator
+are four different results. A fixed action script can test scheduler plumbing,
+but only a blinded agent attempt measures agent behavior. The old scratch
+`/tmp/auv-osworld-batch-20261005/harness.py` and `slot.py` are not a compliant
+implementation: they launch AUV GUI commands through OSWorld `/setup/execute`
+and use stale listener flags. Preserve them as historical scratch only.
+
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
 approval.` After the owner approved access, read-only dry-runs at revision
