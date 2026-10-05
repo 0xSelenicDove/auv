@@ -151,4 +151,35 @@ In Verified mode, Step 2 duration increased at P50 due to an explicit test condi
 
 Decision: Hot-path optimizations validated. Fast mode delivers P50 36.82ms end-to-end operation latency (24.2x faster than baseline under standard linear interpolation, ~19x nearest-rank, ~28.7x upper-median); Verified mode delivers 100% success rate with ~7.8x faster command dispatch and ~6.8x faster WGC health checks.
 
+## Phase 4 — Auto double-loop v0.1: Optimistic compilation + Pessimistic execution (2026-10-04)
+
+Built the compiler and scheduler architecture (`crates/auv-auto-loop`) for the full dual-loop auto mode. Separated completely from Windows hot-path optimizations to ensure isolated verification and measurable performance comparison.
+
+### 1. Design & Core Principles
+- **Optimistic compilation + pessimistic execution**: The machine does not require human per-operation approval; human engineers design guardrails and inspect the exception backlog. Problems that machines cannot solve reliably (implicit mutations, single-trajectory generalization, async side-effects) are bypassed via guardrails.
+- **Zero silent errors invariant**: Every automated decision (approval, rejection, exact hit, candidate interception, gate failure, auto-isolation, escalation) emits a structured `DecisionLog` entry with a typed `ReasonCode`.
+
+### 2. Verified Subsystems & Empirical Test Suite
+
+Verified across 9 automated acceptance tests (`crates/auv-auto-loop/tests/acceptance_test.rs`):
+
+| Subsystem | Mechanism | Verification & Decision Code | Status |
+|---|---|---|---|
+| **Clean Compilation** | Forward diff + backward slice + 3 compile gates | Compiled `record.json` into `qqmusic.prepare_playback` without human intervention (`COMPILATION_APPROVED`) | **PASS** |
+| **Dirty Trajectory** | Ambiguous drop detection | Ambiguous background mutation rejected into manual review queue (`REJECT_AMBIGUOUS_DROPS`) | **PASS** |
+| **Parameter Gate** | Anti-unification & atomic guards | `Next()` parameterization rejected (`REJECT_FORBIDDEN_PARAMETERIZATION`); `SetVolume(40/60)` lifted to `{{volume}}` (`PARAMETER_GATE_APPROVED`) | **PASS** |
+| **Blast Radius Gate** | Action whitelist & destructive blacklist | Deletion action rejected into manual review queue (`REJECT_BLAST_RADIUS_VIOLATION`) | **PASS** |
+| **Scheduler (Exact)** | Canonical operation key matching | `QQMusic.exe:prepare_playback` matched directly with 0 embedding calls (`EXACT_KEY_MATCH`) | **PASS** |
+| **Scheduler (Fallback)** | Embedding top-3 + strict preconditions | Unknown long-tail query falls back to embedding top-3; false candidate intercepted by `App.ProcessName` (`PRECONDITION_MISMATCH`) | **PASS** |
+| **Runtime Isolation** | Consecutive failure threshold (>= 2) | Injected faults trigger gate catch; 2 consecutive failures auto-isolate operation (`AUTO_ISOLATED_CONSECUTIVE_FAILURES`); routes task to VLM (`ESCALATE_TO_VLM`) | **PASS** |
+| **Strict Runtime Mode** | `unverified-step` fallback | Custom/uncovered step tagged `unverified-step`; 1st failure triggers instant escalation and isolation (`STRICT_STEP_FAILED`) | **PASS** |
+| **Zero Silent Errors** | Structured decision logging | 100% of decisions across lifecycle logged with non-empty timestamps, task names, messages, and `ReasonCode` | **PASS** |
+| **Isolation Persistence** | Durable JSONL records & reboot reload | Auto-isolated operations persisted to disk; reloaded on catalog restart; active registration rejected to prevent bad operation revival | **PASS** |
+
+### 3. Decisions & Handoff
+- Clean trajectory (`2026-10-04-qqmusic-vlm-record.json`) achieves 100% automated compilation into an operation semantically consistent with manual YAML.
+- Operations with unverified steps run in strict mode, preventing unverified mutations from degrading the production loop.
+- Manual review queue operates out-of-band: backlog does not block fast-loop execution of active operations.
+- Isolation state persists across restarts to prevent revived faulty operations.
+
 
