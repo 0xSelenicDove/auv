@@ -665,6 +665,45 @@ no coordinates were submitted, and `0.0` is a negative control, not a task
 performance result. The task-owned VM Pod, proxy Pod, Service, and
 port-forward were removed; `osworld-v2-hot` remained Bound.
 
+### V2.1 Task099 blinded agent attempt on current PR head
+
+For a separate fresh overlay, Ubuntu 22.04 built `auv-cli` from exact PR
+source commit `25e2320570a72d3b9580451ea2917a9e03fa6b95`. The source archive
+SHA256 was `c0d3e75daefce012f9d202d931ff22ecb89a0f74971ec047c01280146fbe8e3a`;
+the installed AUV 0.0.28 binary SHA256 was
+`2a8e53eecfef1dcd8fa8368fa480d6df36e254527c7e60be3ac82802e7073427`.
+The build needed newer libspa/PipeWire headers on the task-owned build PVC
+while retaining Jammy runtime libraries; an initial build Pod on
+`neko-gpu-1` was Evicted for node ephemeral-storage pressure. The successful
+build used a task-owned 40 GiB PVC on `liet-gpu-1`; its Pod/PVC were removed
+after extracting the binary. No repository source was changed for the build.
+
+The pinned Task099 `setup()` placed the same image in the guest, and its SHA
+matched the asset above. AUV `display.list` Run
+`01a10e1b-3b6a-754e-ba78-65c9843308df` reported Xorg `Virtual-1`
+1920×1080; capture Run `01a10e1b-3bc2-7202-b084-bfeb6ea89cf0` succeeded.
+An authenticated, paired AUV-only port-forward was given to a fresh subagent
+that did not inherit this task's history, task source, evaluator, or answer.
+The subagent could open the desktop image and use Google Maps/Street View
+through AUV screenshots and input. It spent an extended exploratory period
+on location confirmation and was stopped at a disclosed ad-hoc limit before
+writing an answer. No evaluator feedback was given during the attempt.
+
+After the subagent stopped, exact pinned `Task099.evaluate()` and the original
+`get_vm_file` getter ran through a minimal file-transport adapter, **not**
+the full upstream runner. The evaluator found no
+`/home/user/Desktop/position.txt` (HTTP 404), returning total score `0.0`
+and distance partial score `0.0` with weight `1.0`. The result is
+`/tmp/auv-task099-blind-eval-20261006.json` (SHA256
+`496b15f9f7fa545ffc6fb0cde8372403015f0b59bd836e9cc6ad35ca0ab7af34`);
+the evaluation adapter SHA256 was
+`967b0ec0d0b28c9696f14665917412ccbd8f608c4d3dd5c14428f9b37c73c8e6`.
+This is **one incomplete, time-bounded agent attempt**, not an OSWorld-V2.1
+completion rate. The AUV connection, capture, and GUI navigation worked;
+the missing answer file is not evidence of an X11 input-delivery failure.
+The task-owned VM Pod, proxy Pod, Service, and both local port-forwards were
+removed and verified absent; the retained hot PVC remained Bound.
+
 ## Recommended harness boundary
 
 Treat infrastructure, benchmark control, and computer use as different

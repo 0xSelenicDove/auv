@@ -265,7 +265,7 @@ For V2.1, a static audit of all 108 hash-verified task classes selected
 `position.txt` and scores coordinates. The required image was downloaded from
 the pinned gated asset revision into task-owned scratch storage (SHA256
 `6c99998e7275e2132c6e27d01f212eaabfbf1c10b0e9405d11aa125eb94a16c1`).
-The guest still needs Google Maps access, and a future agent must receive
+The guest needed Google Maps access, and the later blind agent received
 only the task instruction and AUV observations, **not** task source or
 evaluator ground truth. `Task100` is a better mouse-heavy second pilot, but
 requires a self-hosted SlidePuzzle backend; official setup uses CDP to open
@@ -275,10 +275,15 @@ methods through a minimal file-transport adapter on a fresh official V2.1
 guest. The image arrived byte-for-byte, Google Maps loaded through AUV input,
 and the evaluator returned the expected `0.0` with no answer file. That run
 used an older AUV 0.0.27 binary of unproven source identity, not the current
-PR head; no agent attempted the task. See the evidence note. A blinded agent
-trial and full upstream runner integration remain pending.
+PR head; no agent attempted the task in that negative control. See the
+evidence note. A later fresh guest on an exact-current-head AUV 0.0.28 build
+supported one blinded AUV-only agent attempt. The agent navigated the image
+and Google Maps but was stopped at a disclosed ad-hoc limit before writing
+`position.txt`; exact pinned evaluation returned `0.0` because the answer
+file was absent. This is an incomplete single attempt, not a rate or a
+completed batch. Full upstream runner integration remains pending.
 
-### 5. Agent/harness evaluation — pending
+### 5. Agent/harness evaluation — exploratory single attempt incomplete
 
 Once the infrastructure and batch pilot are repeatable, connect an agent that
 observes through AUV and selects typed adapter actions. Score it with the

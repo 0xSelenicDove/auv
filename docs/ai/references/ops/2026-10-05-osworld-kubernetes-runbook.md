@@ -48,12 +48,13 @@ The namespace is `auv-x11-hami-test`. The retained volumes are:
 | `osworld-v2-hot` | node-local on `liet-gpu-1` | extracted V2.1 `System.qcow2` |
 | `auv-osworld-workspace` | `tns-iscsi` | AUV checkout and validation builds |
 
-The guest-compatible X11-only AUV binary currently lives at
+The retained **older** guest-compatible X11-only AUV binary lives at
 `/workspace/target-ubuntu2204-v2/release/auv` in the workspace volume. Its
 validated SHA256 is
 `7bc1f4256fa903d1bb660f73901d34c8aa2c0c85ed948473b9f8809b049cdc26`.
-This is a validation build, not a normal Linux release artifact: the regular
-Debian 13 build requires a newer glibc than Ubuntu 22.04.
+It is AUV 0.0.27 with no proven source commit, **not** the draft PR's current
+head. Use it only to reproduce the older infrastructure control. The regular
+Debian 13 artifact requires a newer glibc than Ubuntu 22.04.
 
 ## 1. Set the local context
 
@@ -243,15 +244,80 @@ momentary API response; allow the guest to finish rebooting before setup.
 
 ## 5. Upload the Ubuntu 22.04 AUV build
 
-Copy the validated binary out of the retained workspace Pod:
+For a current-PR experiment, first build from an exact source commit in an
+Ubuntu 22.04 x86_64 Pod, then use the resulting binary in the upload steps
+below. Do not substitute the retained 0.0.27 binary. The Task099 blinded
+pilot validated commit `25e23205`, binary SHA256
+`2a8e53eecfef1dcd8fa8368fa480d6df36e254527c7e60be3ac82802e7073427`,
+and maximum required glibc 2.35. These hashes identify that experiment, not
+a moving `main` or PR head.
+
+The validated build used `ubuntu:22.04` on `liet-gpu-1`, with a **task-owned**
+40 GiB `tns-iscsi` PVC mounted at `/build`. Request 4 CPU, 8 GiB memory, and
+2 GiB ephemeral storage; limit 8 CPU, 16 GiB memory, and 8 GiB ephemeral
+storage. Put source, Cargo home, target, temporary files, and downloaded
+headers on that PVC. Archive an exact clean Git commit, hash the archive,
+and recheck that hash after copying it into the Pod before extracting to
+`/build/src`. The task-owned build Pod/PVC should be removed after the
+binary is copied and its SHA verified. Do not alter the retained
+`auv-osworld-workspace` or OSWorld image PVCs.
+
+Inside the build Pod, install the system dependencies and minimal Rust 1.95.0
+toolchain. The validated dependency set was `pkg-config libclang-dev
+libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev
+libxkbcommon-dev libegl-dev libgbm-dev libleptonica-dev libtesseract-dev
+build-essential curl ca-certificates`. Jammy's own PipeWire 0.3.48 SPA
+headers do not compile this source. The scoped validation workaround was to
+extract newer Debian `libspa-0.2-dev_1.4.2-1_amd64.deb` (SHA256
+`7d8d46d5a98a031373d01eb74c2a1e40152294bbcaf6fb9320f88648cfde44bd`)
+and `libpipewire-0.3-dev_1.4.2-1_amd64.deb` (SHA256
+`6f7f4c555b6ce362ff556e7f063f92e878510564de434d56a0ded73788e83bd1`)
+under `/build/headers`, not to replace Jammy's runtime libraries. The
+validated source URLs were
+`https://deb.debian.org/debian/pool/main/p/pipewire/libspa-0.2-dev_1.4.2-1_amd64.deb`
+and
+`https://deb.debian.org/debian/pool/main/p/pipewire/libpipewire-0.3-dev_1.4.2-1_amd64.deb`;
+verify each downloaded file's SHA before `dpkg-deb -x`. In their
+extracted `.pc` files, set `prefix=/build/headers/usr`; in
+`libpipewire-0.3.pc`, keep `libdir=/usr/lib/x86_64-linux-gnu` for the Jammy
+library. Verify `pkg-config --cflags --libs libpipewire-0.3` includes both
+`/build/headers/usr/include/pipewire-0.3` and
+`/build/headers/usr/include/spa-0.2`, and links `-lpipewire-0.3`.
+
+The successful build invocation from `/build/src` was:
+
+```bash
+RUSTUP_HOME=/build/rustup CARGO_HOME=/build/cargo \
+  CARGO_TARGET_DIR=/build/target TMPDIR=/build/tmp CARGO_BUILD_JOBS=4 \
+  PKG_CONFIG_PATH=/build/headers/usr/lib/x86_64-linux-gnu/pkgconfig \
+  /build/cargo/bin/cargo build -p auv-cli --bin auv --release --locked
+sha256sum /build/target/release/auv
+ldd /build/target/release/auv
+readelf -V /build/target/release/auv
+```
+
+`auv-cli` owns the `auv` binary; `-p auv` is the wrong package. Check that
+`ldd` has no missing libraries and that the maximum `GLIBC_*` requirement
+does not exceed the guest's 2.35. The newer-header/Jammy-library mix is a
+temporary X11 validation workaround, **not** a supported release build or
+ABI policy. `rust:1.95.0-jammy` did not exist, and a build Pod on
+`neko-gpu-1` without an ephemeral-storage request was Evicted during apt
+installation; neither should be treated as an AUV compile failure.
+
+For a current-head run, copy `/build/target/release/auv` out of the task-owned
+build Pod to `/tmp/auv-ubuntu2204` and verify its SHA locally against the
+Pod output before uploading it. The following command is **only** for
+reproducing the older 0.0.27 infrastructure control from the retained
+workspace Pod:
 
 ```bash
 kubectl -n "$OSWORLD_NAMESPACE" exec auv-osworld-x11 -c desktop -- cat /workspace/target-ubuntu2204-v2/release/auv > /tmp/auv-ubuntu2204
 shasum -a 256 /tmp/auv-ubuntu2204
 ```
 
-The digest must match the value in the inventory section. Uploading to the QEMU
-container with `kubectl cp` would not reach the guest. Use the guest setup API:
+The older digest must match the value in the inventory section; a new build
+must match its own recorded digest. Uploading to the QEMU container with
+`kubectl cp` would not reach the guest. Use the guest setup API:
 
 ```bash
 curl --fail-with-body -F 'file_path=/home/user/auv' -F 'file_data=@/tmp/auv-ubuntu2204' http://127.0.0.1:5000/setup/upload
