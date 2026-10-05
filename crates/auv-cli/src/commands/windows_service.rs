@@ -112,29 +112,28 @@ fn validate_with_root(args: &ServeArgs, expected_root: &std::path::Path) -> Resu
     return Err("Windows service requires --store-root at ProgramData\\AUVDeviceEntry and --pairing-store at its pairings.json".into());
   }
 
-  // TODO(windows-service-installed-gate): Protected Windows PairingStore has
-  // native unit coverage; require installed LocalSystem, ACL, and listener
-  // verification before enabling a live Device-entry service.
   let [listener] = args.listeners.as_slice() else {
-    return Err("Windows service requires exactly one explicit http://LOOPBACK_IP:PORT --listen URI".into());
+    return Err("Windows service requires exactly one explicit http://IP:PORT --listen URI".into());
   };
-
-  let address = listener
-    .strip_prefix("http://")
-    .ok_or("Windows service requires an http://LOOPBACK_IP:PORT --listen URI")?
-    .parse::<std::net::SocketAddr>()
-    .map_err(|error| format!("invalid Windows service --listen URI: {error}"))?;
-  // TODO(windows-service-device-router): Keep the privileged service on
-  // loopback until a dedicated Device-only router is reviewed and approved.
-  if !address.ip().is_loopback() || address.port() == 0 {
-    return Err("Windows service --listen must use a loopback IP and nonzero port".into());
-  }
+  validate_listener_uri(listener)?;
 
   if args.discovery_file.is_some() || args.daemon_idle_timeout.is_some() || !args.runner_providers.is_empty() {
     return Err("Windows service does not accept --discovery-file, --daemon-idle-timeout, or --runner-provider".into());
   }
 
   Ok(())
+}
+
+pub(crate) fn validate_listener_uri(listener: &str) -> Result<std::net::SocketAddr, String> {
+  let address = listener
+    .strip_prefix("http://")
+    .ok_or("Windows service requires an http://IP:PORT --listen URI")?
+    .parse::<std::net::SocketAddr>()
+    .map_err(|error| format!("invalid Windows service --listen URI: {error}"))?;
+  if address.port() == 0 {
+    return Err("Windows service --listen must use a nonzero port".into());
+  }
+  Ok(address)
 }
 
 fn service_main(_scm_arguments: Vec<OsString>) {
@@ -337,7 +336,11 @@ mod tests {
     args.listeners.push("http://127.0.0.1:9847".into());
     args.listeners[0] = "http://0.0.0.0:9847".into();
 
-    assert!(validate_with_root(&args, root).unwrap_err().contains("loopback"));
+    assert!(validate_with_root(&args, root).is_ok());
+
+    args.listeners[0] = "http://127.0.0.1:0".into();
+
+    assert!(validate_with_root(&args, root).unwrap_err().contains("nonzero port"));
 
     args.listeners[0] = "http://127.0.0.1:9847".into();
     args.pairing_store = Some(root.join("nested").join("pairings.json"));

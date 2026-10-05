@@ -16,8 +16,10 @@ daemon, then reports `Running`; SCM `Stop` cancels the daemon and reports
 `Stopped` status. Ordinary `auv serve` retains foreground Ctrl-C shutdown.
 The SCM path does not depend on a console stdout stream to report readiness.
 
-The service mode requires one explicit loopback HTTP listener and absolute `--store-root`
-and `--pairing-store` paths. The store root is fixed to the OS ProgramData
+The service mode requires one explicit HTTP IP listener and absolute `--store-root`
+and `--pairing-store` paths. The installer defaults to loopback and may
+explicitly configure a non-loopback address; remote requests remain behind the
+daemon's paired-bearer authentication boundary. The store root is fixed to the OS ProgramData
 folder's `AUVDeviceEntry` leaf, shared with the Windows Device entry storage;
 the pairing path is its `pairings.json` file. The Windows PairingStore creates
 or opens that fixed directory under LocalSystem and verifies its SYSTEM-only
@@ -56,9 +58,11 @@ protected `C:\Program Files\AUV` directory. The service creates
 `O:SYD:P(A;;GA;;;SY)` security descriptor required by `storage_windows`.
 Windows reports the filesystem ACE as `FA` when it is read back; the verifier
 accepts only that corresponding protected SYSTEM-only form.
-Verify the effective ACLs after starting. The service accepts only loopback
-binding for the supervised gate. A dedicated Device-only router and owner
-approval are required before broader network exposure.
+Verify the effective ACLs after starting. The original supervised gate used
+loopback binding. Later owner approval allowed the same paired Device router to
+bind a non-loopback address when the installer receives an explicit `--listen`.
+Windows Firewall policy remains separate and should restrict the trusted source
+network.
 
 ```powershell
 $image = '"C:\Program Files\AUV\auv.exe" serve --windows-service --listen http://127.0.0.1:9847 --store-root "C:\ProgramData\AUVDeviceEntry" --pairing-store "C:\ProgramData\AUVDeviceEntry\pairings.json"'

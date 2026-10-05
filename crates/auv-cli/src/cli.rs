@@ -330,6 +330,17 @@ mod tests {
       let parsed = RootArgs::try_parse_from(["auv", "setup", "windows-helper", command, "--json"]).unwrap();
       assert!(matches!(parsed.command, Some(RootCommand::Setup(_))));
     }
+
+    let parsed = RootArgs::try_parse_from([
+      "auv",
+      "setup",
+      "windows-helper",
+      "install",
+      "--listen",
+      "http://0.0.0.0:9847",
+    ])
+    .unwrap();
+    assert!(matches!(parsed.command, Some(RootCommand::Setup(_))));
   }
 
   #[test]

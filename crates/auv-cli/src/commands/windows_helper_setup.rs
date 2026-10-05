@@ -21,7 +21,6 @@ use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
 const SERVICE_NAME: &str = "AuvDevice";
 const DISPLAY_NAME: &str = "AUV Device Helper";
-const LISTEN_URI: &str = "http://127.0.0.1:9847";
 
 mod embedded {
   include!(concat!(env!("OUT_DIR"), "/embedded_windows_helper.rs"));
@@ -57,7 +56,7 @@ impl Layout {
     }
   }
 
-  fn service_info(&self) -> ServiceInfo {
+  fn service_info(&self, listen_uri: &str) -> ServiceInfo {
     ServiceInfo {
       name: OsString::from(SERVICE_NAME),
       display_name: OsString::from(DISPLAY_NAME),
@@ -71,7 +70,7 @@ impl Layout {
         "serve".into(),
         "--windows-service".into(),
         "--listen".into(),
-        LISTEN_URI.into(),
+        listen_uri.into(),
         "--store-root".into(),
         self.store_root.as_os_str().to_owned(),
         "--pairing-store".into(),
@@ -91,6 +90,7 @@ struct Status {
   service_running: bool,
   auv_installed: bool,
   helper_installed: bool,
+  listen_uri: Option<String>,
   install_directory: String,
   store_root: String,
   bootstrap_token_file: Option<String>,
@@ -104,7 +104,8 @@ pub fn status(json: bool) -> Result<i32, String> {
   Ok(if status.state == "ready" { 0 } else { 1 })
 }
 
-pub fn install(json: bool) -> Result<i32, String> {
+pub fn install(listen_uri: &str, json: bool) -> Result<i32, String> {
+  super::windows_service::validate_listener_uri(listen_uri)?;
   let layout = Layout::resolve()?;
   let source_auv = std::env::current_exe().map_err(|error| format!("failed to locate auv.exe: {error}"))?;
   let helper = embedded::EXECUTABLE
@@ -141,7 +142,7 @@ pub fn install(json: bool) -> Result<i32, String> {
     issue_first_pairing_token(&manager, &layout)?;
     let service = manager
       .create_service(
-        &layout.service_info(),
+        &layout.service_info(listen_uri),
         ServiceAccess::QUERY_STATUS | ServiceAccess::START | ServiceAccess::STOP | ServiceAccess::DELETE | ServiceAccess::CHANGE_CONFIG,
       )
       .map_err(|error| format!("failed to register {SERVICE_NAME}: {error}"))?;
@@ -218,7 +219,8 @@ fn inspect(layout: &Layout) -> Result<Status, String> {
   let service = open_service(&manager, SERVICE_NAME, ServiceAccess::QUERY_STATUS | ServiceAccess::QUERY_CONFIG)?;
   let service_running =
     service.as_ref().and_then(|service| service.query_status().ok()).is_some_and(|status| status.current_state == ServiceState::Running);
-  let service_owned = service.as_ref().is_some_and(|service| require_owned_service(service, layout).is_ok());
+  let listen_uri = service.as_ref().and_then(|service| require_owned_service(service, layout).ok());
+  let service_owned = listen_uri.is_some();
   let service_name = if service.is_some() {
     "installed"
   } else {
@@ -249,6 +251,7 @@ fn inspect(layout: &Layout) -> Result<Status, String> {
     service_running,
     auv_installed,
     helper_installed,
+    listen_uri,
     install_directory: layout.install_dir.display().to_string(),
     store_root: layout.store_root.display().to_string(),
     bootstrap_token_file: regular_file(&layout.bootstrap_token).then(|| layout.bootstrap_token.display().to_string()),
@@ -313,19 +316,19 @@ fn wait_for_bootstrap(service: &windows_service::service::Service, token_file: &
   }
 }
 
-fn require_owned_service(service: &windows_service::service::Service, layout: &Layout) -> Result<(), String> {
+fn require_owned_service(service: &windows_service::service::Service, layout: &Layout) -> Result<String, String> {
   let config = service.query_config().map_err(|error| format!("failed to inspect {SERVICE_NAME}: {error}"))?;
   let command = config.executable_path.to_string_lossy();
-  if !service_command_is_owned(&command, layout)
-    || config.start_type != ServiceStartType::AutoStart
-    || !config.account_name.as_deref().is_some_and(is_local_system_account)
-  {
+  let Some(listener) = owned_service_listener(&command, layout) else {
+    return Err(format!("refusing to manage {SERVICE_NAME}: its executable, arguments, account, or startup type does not match AUV"));
+  };
+  if config.start_type != ServiceStartType::AutoStart || !config.account_name.as_deref().is_some_and(is_local_system_account) {
     return Err(format!("refusing to manage {SERVICE_NAME}: its executable, arguments, account, or startup type does not match AUV"));
   }
-  Ok(())
+  Ok(listener)
 }
 
-fn service_command_is_owned(command: &str, layout: &Layout) -> bool {
+fn owned_service_listener(command: &str, layout: &Layout) -> Option<String> {
   struct Arguments(*mut windows::core::PWSTR);
   impl Drop for Arguments {
     fn drop(&mut self) {
@@ -339,7 +342,7 @@ fn service_command_is_owned(command: &str, layout: &Layout) -> bool {
   // SAFETY: wide is NUL-terminated and count is live for the call.
   let raw = unsafe { CommandLineToArgvW(PCWSTR(wide.as_ptr()), &mut count) };
   if raw.is_null() || count <= 0 {
-    return false;
+    return None;
   }
   let arguments = Arguments(raw);
   let actual = (0..count as usize)
@@ -355,9 +358,11 @@ fn service_command_is_owned(command: &str, layout: &Layout) -> bool {
       OsString::from_wide(unsafe { std::slice::from_raw_parts(pointer.0, length) })
     })
     .collect::<Vec<_>>();
-  let info = layout.service_info();
+  let listener = actual.get(4)?.to_str()?;
+  super::windows_service::validate_listener_uri(listener).ok()?;
+  let info = layout.service_info(listener);
   let expected = std::iter::once(info.executable_path.into_os_string()).chain(info.launch_arguments).collect::<Vec<_>>();
-  actual == expected
+  (actual == expected).then(|| listener.to_string())
 }
 
 fn is_local_system_account(account: &OsStr) -> bool {
@@ -474,6 +479,9 @@ fn print_status(status: &Status, json: bool) -> Result<(), String> {
     println!("service_running\t{}", status.service_running);
     println!("auv_installed\t{}", status.auv_installed);
     println!("helper_installed\t{}", status.helper_installed);
+    if let Some(listener) = &status.listen_uri {
+      println!("listen_uri\t{listener}");
+    }
     println!("install_directory\t{}", status.install_directory);
     println!("store_root\t{}", status.store_root);
     if let Some(path) = &status.bootstrap_token_file {
@@ -493,7 +501,7 @@ mod tests {
   #[test]
   fn service_plan_installs_both_binaries_and_fixed_private_store() {
     let layout = Layout::from_roots(Path::new(r"C:\Program Files"), Path::new(r"C:\ProgramData"));
-    let info = layout.service_info();
+    let info = layout.service_info("http://127.0.0.1:9847");
 
     assert_eq!(layout.auv, PathBuf::from(r"C:\Program Files").join("AUV").join("auv.exe"));
     assert_eq!(layout.helper, PathBuf::from(r"C:\Program Files").join("AUV").join("auv-helper.exe"));
@@ -536,12 +544,12 @@ mod tests {
   }
 
   #[test]
-  fn owned_service_command_rejects_a_different_listener_or_store() {
+  fn owned_service_command_accepts_a_valid_listener_and_rejects_a_different_store() {
     let layout = Layout::from_roots(Path::new(r"C:\Program Files"), Path::new(r"C:\ProgramData"));
     let valid = r#""C:\Program Files\AUV\auv.exe" serve --windows-service --listen http://127.0.0.1:9847 --store-root "C:\ProgramData\AUVDeviceEntry" --pairing-store "C:\ProgramData\AUVDeviceEntry\pairings.json""#;
 
-    assert!(service_command_is_owned(valid, &layout));
-    assert!(!service_command_is_owned(&valid.replace(":9847", ":9848"), &layout));
-    assert!(!service_command_is_owned(&valid.replace("AUVDeviceEntry", "ForeignStore"), &layout));
+    assert_eq!(owned_service_listener(valid, &layout).as_deref(), Some("http://127.0.0.1:9847"));
+    assert_eq!(owned_service_listener(&valid.replace("127.0.0.1", "0.0.0.0"), &layout).as_deref(), Some("http://0.0.0.0:9847"));
+    assert!(owned_service_listener(&valid.replace("AUVDeviceEntry", "ForeignStore"), &layout).is_none());
   }
 }

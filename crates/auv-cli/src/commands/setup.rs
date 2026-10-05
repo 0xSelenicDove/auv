@@ -67,6 +67,10 @@ enum WindowsHelperCommand {
   },
   /// Install auv.exe, extract its embedded helper, and register the LocalSystem service.
   Install {
+    /// HTTP listener registered for the service. Non-loopback listeners require
+    /// paired Device credentials and a separately configured Windows Firewall rule.
+    #[arg(long, value_name = "URI", default_value = "http://127.0.0.1:9847")]
+    listen: String,
     /// Emit a stable machine-readable result after installation.
     #[arg(long)]
     json: bool,
@@ -125,7 +129,7 @@ pub fn run(args: SetupArgs) -> Result<i32, String> {
     match args.command {
       SetupCommand::WindowsHelper(args) => match args.command {
         WindowsHelperCommand::Status { json } => super::windows_helper_setup::status(json),
-        WindowsHelperCommand::Install { json } => super::windows_helper_setup::install(json),
+        WindowsHelperCommand::Install { listen, json } => super::windows_helper_setup::install(&listen, json),
         WindowsHelperCommand::Uninstall { json } => super::windows_helper_setup::uninstall(json),
         WindowsHelperCommand::ClearBootstrapToken => super::windows_helper_setup::clear_bootstrap_token(),
       },
