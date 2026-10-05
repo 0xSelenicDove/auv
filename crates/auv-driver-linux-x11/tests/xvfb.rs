@@ -144,6 +144,27 @@ root.mainloop()
   let hold =
     input.key_down(&InputTarget::Foreground, vec!["Shift".into()], InputPolicy::ForegroundPreferred, Duration::from_secs(1)).unwrap();
   input.key_up(hold.into_id()).unwrap();
+  let control = input
+    .key_down(&InputTarget::Foreground, vec!["ctrl".into()], InputPolicy::ForegroundPreferred, Duration::from_secs(2))
+    .unwrap()
+    .into_id();
+  let shift = input
+    .key_down(&InputTarget::Foreground, vec!["shift".into()], InputPolicy::ForegroundPreferred, Duration::from_secs(2))
+    .unwrap()
+    .into_id();
+  // Both names resolve to the same X keysym; a second press must be refused
+  // before delivery rather than releasing the first owner's modifier.
+  assert!(
+    input.key_down(&InputTarget::Foreground, vec!["control".into()], InputPolicy::ForegroundPreferred, Duration::from_secs(2)).is_err()
+  );
+  input
+    .press_key(KeyPressOptions {
+      key: "p".into(),
+      ..Default::default()
+    })
+    .unwrap();
+  input.key_up(shift).unwrap();
+  input.key_up(control).unwrap();
   input
     .press_key(KeyPressOptions {
       key: "Escape".into(),
@@ -163,6 +184,8 @@ root.mainloop()
         && events.contains("button-up:1\n")
         && events.contains("key-down:Shift_L\n")
         && events.contains("key-up:Shift_L\n")
+        && events.contains("key-down:Control_L\nkey-down:Shift_L\n")
+        && events.contains("key-up:Shift_L\nkey-up:Control_L\n")
     })
   });
 }

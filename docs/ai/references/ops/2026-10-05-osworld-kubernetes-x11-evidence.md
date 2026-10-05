@@ -152,6 +152,43 @@ A temporary in-cluster TCP proxy made the Service reachable to a local
 port-forward. The runtime should also use a startup probe: its readiness briefly
 reported success during guest reboot before the setup API was durably ready.
 
+### V2.1 computer-use capability baseline (2026-10-05)
+
+A new ephemeral overlay of the official V2.1 VM was booted on `liet-gpu-1` with
+`-enable-kvm -cpu host`. Guest-local AUV `0.0.27` used its Unix endpoint;
+`display.list` Run `01a10c92-fc30-741d-b5b0-4a0204439b3e` reported
+`Virtual-1` at 1920x1080. `display.capture` Run
+`01a10c93-1e4b-73c6-a726-ac97cf5270d7` used `xcap.x11` and produced a
+2,226,580-byte PNG (SHA256
+`4be2c20876b52e2da5c6e55ec98b8260ea23374bbd494fa5d61282c92c787282`).
+The screenshot and desktop input came only from AUV. An independent `xev`
+receiver observed these events:
+
+| AUV input | Run | Independent X11 event |
+| --- | --- | --- |
+| move to `(450,300)` | `01a10c93-a37c-70a3-b54f-98f65f6336ee` | `MotionNotify` at the requested root point |
+| middle and right click | `01a10c94-3252-76b7-ae36-d48a8e3f71ab`, `01a10c94-32e5-7448-aca0-33e99093bb8b` | Button-2 and Button-3 press/release pairs |
+| triple click | `01a10c94-33cd-7684-8346-a95e29adcc86` | three Button-1 press/release cycles |
+| scroll X=2, Y=3 | `01a10c94-7a97-7085-9696-fe13b52c92ec` | two Button-7 and three Button-5 cycles |
+| hold Shift for 400 ms | `01a10c94-eb1a-7643-8309-f79f4e6e22cb` | `Shift_L` down/up 402 ms apart |
+| type `AΩ中` | `01a10c95-560d-74f6-83ce-cb64ad26fc47` | `A`, `Greek_OMEGA`, and Unicode `U4E2D` events |
+| press F13 | `01a10c95-aeb6-7754-a506-9bb48e1f9492` | `invalid_input` before any key press; official action list includes F13 |
+
+The `xev` log and capture PNG were not exported from the disposable VM, so
+their hashes cannot be independently recomputed from retained artifacts. The
+Run IDs and event excerpts are the surviving receipt. This baseline does not
+claim a V2.1 task score: the 108 release tasks and assets are gated by dataset
+access, and this run did not provision mocked websites/GitLab or retest remote
+pairing. Cross-call mouse/key ownership, cursor compositing, window/clipboard
+APIs, and unattended agent success were also not exercised here. The test Pod,
+Service, proxy, and local port-forward were removed; image PVCs remain.
+
+The setup server's `/screenshot` took about 6.9 seconds in this run. A probe
+with Kubernetes's default one-second timeout left the Pod NotReady even after
+three consecutive direct screenshot successes. The runbook now gives both
+startup and readiness probes a 15-second timeout; that revised manifest still
+needs its own live readiness check.
+
 ## Official OSWorld V1 task result
 
 The current V1 Ubuntu archive was also extracted to a separate node-local hot
@@ -173,6 +210,66 @@ read by `zipfile`, which validates the member CRC while extracting. Unlike the
 V2 archive, its declared LFS SHA256 was not independently recomputed during
 this run; do not describe the V1 archive digest as live-verified evidence. The
 importer should hash while downloading on the next clean import.
+
+### Small V1 batch-slot pilot (2026-10-05)
+
+The same KVM node was reused for two further V1 task IDs. A fresh QEMU Pod
+recreated the guest overlay between tasks; the source `System.qcow2` on
+`osworld-v1-hot` stayed read-only. A Codex agent interpreted AUV screenshots and
+chose typed AUV input actions. This pilot tested task reset and two applications;
+it was hand-guided, not an unattended benchmark run or a representative sample.
+
+| Task | Final AUV capture Run | Evaluator evidence |
+| --- | --- | --- |
+| GIMP minimum undo steps = 100, `7b7617bd-57cc-468e-9c91-40c4ec2bcb3d` | `01a10b9e-29ea-74c0-bbdc-a786e6143a7e` | retrieved `(undo-levels 100)`; upstream `check_config_status` returned `1.0` |
+| Chrome enable Do Not Track, `030eeff7-b492-4218-b312-701ec99ee0cc` | `01a10c75-bc9f-71f1-a206-3fb80f8b220e` | retrieved Preferences `enable_do_not_track: true`; upstream `get_enable_do_not_track` and `exact_match` returned `1.0` |
+
+The Chrome task was initialized with upstream `launch` steps. The agent's
+navigation, toggle, confirmation, and captures used only the guest-installed
+AUV; no OSWorld action `/execute`, PyAutoGUI input, VNC input, or CUA was used.
+The upstream evaluator functions were extracted from the pinned V1 source for
+this pilot, with retrieved guest files supplied to the getter. The complete
+`DesktopEnv.evaluate()` lifecycle, including task postconfig, was not invoked.
+
+The pilot also exposed two orchestration issues. The retained V1 and V2 hot
+PVCs both store the extracted image as `System.qcow2`; using an archive member
+name as Kubernetes `subPath` created an empty directory and QEMU reported no
+boot disk. A single successful `/screenshot` readiness probe was insufficient
+during the guest's internal reboot. The slot needs several stable API checks
+and retryable uploads. On the next fresh boot, `packagekitd` briefly held the
+apt lock while the Ubuntu-compatible AUV dependencies were being installed.
+
+### V1 computer-use capability baseline (2026-10-05)
+
+A separate official V1 VM booted from the retained read-only `System.qcow2` on
+`liet-gpu-1`. The guest-installed AUV `0.0.27` used its Unix endpoint. An
+independent Tk receiver recorded X11 events; all desktop capture and input
+came from AUV. This is a delivery-contract test, not an OSWorld task score or
+an agent/harness evaluation. The 1920x1080 `xcap.x11` capture Run was
+`01a10c82-50c7-7425-87d0-7ba51c711317` (PNG SHA256
+`a5a5626baa349d08e1642a5306d5053379c29509242853c0e7772c23ef7fc546`).
+The receiver JSONL SHA256 was
+`6005c2e411c51869f7fe6ebc3db2c07e306dd90e27bb2c8c83f67978b00e1f0c`.
+
+| AUV input | Representative Run | Independent receiver observation |
+| --- | --- | --- |
+| move pointer | `01a10c83-61e0-7074-864e-0616bc5036a1` | motion to `(300,300)` |
+| left, right, middle click | `01a10c83-62d1-732c-a091-ebb2452130a8`, `01a10c83-63a2-756f-8e6f-997b286e4dd7`, `01a10c84-5b0d-76c4-8898-7b97bacb9a22` | Button-1, Button-3, Button-2 press/release pairs |
+| double click | `01a10c83-642e-7487-844a-87856f7e4ff8` | two Button-1 cycles and Tk double-click event |
+| sampled drag | `01a10c83-65cc-76ff-afbf-de077e682eb4` | Button-1 down at `(250,400)`, 28 motion samples, up at `(600,400)` |
+| vertical down/up | `01a10c83-683c-77bd-91fe-7606158a0d86`, `01a10c85-9104-7209-bcfd-7f35f3bc2946` | three Button-5 and two Button-4 wheel cycles |
+| horizontal right/left | `01a10c84-5bde-704f-89bf-c3ae732ccab0`, `01a10c85-9225-77a5-9cb3-c33fcc0326dc` | two Shift+Button-5 and two Shift+Button-4 cycles in Tk |
+| ASCII and Unicode text | `01a10c83-6947-751a-a549-85034c359e06`, `01a10c84-5cb7-76f3-b64d-d70ae85ec093` | `AuvV1_abc123`, `é`, and `中` key events |
+| shortcut, single keys, timed hold | `01a10c83-6a7a-7374-94c6-bad77d8bc7c2`, `01a10c85-931b-7019-9e1c-8eed926acb5e`, `01a10c85-9402-74de-99a7-cafdedbc7338`, `01a10c85-94d0-706c-b08d-ed6042eecbf2`, `01a10c83-6c5f-70c4-a2ef-0ef8f24a7e1e` | Ctrl+A modifier sequence; Escape, F5, Left pairs; bounded Shift press/release |
+
+The CLI rejects `input.clickPoint` without `<X> <Y>` and has no separate
+`input.keyDown` command. Two overlapping `input.holdKeys` calls in separate CLI
+processes did generate overlapping Ctrl and Shift events, but this does **not**
+prove that one persistent Runner can hold independently addressable keys across
+calls. The shared `KeyboardHoldController` currently permits one combination
+per Runner process. These are explicit adapter/driver-contract gaps, not failed
+OSWorld tasks. The temporary V1 VM, Service, and proxy were removed; hot and
+cold PVCs were retained.
 
 ### Sampled-drag regression found by the live run
 
@@ -203,12 +300,12 @@ and reuse only environment reset/setup, observation, and evaluation.
 | OSWorld action | AUV route | Current status |
 | --- | --- | --- |
 | screenshot | `display.capture` | live-validated |
-| `MOVE_TO` | `input.moveMouse` | implemented; not exercised in this cluster record separately from drag |
-| `CLICK`, `RIGHT_CLICK`, `DOUBLE_CLICK` | `input.clickPoint` button/count | click live-validated; all buttons/counts covered by driver tests |
+| `MOVE_TO` | `input.moveMouse` | live-validated in V1 and V2.1 |
+| `CLICK`, `RIGHT_CLICK`, `DOUBLE_CLICK` | `input.clickPoint` button/count | left/right/middle/double live-validated in V1; right/middle/triple live-validated in V2.1; coordinate omission unsupported by CLI |
 | `DRAG_TO` | `input.drag` or logical-mouse Runner calls | sampled drag live-validated after the rounding fix |
-| `SCROLL` | `input.scrollPoint` | live-validated |
-| `TYPING` | `input.typeText` | live-validated |
-| `PRESS`, `HOTKEY` | `input.keys` | live-validated for a modifier chord and literal keys |
+| `SCROLL` | `input.scrollPoint` | vertical/horizontal directions live-validated; OSWorld adapter must invert Y |
+| `TYPING` | `input.typeText` | ASCII and Unicode live-validated |
+| `PRESS`, `HOTKEY` | `input.keys` | modifier chord and several keys live-validated; baseline V2.1 binary rejected F13, repaired and live-validated on the direct Xorg fixture afterward |
 | `MOUSE_DOWN`, `MOUSE_UP` | logical-mouse Runner lifecycle | implemented and Xvfb-validated; no one-shot invoke command because cross-call ownership needs a session |
 | `KEY_DOWN`, `KEY_UP` | held-key Runner lifecycle | implemented and Xvfb-validated; the public invoke surface exposes bounded `holdKeys`, not arbitrary cross-process ownership |
 | `WAIT`, `DONE`, `FAIL` | harness lifecycle | no driver operation required |
@@ -216,8 +313,15 @@ and reuse only environment reset/setup, observation, and evaluation.
 
 An adapter is still required because OSWorld's `DRAG_TO` starts at the current
 cursor while `input.drag` names both endpoints, and down/up actions require a
-stable logical input owner across calls. The adapter should be a typed harness
-consumer of the existing Runner APIs, not a parser that executes arbitrary
+stable logical input owner across calls. OSWorld's positive vertical scroll is
+up, whereas AUV's positive Y scroll is down; the adapter must negate that
+axis. OSWorld also permits a click without coordinates at the current cursor
+and accepts floating-point coordinates. AUV now exposes the current pointer
+position and permits independent X11 key holds in one Runner, but the adapter
+must still define coordinate rounding and retain one Runner/session for
+`KEY_DOWN`/`KEY_UP` ownership. These are adapter requirements, not evidence
+that any particular benchmark task failed. The adapter should be a typed
+harness consumer of Driver APIs, not a parser that executes arbitrary
 PyAutoGUI source.
 
 Two observation differences remain explicit:
@@ -227,6 +331,44 @@ Two observation differences remain explicit:
 - X11 window discovery/capture and clipboard paste are unsupported. Visual
   OSWorld agents can use display capture and foreground typing, but a task that
   specifically depends on clipboard semantics needs a separate approved slice.
+
+### Follow-up capability repairs in this PR
+
+The V2.1 baseline reproduced an `F13` parser failure before X11 delivery.
+The X11 key parser now accepts F13–F24 and common OSWorld spellings for Page
+Up/Down, PrintScreen, lock keys, Insert, and Pause/Break. A new build on the
+direct Xorg fixture sent `input.keys f13` as Run
+`01a10cad-9a49-7516-b214-013c575df5e0`; an independent `xev` window received
+F13 keycode 93/keysym `0xffca` press and release. This is a driver-level repair,
+not a new official-VM task score. The baseline official-VM binary predates this
+change; a new Ubuntu 22.04-compatible artifact must be built before claiming
+the same repair inside the V1/V2.1 guest.
+
+The shared keyboard hold controller now admits separate, non-overlapping X11
+native key identities on the same pinned display route, while the other
+platforms keep their single-combination rule. Each hold still has its own
+release ID, cancellation, and deadline; the Runner retains its 30-second
+maximum. Common unit tests, an Xvfb/Tk real-event integration test, and an
+ignored Linux Runner test exercised separate Ctrl/Shift down and up calls,
+duplicate-alias rejection, release-failure recovery, shutdown, and a replacement
+Runner after shutdown. That Runner test also passed against the direct Xorg
+fixture; an independent `xev` receiver saw Ctrl down, Shift down, Shift up,
+Ctrl up. It calls the Runner service methods across separate requests but does
+not yet prove a full remote paired multi-RPC client session. The test-only
+daemon, receiver, and temporary store were removed; the existing paired daemon
+and PVCs remained untouched.
+
+The read-only `input.pointerPosition` command and `GetMousePosition` Runner RPC
+provide the cursor location needed for OSWorld's no-coordinate click and
+current-cursor drag. Against the direct Xorg fixture, a fresh local daemon
+returned `(150,150)` in Run `01a10cc1-4b83-725b-a21a-9caa54618da0`;
+after `input.moveMouse 321 234` (Run
+`01a10cc1-765c-75e7-86f1-d9e4042592d2`), it returned `(321,234)` in Run
+`01a10cc1-9d04-761f-ab3a-d61c778f9cf3`. The existing paired Mac client
+also returned `(321,234)` through the forwarded daemon in Run
+`6672f98c-6eb1-db53-1178-37bbe4bc0344`. This validates the read path in
+both local and paired topologies; it does not make a read-then-click sequence
+atomic or prove an official VM task result.
 
 ## Which OSWorld deployment model fits Kubernetes?
 

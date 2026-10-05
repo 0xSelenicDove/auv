@@ -1107,6 +1107,20 @@ fn permission_status_from_proto(value: i32, field: &'static str) -> Result<auv_d
 }
 
 impl InputClient {
+  /// Observes the OS pointer in logical screen coordinates without delivering input.
+  pub async fn current_position(&self) -> Result<auv_driver::Point, CapabilityError> {
+    let response = proto::input_service_client::InputServiceClient::new(self.runner.transport()?)
+      .get_mouse_position(proto::GetMousePositionRequest {})
+      .await
+      .map_err(capability_status)?
+      .into_inner();
+    let point = required(response.point, "GetMousePosition omitted point")?;
+    if !point.x.is_finite() || !point.y.is_finite() {
+      return Err(CapabilityError::InvalidResponse("GetMousePosition returned non-finite coordinates".into()));
+    }
+    Ok(auv_driver::Point::new(point.x, point.y))
+  }
+
   /// Allocates logical mouse state on this Runner; zero remains the shared mouse.
   pub async fn create_mouse(&self) -> Result<u64, CapabilityError> {
     Ok(

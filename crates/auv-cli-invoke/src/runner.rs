@@ -38,6 +38,7 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
   }
 
   match input.command_id.as_str() {
+    "input.pointerPosition" if input.dry_run => return Ok(crate::InvokeCommandOutput::completed()),
     "input.key" | "input.keys" | "input.pressKeys" | "input.keyboard" | "input.typeText" | "input.pasteText" => {
       let keyboard = crate::commands::input::decode_keyboard_input(&input)
         .map_err(|message| crate::InvokeFailure::new(crate::FailureCode::InvalidInput, message))?;
@@ -68,6 +69,12 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
     .map_err(|error| format!("route core Runner for {command_id} failed: {error}"))?;
 
   let result = match command_id {
+    "input.pointerPosition" => runner
+      .input()
+      .current_position()
+      .await
+      .map_err(|status| format!("InputService/GetMousePosition failed: {status}"))
+      .and_then(crate::commands::input::pointer_position_output),
     "app.activate" => {
       let target = input.application_target()?.expect("validated target").trim();
       runner

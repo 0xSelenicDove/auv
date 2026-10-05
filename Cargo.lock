@@ -731,6 +731,7 @@ dependencies = [
  "enigo",
  "image",
  "xcap",
+ "xkeysym",
 ]
 
 [[package]]

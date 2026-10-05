@@ -5,6 +5,35 @@ use auv_tracing::{Context, MemoryTracingStore, RunId, TraceRecord, configure, di
 use std::sync::Arc;
 
 #[test]
+fn pointer_position_has_no_arguments_and_reports_logical_screen_coordinates() {
+  let registry = crate::default_registry();
+  let command = registry.resolve("input.pointerPosition").expect("pointer-position command");
+  let crate::InvokeCliParse::Invoke { inputs, target, .. } = crate::parse_invoke_args(&["input.pointerPosition".into()]).unwrap() else {
+    panic!("expected pointer-position invocation");
+  };
+  assert!(inputs.is_empty());
+  assert!(target.is_none());
+  let error = command
+    .target
+    .validate(&InvokeCommandInput {
+      command_id: "input.pointerPosition".into(),
+      target: Some(crate::ExecutionTarget::Display {
+        id: "primary".into(),
+      }),
+      inputs: Default::default(),
+      typed_args: None,
+      dry_run: true,
+      cancellation: Default::default(),
+    })
+    .expect_err("pointer observation is global");
+  assert!(error.contains("forbids --target"), "{error}");
+
+  let output = pointer_position_output(auv_driver::Point::new(123.5, 456.25)).expect("typed position result");
+  assert_eq!(output.result(), Some(&serde_json::json!({ "x": 123.5, "y": 456.25 })));
+  assert_eq!(output.report.expect("human report").fields[0].value, "123.5,456.2");
+}
+
+#[test]
 fn scroll_parses_and_validates_screen_wheel_input() {
   let crate::InvokeCommandCliParse::Invoke {
     inputs, typed_args, ..

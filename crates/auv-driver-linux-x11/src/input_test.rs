@@ -130,6 +130,46 @@ fn invalid_keys_and_repetition_are_rejected_as_a_whole() {
 }
 
 #[test]
+fn osworld_function_keys_and_navigation_aliases_keep_physical_identity() {
+  assert_eq!(parse_key("f13").unwrap(), Key::F13);
+  assert_eq!(parse_key("F24").unwrap(), Key::F24);
+  assert_eq!(parse_key("pgup").unwrap(), Key::PageUp);
+  assert_eq!(parse_key("pgdn").unwrap(), Key::PageDown);
+  assert_eq!(
+    parse_keys(&PressKeysOptions {
+      keys: vec![
+        "pageup".into(),
+        "pgup".into(),
+        "pagedown".into(),
+        "pgdn".into()
+      ],
+      ..Default::default()
+    })
+    .unwrap(),
+    [Key::PageUp, Key::PageDown]
+  );
+  assert!(parse_key("f25").is_err());
+}
+
+#[test]
+fn osworld_special_keys_map_to_distinct_x11_keysyms() {
+  for (name, expected) in [
+    ("prtsc", Key::PrintScr),
+    ("printscreen", Key::PrintScr),
+    ("capslock", Key::CapsLock),
+    ("numlock", Key::Numlock),
+    ("scrolllock", Key::ScrollLock),
+    ("insert", Key::Insert),
+    ("ins", Key::Insert),
+    ("pause", Key::Pause),
+    ("break", Key::Break),
+  ] {
+    assert_eq!(parse_key(name).unwrap(), expected, "{name}");
+  }
+  assert!(parse_key("fn").is_err());
+}
+
+#[test]
 fn rejects_lossy_coordinates_and_invalid_text_before_mutation() {
   for point in [
     Point::new(f64::NAN, 0.0),

@@ -546,6 +546,16 @@ fn permission_status_to_proto(status: auv_driver::PermissionStatus) -> macos_pro
 
 #[tonic::async_trait]
 impl InputService for LocalInputService {
+  async fn get_mouse_position(
+    &self,
+    _: Request<proto::GetMousePositionRequest>,
+  ) -> Result<Response<proto::GetMousePositionResponse>, Status> {
+    let point = self.session.input().current_position().map_err(driver_status)?;
+    Ok(Response::new(proto::GetMousePositionResponse {
+      point: Some(raw_screen_point_to_proto(point)),
+    }))
+  }
+
   async fn create_mouse(&self, _: Request<proto::CreateMouseRequest>) -> Result<Response<proto::CreateMouseResponse>, Status> {
     Ok(Response::new(proto::CreateMouseResponse {
       mouse: self.session.input().create_mouse().map_err(driver_status)?,

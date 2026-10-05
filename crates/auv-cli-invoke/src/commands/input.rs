@@ -24,10 +24,49 @@ pub fn group() -> CommandGroup {
     .command(press_keys_named_invoke_command())
     .command(hold_keys_invoke_command())
     .command(input_keyboard_invoke_command())
+    .command(pointer_position_invoke_command())
     .command(move_mouse_invoke_command())
     .command(scroll_point_invoke_command())
     .command(click_point_invoke_command())
     .command(drag_invoke_command())
+}
+
+#[derive(Clone, Debug, Args, serde::Serialize, serde::Deserialize)]
+#[command(after_long_help = "Example:\n  auv invoke input.pointerPosition")]
+struct PointerPositionArgs {}
+
+#[invoke_command(
+  id = "input.pointerPosition",
+  group = "input",
+  description = "Read the OS pointer position in logical screen coordinates without delivering input.",
+  input = PointerPositionArgs,
+)]
+async fn pointer_position(input: InvokeCommandInput, _args: PointerPositionArgs) -> InvokeCommandResult {
+  if input.dry_run {
+    return Ok(InvokeCommandOutput::completed());
+  }
+  #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+  {
+    let session = auv::local::open().map_err(|error| error.to_string())?;
+    pointer_position_output(session.input().current_position().map_err(|error| error.to_string())?)
+  }
+  #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+  {
+    Err("input.pointerPosition is unavailable on this platform".to_string())
+  }
+}
+
+pub fn pointer_position_output(point: auv_driver::Point) -> InvokeCommandResult {
+  if !point.x.is_finite() || !point.y.is_finite() {
+    return Err("input.pointerPosition observed non-finite coordinates".to_string());
+  }
+  Ok(InvokeCommandOutput::from_result(&point)?.with_report(InvokeReport::new(
+    vec![InvokeReportField::new(
+      "Screen point",
+      format!("{:.1},{:.1}", point.x, point.y),
+    )],
+    Vec::new(),
+  )))
 }
 
 #[derive(Clone, Debug, Args, serde::Serialize, serde::Deserialize)]

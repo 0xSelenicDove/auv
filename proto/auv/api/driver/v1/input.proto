@@ -9,6 +9,14 @@ import "auv/api/driver/v1/window.proto";
 import "google/protobuf/duration.proto";
 
 service InputService {
+  // Observes the OS pointer in logical screen coordinates. This does not
+  // create a logical mouse, reserve input, move the pointer, or deliver input.
+  // TODO(pointer-click-atomic): A later click may see a different position;
+  // add an atomic at-pointer action only if a caller needs that guarantee.
+  rpc GetMousePosition(GetMousePositionRequest) returns (GetMousePositionResponse) {
+    option (auv.api.annotations.v1.discoverable) = true;
+    option (auv.api.annotations.v1.effect) = METHOD_EFFECT_READ_ONLY;
+  }
   // NOTICE: Timed hold is a local driver convenience, not an RPC capability.
   // Remote convenience awaits an approved atomic sequence contract; client-side
   // sleep cannot preserve whole-gesture admission and cancellation cleanup.
@@ -107,6 +115,13 @@ service InputService {
     option (auv.api.annotations.v1.discoverable) = true;
     option (auv.api.annotations.v1.effect) = METHOD_EFFECT_INPUT;
   }
+}
+
+message GetMousePositionRequest {}
+
+message GetMousePositionResponse {
+  // OS pointer position in the Device screen's logical coordinate space.
+  ScreenPoint point = 1;
 }
 
 enum InputPolicy {

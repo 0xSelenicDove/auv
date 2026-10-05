@@ -696,6 +696,40 @@ async fn keyboard_hold_rpc_rejects_missing_deadline_before_delivery() {
 }
 
 #[tokio::test]
+#[cfg(target_os = "linux")]
+#[ignore = "requires a live Xvfb display"]
+async fn x11_runner_keeps_disjoint_key_holds_across_rpc_calls() {
+  // ROOT CAUSE:
+  //
+  // If a second OSWorld KEY_DOWN arrived while another key was held, the
+  // process-wide controller rejected it because it owned only one combination.
+  // Before the fix, Ctrl down followed by Shift down failed before delivery.
+  // The fix gives disjoint X11 keys separate release IDs in one Runner.
+  let service = LocalInputService {
+    session: auv_driver::open_local().unwrap(),
+  };
+  let target = proto::InputTarget {
+    recipient: Some(proto::input_target::Recipient::Foreground(true)),
+  };
+  let request = |key: &str| proto::KeyDownRequest {
+    target: Some(target.clone()),
+    keys: vec![key.into()],
+    policy: proto::InputPolicy::ForegroundPreferred as i32,
+    timeout: Some(prost_types::Duration {
+      seconds: 2,
+      nanos: 0,
+    }),
+  };
+  let control = service.key_down(Request::new(request("ctrl"))).await.unwrap().into_inner().hold_id;
+  let shift = service.key_down(Request::new(request("shift"))).await.unwrap().into_inner().hold_id;
+  assert_ne!(control, shift);
+  let duplicate = service.key_down(Request::new(request("control"))).await.unwrap_err();
+  assert_eq!(duplicate.code(), tonic::Code::InvalidArgument);
+  service.key_up(Request::new(proto::KeyUpRequest { hold_id: shift })).await.unwrap();
+  service.key_up(Request::new(proto::KeyUpRequest { hold_id: control })).await.unwrap();
+}
+
+#[tokio::test]
 async fn keyboard_rpc_reports_wire_validation_position_without_delivering_prefix() {
   use prost::Message;
   let service = LocalInputService {

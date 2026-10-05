@@ -43,9 +43,9 @@ The namespace is `auv-x11-hami-test`. The retained volumes are:
 | PVC | Storage | Contents |
 | --- | --- | --- |
 | `osworld-v1-image` | `tns-iscsi` | V1 cold release archive |
-| `osworld-v1-hot` | node-local on `liet-gpu-1` | extracted V1 `Ubuntu.qcow2` |
+| `osworld-v1-hot` | node-local on `liet-gpu-1` | extracted V1 `System.qcow2` |
 | `osworld-v2-image` | `tns-iscsi` | V2.1 cold release archive |
-| `osworld-v2-hot` | node-local on `liet-gpu-1` | extracted V2.1 `osworld-v2-ubuntu-x86.qcow2` |
+| `osworld-v2-hot` | node-local on `liet-gpu-1` | extracted V2.1 `System.qcow2` |
 | `auv-osworld-workspace` | `tns-iscsi` | AUV checkout and validation builds |
 
 The guest-compatible X11-only AUV binary currently lives at
@@ -89,7 +89,7 @@ export OSWORLD_VERSION=v2
 Set the runtime variables:
 
 ```bash
-case "$OSWORLD_VERSION" in v1) export OSWORLD_POD=osworld-v1-runtime OSWORLD_PVC=osworld-v1-hot OSWORLD_QCOW=Ubuntu.qcow2 ;; v2) export OSWORLD_POD=osworld-v2-runtime OSWORLD_PVC=osworld-v2-hot OSWORLD_QCOW=osworld-v2-ubuntu-x86.qcow2 ;; *) echo "OSWORLD_VERSION must be v1 or v2" >&2; exit 2 ;; esac
+case "$OSWORLD_VERSION" in v1) export OSWORLD_POD=osworld-v1-runtime OSWORLD_PVC=osworld-v1-hot OSWORLD_QCOW=System.qcow2 ;; v2) export OSWORLD_POD=osworld-v2-runtime OSWORLD_PVC=osworld-v2-hot OSWORLD_QCOW=System.qcow2 ;; *) echo "OSWORLD_VERSION must be v1 or v2" >&2; exit 2 ;; esac
 export OSWORLD_RUNTIME_IMAGE='happysixd/osworld-docker@sha256:0e6497a9295647cf05bf2b2af522fdd79bdeba2737595259cab310a3bcf6baa9'
 ```
 
@@ -140,10 +140,12 @@ spec:
       startupProbe:
         httpGet: { path: /screenshot, port: setup }
         periodSeconds: 5
+        timeoutSeconds: 15
         failureThreshold: 120
       readinessProbe:
         httpGet: { path: /screenshot, port: setup }
         periodSeconds: 5
+        timeoutSeconds: 15
         failureThreshold: 3
       volumeMounts:
         - name: image
@@ -184,7 +186,10 @@ kubectl -n "$OSWORLD_NAMESPACE" wait --for=condition=Ready "pod/$OSWORLD_POD" --
 kubectl -n "$OSWORLD_NAMESPACE" logs "$OSWORLD_POD" -c qemu --tail=100
 ```
 
-The log should show KVM acceleration. An exit code 88 usually means that the
+`Ready` can briefly turn true before an internal guest reboot. Require several
+successful API checks over at least 15 seconds before uploading files, and
+retry an upload if the connection resets during boot. The log should show KVM
+acceleration. An exit code 88 usually means that the
 container cannot open `/dev/kvm`; check the selected node and the privileged
 security context.
 
@@ -233,15 +238,15 @@ curl --fail --output /tmp/osworld-screenshot.png http://127.0.0.1:5000/screensho
 open http://127.0.0.1:8006/
 ```
 
-The browser URL is the noVNC view. The setup endpoint is ready when the first
-command downloads a non-empty PNG.
+The browser URL is the noVNC view. A single non-empty PNG confirms only a
+momentary API response; allow the guest to finish rebooting before setup.
 
 ## 5. Upload the Ubuntu 22.04 AUV build
 
 Copy the validated binary out of the retained workspace Pod:
 
 ```bash
-kubectl -n "$OSWORLD_NAMESPACE" cp auv-osworld-x11:/workspace/target-ubuntu2204-v2/release/auv /tmp/auv-ubuntu2204 -c desktop
+kubectl -n "$OSWORLD_NAMESPACE" exec auv-osworld-x11 -c desktop -- cat /workspace/target-ubuntu2204-v2/release/auv > /tmp/auv-ubuntu2204
 shasum -a 256 /tmp/auv-ubuntu2204
 ```
 
@@ -257,9 +262,10 @@ curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["/home
 ```
 
 The validation guest also needed `libtesseract4`, `liblept5`, and
-`tesseract-ocr-eng`. Install them only if the AUV process reports missing
-libraries. V1 uses sudo password `password`; V2.1 uses
-`osworld-public-evaluation`.
+`tesseract-ocr-eng`. Install them if `auv --version` reports a missing shared
+library, then recheck the version. V1 uses sudo password `password`; V2.1 uses
+`osworld-public-evaluation`. On a fresh V1 boot, `packagekitd` may briefly
+hold the apt lock; wait and retry instead of killing it.
 
 Choose either section 6A or 6B for an episode. If changing topology without
 recreating the runtime Pod, stop the old guest daemon first so it does not keep
@@ -286,6 +292,7 @@ Use the same wrapper for typed input operations such as:
 
 ```text
 /home/user/auv invoke input.clickPoint X Y --json
+/home/user/auv invoke input.pointerPosition --json
 /home/user/auv invoke input.typeText TEXT --json
 /home/user/auv invoke input.keys control q --json
 /home/user/auv invoke input.scrollPoint X Y DX DY --json
@@ -427,6 +434,7 @@ and official evaluator output for each episode.
 | Pod exits with code 88 | `/dev/kvm`, `liet-gpu-1`, and `privileged: true` |
 | PVC remains Pending | use `nodeSelector`, not `spec.nodeName`, for an unbound `WaitForFirstConsumer` PVC |
 | `/screenshot` briefly succeeds then fails | wait for the startup probe across the guest reboot |
+| screenshot succeeds directly but Pod remains NotReady | `/screenshot` can take several seconds; set probe `timeoutSeconds` above the observed latency (15 seconds in this runbook) |
 | direct Pod port-forward refuses connections | use the Service-backed proxy in section 4 |
 | AUV reports a newer glibc is required | use the Ubuntu 22.04 validation build, not the Debian 13 artifact |
 | remote Device lists but invocation fails | make the Mac and guest AUV versions identical |

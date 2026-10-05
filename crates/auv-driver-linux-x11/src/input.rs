@@ -4,8 +4,8 @@ use crate::{
 };
 use auv_driver_common::{
   Click, ClickModifiers, DisturbanceLevel, DriverError, DriverResult, InputActionResult, InputDeliveryPath, InputPolicy, InputTarget,
-  KeyPressOptions, KeyboardBackend, KeyboardInput, KeyboardInputError, KeyboardInputProgress, Point, PressKeysOptions, Scroll, TextSubmit,
-  TypeTextOptions, input::MouseButton, mouse_input::MouseBackend,
+  KeyPressOptions, KeyboardBackend, KeyboardHoldIdentity, KeyboardInput, KeyboardInputError, KeyboardInputProgress, Point, PressKeysOptions,
+  Scroll, TextSubmit, TypeTextOptions, input::MouseButton, mouse_input::MouseBackend,
 };
 use enigo::{Axis, Button, Coordinate, Direction, Key, Keyboard, Mouse};
 use std::{sync::Arc, time::Duration};
@@ -29,11 +29,16 @@ impl InputApi<'_> {
       keys,
       ..Default::default()
     })?;
+    // Enigo maps Key through this X keysym before choosing an X11 keycode.
+    // The session pins DISPLAY/XAUTHORITY process-wide, so all independent
+    // holds on this controller have one native route. Alias spellings that
+    // resolve to the same keysym conflict before XTEST delivery.
+    let identity = KeyboardHoldIdentity::new("x11-pinned-display", keys.iter().map(|key| format!("{}", xkeysym::Keysym::from(*key).raw())));
     let backend = Arc::new(HeldKeyboardBackend {
       session: self.session.clone(),
       keys,
     });
-    auv_driver_common::keyboard_hold_controller().clone().down(backend, timeout)
+    auv_driver_common::keyboard_hold_controller().clone().down_independent(backend, timeout, identity)
   }
 
   pub fn key_up(&self, hold: auv_driver_common::KeyboardHoldId) -> DriverResult<InputActionResult> {
@@ -523,8 +528,15 @@ fn parse_key(name: &str) -> DriverResult<Key> {
     "down" => Key::DownArrow,
     "home" => Key::Home,
     "end" => Key::End,
-    "pageup" => Key::PageUp,
-    "pagedown" => Key::PageDown,
+    "pageup" | "pgup" => Key::PageUp,
+    "pagedown" | "pgdn" => Key::PageDown,
+    "prtsc" | "prtscr" | "printscreen" | "print" => Key::PrintScr,
+    "capslock" => Key::CapsLock,
+    "numlock" => Key::Numlock,
+    "scrolllock" => Key::ScrollLock,
+    "insert" | "ins" => Key::Insert,
+    "pause" => Key::Pause,
+    "break" => Key::Break,
     "f1" => Key::F1,
     "f2" => Key::F2,
     "f3" => Key::F3,
@@ -537,6 +549,18 @@ fn parse_key(name: &str) -> DriverResult<Key> {
     "f10" => Key::F10,
     "f11" => Key::F11,
     "f12" => Key::F12,
+    "f13" => Key::F13,
+    "f14" => Key::F14,
+    "f15" => Key::F15,
+    "f16" => Key::F16,
+    "f17" => Key::F17,
+    "f18" => Key::F18,
+    "f19" => Key::F19,
+    "f20" => Key::F20,
+    "f21" => Key::F21,
+    "f22" => Key::F22,
+    "f23" => Key::F23,
+    "f24" => Key::F24,
     _ => {
       let mut chars = name.chars();
       match (chars.next(), chars.next()) {
