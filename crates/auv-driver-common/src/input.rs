@@ -445,6 +445,41 @@ pub trait WindowInput {
 
   fn scroll(&self, window: &Window, point: WindowPoint, scroll: Scroll, options: ScrollOptions) -> DriverResult<InputActionResult>;
 
+  /// Logical pixels per native wheel unit. Timed scroll motion quantizes its
+  /// cumulative target in this unit so the delivered total stays exact.
+  fn scroll_quantum(&self) -> f64 {
+    1.0
+  }
+
+  /// Spreads one scroll over time with a timing function. The first non-empty
+  /// sample selects the delivery path; later samples reuse it. `notify`
+  /// receives latest progress after each delivered or skipped sample.
+  fn scroll_motion(
+    &self,
+    window: &Window,
+    point: WindowPoint,
+    motion: &crate::ScrollMotion,
+    options: ScrollOptions,
+    notify: &mut dyn FnMut(crate::ScrollMotionProgress),
+  ) -> DriverResult<crate::ScrollMotionResult> {
+    crate::scroll_motion::run_window_scroll_motion(self, window, point, motion, options, notify)
+  }
+
+  /// Delivers wheel input while the caller steers velocity through `control`,
+  /// until it stops or cancels or the lease expires. The first non-empty
+  /// sample selects the delivery path; later samples reuse it.
+  fn scroll_stream(
+    &self,
+    window: &Window,
+    point: WindowPoint,
+    control: &crate::ScrollStreamControl,
+    stream: crate::ScrollStreamOptions,
+    options: ScrollOptions,
+    notify: &mut dyn FnMut(crate::ScrollStreamProgress),
+  ) -> DriverResult<crate::ScrollStreamResult> {
+    crate::scroll_stream::run_window_scroll_stream(self, window, point, control, stream, options, notify)
+  }
+
   /// Drags along `movement` while holding `button`, under one input admission.
   /// Movement points are screen coordinates, and the adapter sets
   /// `movement.target`. `ForegroundPreferred` foregrounds the window the same

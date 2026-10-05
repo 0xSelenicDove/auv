@@ -157,6 +157,105 @@ impl MouseMotionStream {
   }
 }
 
+/// One event from a timed window scroll.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ScrollMotionEvent {
+  Started {
+    window: auv_driver::Window,
+    point: auv_driver::WindowPoint,
+    planned_sample_count: u64,
+    duration: std::time::Duration,
+  },
+  /// Latest progress; sample indices can skip coalesced overdue samples.
+  Progress {
+    sample_index: u64,
+    scheduled_elapsed: std::time::Duration,
+    /// Logical pixels delivered so far.
+    delivered: auv_driver::Scroll,
+  },
+  Completed {
+    /// Logical pixels delivered (the total quantized to native wheel units).
+    delivered: auv_driver::Scroll,
+    action: auv_driver::InputActionResult,
+  },
+}
+
+pub struct ScrollMotionStream {
+  inner: tonic::Streaming<proto::ScrollWindowPointMotionResponse>,
+}
+
+impl ScrollMotionStream {
+  pub async fn next(&mut self) -> Result<Option<ScrollMotionEvent>, CapabilityError> {
+    self.inner.message().await.map_err(capability_status)?.map(scroll_motion_event_from_proto).transpose()
+  }
+}
+
+/// One event from a live scroll stream.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ScrollStreamEvent {
+  Started {
+    window: auv_driver::Window,
+    point: auv_driver::WindowPoint,
+  },
+  /// Latest progress; intermediate updates can be coalesced.
+  Progress {
+    elapsed: std::time::Duration,
+    delivered: auv_driver::Scroll,
+    velocity: auv_driver::ScrollVelocity,
+  },
+  Completed {
+    delivered: auv_driver::Scroll,
+    /// Absent when nothing was delivered.
+    action: Option<auv_driver::InputActionResult>,
+    reason: auv_driver::ScrollStreamStopReason,
+    elapsed: std::time::Duration,
+  },
+}
+
+/// Caller side of a live scroll stream. Every `set_velocity` renews the lease;
+/// dropping the session disconnects and stops delivery at the next sample.
+pub struct ScrollStreamSession {
+  requests: tokio::sync::mpsc::Sender<proto::StreamScrollRequest>,
+  responses: tonic::Streaming<proto::StreamScrollResponse>,
+}
+
+impl ScrollStreamSession {
+  /// Sets the target velocity in logical px/s (positive = down/right).
+  pub async fn set_velocity(&self, velocity: auv_driver::ScrollVelocity) -> Result<(), CapabilityError> {
+    velocity.validate().map_err(|error| CapabilityError::InvalidArgument(error.to_string()))?;
+    self
+      .send(proto::stream_scroll_request::Event::SetVelocity(proto::StreamScrollSetVelocity {
+        velocity: Some(proto::ScrollVelocity {
+          delta_x_per_second: velocity.delta_x_per_second,
+          delta_y_per_second: velocity.delta_y_per_second,
+        }),
+      }))
+      .await
+  }
+
+  /// Ramps to zero, then completes.
+  pub async fn stop(&self) -> Result<(), CapabilityError> {
+    self.send(proto::stream_scroll_request::Event::Stop(proto::StreamScrollStop {})).await
+  }
+
+  /// Ends delivery at the next sample without ramping.
+  pub async fn cancel(&self) -> Result<(), CapabilityError> {
+    self.send(proto::stream_scroll_request::Event::Cancel(proto::StreamScrollCancel {})).await
+  }
+
+  pub async fn next(&mut self) -> Result<Option<ScrollStreamEvent>, CapabilityError> {
+    self.responses.message().await.map_err(capability_status)?.map(scroll_stream_event_from_proto).transpose()
+  }
+
+  async fn send(&self, event: proto::stream_scroll_request::Event) -> Result<(), CapabilityError> {
+    self
+      .requests
+      .send(proto::StreamScrollRequest { event: Some(event) })
+      .await
+      .map_err(|_| CapabilityError::InvalidResponse("StreamScroll request stream closed".into()))
+  }
+}
+
 pub struct MouseMotionSession {
   requests: tokio::sync::mpsc::Sender<proto::StreamMouseMotionRequest>,
   responses: tonic::Streaming<proto::StreamMouseMotionResponse>,
@@ -716,6 +815,67 @@ impl WindowClient {
       window: window_from_proto(required(response.window, "ClickWindowPoint response omitted Window")?)?,
       point: auv_driver::WindowPoint::new(point.x, point.y),
       action: input_action_result_from_proto(required(response.action, "ClickWindowPoint response omitted InputActionResult")?)?,
+    })
+  }
+
+  /// Spreads one wheel scroll over time with a timing function. The stream
+  /// yields started, progress, and completed events; dropping it cancels the
+  /// remaining samples.
+  pub async fn scroll_motion(
+    &self,
+    point: auv_driver::WindowPoint,
+    motion: auv_driver::ScrollMotion,
+    options: auv_driver::ScrollOptions,
+  ) -> Result<ScrollMotionStream, CapabilityError> {
+    let response = proto::input_service_client::InputServiceClient::new(self.runner.transport()?)
+      .scroll_window_point_motion(proto::ScrollWindowPointMotionRequest {
+        window: Some(self.window_ref.clone()),
+        point: Some(proto::WindowPoint {
+          x: point.point().x,
+          y: point.point().y,
+        }),
+        motion: Some(scroll_motion_to_proto(motion)?),
+        options: Some(scroll_options_to_proto(options)?),
+      })
+      .await
+      .map_err(capability_status)?
+      .into_inner();
+    Ok(ScrollMotionStream { inner: response })
+  }
+
+  /// Opens a live scroll stream at a window-local point. Delivery starts at
+  /// zero velocity; steer it through the returned session.
+  pub async fn scroll_stream(
+    &self,
+    point: auv_driver::WindowPoint,
+    stream: auv_driver::ScrollStreamOptions,
+    options: auv_driver::ScrollOptions,
+  ) -> Result<ScrollStreamSession, CapabilityError> {
+    let (requests, receiver) = tokio::sync::mpsc::channel(4);
+    requests
+      .send(proto::StreamScrollRequest {
+        event: Some(proto::stream_scroll_request::Event::Begin(proto::StreamScrollBegin {
+          window: Some(self.window_ref.clone()),
+          point: Some(proto::WindowPoint {
+            x: point.point().x,
+            y: point.point().y,
+          }),
+          options: Some(scroll_options_to_proto(options)?),
+          sample_rate_hz: stream.sample_rate_hz,
+          max_acceleration: stream.max_acceleration,
+          lease: Some(duration_to_proto(stream.lease)?),
+        })),
+      })
+      .await
+      .map_err(|_| CapabilityError::InvalidResponse("StreamScroll request stream failed to open".into()))?;
+    let responses = proto::input_service_client::InputServiceClient::new(self.runner.transport()?)
+      .stream_scroll(tokio_stream::wrappers::ReceiverStream::new(receiver))
+      .await
+      .map_err(capability_status)?
+      .into_inner();
+    Ok(ScrollStreamSession {
+      requests,
+      responses,
     })
   }
 
@@ -1763,6 +1923,107 @@ fn click_options_to_proto(value: auv_driver::ClickOptions) -> Result<proto::Clic
       auv_driver::WindowClickStrategy::PidTargeted => proto::WindowClickStrategy::PidTargeted,
     } as i32,
   })
+}
+
+fn scroll_motion_to_proto(value: auv_driver::ScrollMotion) -> Result<proto::ScrollMotion, CapabilityError> {
+  let auv_driver::MotionTiming::FixedDuration { duration, function } = value.timing;
+  let function = match function {
+    auv_driver::TimingFunction::Linear => {
+      proto::motion_timing_function::Function::Standard(proto::StandardMotionTimingFunction::Linear as i32)
+    }
+    auv_driver::TimingFunction::EaseInCubic => {
+      proto::motion_timing_function::Function::Standard(proto::StandardMotionTimingFunction::EaseInCubic as i32)
+    }
+    auv_driver::TimingFunction::EaseOutCubic => {
+      proto::motion_timing_function::Function::Standard(proto::StandardMotionTimingFunction::EaseOutCubic as i32)
+    }
+    auv_driver::TimingFunction::EaseInOutCubic => {
+      proto::motion_timing_function::Function::Standard(proto::StandardMotionTimingFunction::EaseInOutCubic as i32)
+    }
+    auv_driver::TimingFunction::CubicBezier { x1, y1, x2, y2 } => {
+      proto::motion_timing_function::Function::CubicBezier(proto::CubicBezierMotionTimingFunction { x1, y1, x2, y2 })
+    }
+  };
+  Ok(proto::ScrollMotion {
+    total: Some(proto::Scroll {
+      delta_x: value.total.delta_x,
+      delta_y: value.total.delta_y,
+    }),
+    timing: Some(proto::scroll_motion::Timing::FixedDuration(proto::FixedDurationMotionTiming {
+      duration: Some(duration_to_proto(duration)?),
+      function: Some(proto::MotionTimingFunction {
+        function: Some(function),
+      }),
+    })),
+    sample_rate_hz: value.sample_rate_hz,
+  })
+}
+
+fn scroll_motion_event_from_proto(value: proto::ScrollWindowPointMotionResponse) -> Result<ScrollMotionEvent, CapabilityError> {
+  use proto::scroll_window_point_motion_response::Event;
+  let scroll = |value: Option<proto::Scroll>, message: &'static str| {
+    required(value, message).map(|scroll| auv_driver::Scroll::new(scroll.delta_x, scroll.delta_y))
+  };
+  match required(value.event, "ScrollWindowPointMotion response omitted event")? {
+    Event::Started(value) => {
+      let point = required(value.point, "scroll motion started event omitted point")?;
+      Ok(ScrollMotionEvent::Started {
+        window: window_from_proto(required(value.window, "scroll motion started event omitted window")?)?,
+        point: auv_driver::WindowPoint::new(point.x, point.y),
+        planned_sample_count: value.planned_sample_count,
+        duration: duration_from_proto(required(value.duration, "scroll motion started event omitted duration")?, "scroll motion duration")?,
+      })
+    }
+    Event::Progress(value) => Ok(ScrollMotionEvent::Progress {
+      sample_index: value.sample_index,
+      scheduled_elapsed: duration_from_proto(
+        required(value.scheduled_elapsed, "scroll motion progress omitted scheduled_elapsed")?,
+        "scroll motion scheduled_elapsed",
+      )?,
+      delivered: scroll(value.delivered, "scroll motion progress omitted delivered")?,
+    }),
+    Event::Completed(value) => Ok(ScrollMotionEvent::Completed {
+      delivered: scroll(value.delivered, "scroll motion completed event omitted delivered")?,
+      action: input_action_result_from_proto(required(value.action, "scroll motion completed event omitted action")?)?,
+    }),
+  }
+}
+
+fn scroll_stream_event_from_proto(value: proto::StreamScrollResponse) -> Result<ScrollStreamEvent, CapabilityError> {
+  use proto::stream_scroll_response::Event;
+  let scroll = |value: Option<proto::Scroll>, message: &'static str| {
+    required(value, message).map(|scroll| auv_driver::Scroll::new(scroll.delta_x, scroll.delta_y))
+  };
+  match required(value.event, "StreamScroll response omitted event")? {
+    Event::Started(value) => {
+      let point = required(value.point, "scroll stream started event omitted point")?;
+      Ok(ScrollStreamEvent::Started {
+        window: window_from_proto(required(value.window, "scroll stream started event omitted window")?)?,
+        point: auv_driver::WindowPoint::new(point.x, point.y),
+      })
+    }
+    Event::Progress(value) => {
+      let velocity = required(value.velocity, "scroll stream progress omitted velocity")?;
+      Ok(ScrollStreamEvent::Progress {
+        elapsed: duration_from_proto(required(value.elapsed, "scroll stream progress omitted elapsed")?, "scroll stream elapsed")?,
+        delivered: scroll(value.delivered, "scroll stream progress omitted delivered")?,
+        velocity: auv_driver::ScrollVelocity::new(velocity.delta_x_per_second, velocity.delta_y_per_second),
+      })
+    }
+    Event::Completed(value) => Ok(ScrollStreamEvent::Completed {
+      delivered: scroll(value.delivered, "scroll stream completed event omitted delivered")?,
+      action: value.action.map(input_action_result_from_proto).transpose()?,
+      reason: match proto::ScrollStreamStopReason::try_from(value.reason) {
+        Ok(proto::ScrollStreamStopReason::Stopped) => auv_driver::ScrollStreamStopReason::Stopped,
+        Ok(proto::ScrollStreamStopReason::Cancelled) => auv_driver::ScrollStreamStopReason::Cancelled,
+        Ok(proto::ScrollStreamStopReason::LeaseExpired) => auv_driver::ScrollStreamStopReason::LeaseExpired,
+        Ok(proto::ScrollStreamStopReason::Unspecified) | Err(_) => {
+          return Err(CapabilityError::InvalidResponse("scroll stream completed with an unknown stop reason".into()));
+        }
+      },
+      elapsed: duration_from_proto(required(value.elapsed, "scroll stream completed event omitted elapsed")?, "scroll stream elapsed")?,
+    }),
+  }
 }
 
 fn scroll_options_to_proto(value: auv_driver::ScrollOptions) -> Result<proto::ScrollOptions, CapabilityError> {

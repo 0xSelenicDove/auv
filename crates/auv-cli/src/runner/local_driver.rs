@@ -703,6 +703,8 @@ impl InputService for LocalInputService {
   }
 
   type MoveMouseStream = Pin<Box<dyn Stream<Item = Result<proto::MoveMouseStreamResponse, Status>> + Send>>;
+  type ScrollWindowPointMotionStream = Pin<Box<dyn Stream<Item = Result<proto::ScrollWindowPointMotionResponse, Status>> + Send>>;
+  type StreamScrollStream = Pin<Box<dyn Stream<Item = Result<proto::StreamScrollResponse, Status>> + Send>>;
   type StreamMouseMotionStream = Pin<Box<dyn Stream<Item = Result<proto::StreamMouseMotionResponse, Status>> + Send>>;
 
   async fn click_window_point(
@@ -748,6 +750,75 @@ impl InputService for LocalInputService {
       }),
       action: Some(input_action_to_proto(action)?),
     }))
+  }
+
+  async fn scroll_window_point_motion(
+    &self,
+    request: Request<proto::ScrollWindowPointMotionRequest>,
+  ) -> Result<Response<Self::ScrollWindowPointMotionStream>, Status> {
+    let request = request.into_inner();
+    let window_ref = request.window.ok_or_else(|| Status::invalid_argument("window is required"))?;
+    let point = window_point_from_proto(request.point.ok_or_else(|| Status::invalid_argument("point is required"))?)?;
+    let motion = scroll_motion_from_proto(request.motion)?;
+    let options = scroll_options_from_proto(request.options)?;
+    let schedule = motion.schedule().map_err(driver_status)?;
+    let window = resolve_window_ref(&self.session, window_ref)?;
+    require_point_inside_window(&window, point)?;
+    let started = proto::ScrollMotionStarted {
+      window: Some(window_to_proto(window.clone())),
+      point: Some(window_point_to_proto(point)),
+      planned_sample_count: schedule.len(),
+      duration: Some(duration_to_proto(schedule.duration())),
+    };
+    let (sender, receiver) = tokio::sync::mpsc::channel(1);
+    let session = self.session.clone();
+    tokio::spawn(async move {
+      let disconnected = sender.clone();
+      let operation = relay_scroll_motion(session, window, point, motion, options, started, sender);
+      tokio::select! {
+        _ = disconnected.closed() => {},
+        _ = operation => {},
+      }
+    });
+    Ok(Response::new(Box::pin(ReceiverStream::new(receiver))))
+  }
+
+  async fn stream_scroll(
+    &self,
+    request: Request<tonic::Streaming<proto::StreamScrollRequest>>,
+  ) -> Result<Response<Self::StreamScrollStream>, Status> {
+    use proto::stream_scroll_request::Event;
+    let mut requests = request.into_inner();
+    let begin = match requests.next().await.transpose()?.and_then(|request| request.event) {
+      Some(Event::Begin(begin)) => begin,
+      _ => return Err(Status::invalid_argument("begin must be the first StreamScroll event")),
+    };
+    let window_ref = begin.window.ok_or_else(|| Status::invalid_argument("begin.window is required"))?;
+    let point = window_point_from_proto(begin.point.ok_or_else(|| Status::invalid_argument("begin.point is required"))?)?;
+    let options = scroll_options_from_proto(begin.options)?;
+    let stream_options = auv_driver::ScrollStreamOptions {
+      sample_rate_hz: begin.sample_rate_hz,
+      max_acceleration: begin.max_acceleration,
+      lease: duration_from_proto(
+        Some(begin.lease.ok_or_else(|| Status::invalid_argument("begin.lease is required"))?),
+        std::time::Duration::ZERO,
+        "begin.lease",
+      )?,
+    };
+    stream_options.validate().map_err(driver_status)?;
+    let window = resolve_window_ref(&self.session, window_ref)?;
+    require_point_inside_window(&window, point)?;
+    let (sender, receiver) = tokio::sync::mpsc::channel(1);
+    let session = self.session.clone();
+    tokio::spawn(async move {
+      let disconnected = sender.clone();
+      let operation = relay_scroll_stream(session, window, point, stream_options, options, requests, sender);
+      tokio::select! {
+        _ = disconnected.closed() => {},
+        _ = operation => {},
+      }
+    });
+    Ok(Response::new(Box::pin(ReceiverStream::new(receiver))))
   }
 
   async fn click_screen_point(
@@ -1100,6 +1171,159 @@ async fn run_mouse_motion<F, Fut>(
   }
 }
 
+/// Streams one timed scroll. Progress is a latest-value mailbox; started and
+/// completed are always delivered. Dropping this future (client disconnect)
+/// aborts the native task, whose cancellation guard stops the next sample.
+async fn relay_scroll_motion(
+  session: auv_driver::LocalDriverSession,
+  window: auv_driver::Window,
+  point: auv_driver::WindowPoint,
+  motion: auv_driver::ScrollMotion,
+  options: auv_driver::ScrollOptions,
+  started: proto::ScrollMotionStarted,
+  sender: tokio::sync::mpsc::Sender<Result<proto::ScrollWindowPointMotionResponse, Status>>,
+) {
+  use proto::scroll_window_point_motion_response::Event;
+  let response = |event| proto::ScrollWindowPointMotionResponse { event: Some(event) };
+  if sender.send(Ok(response(Event::Started(started)))).await.is_err() {
+    return;
+  }
+  let (progress_tx, mut progress_rx) = tokio::sync::watch::channel(None);
+  let mut tasks = tokio::task::JoinSet::new();
+  tasks.spawn(run_input_blocking(move || {
+    session.window().scroll_motion(&window, point, &motion, options, &mut |progress| {
+      progress_tx.send_replace(Some(progress));
+    })
+  }));
+  let mut progress_open = true;
+  loop {
+    tokio::select! {
+      biased;
+      result = tasks.join_next() => {
+        let event = result.expect("one native scroll motion task")
+          .map_err(|error| Status::internal(format!("input task failed: {error}")))
+          .and_then(|result| result)
+          .and_then(|result| Ok(response(Event::Completed(proto::ScrollMotionCompleted {
+            delivered: Some(proto::Scroll { delta_x: result.delivered.delta_x, delta_y: result.delivered.delta_y }),
+            action: Some(input_action_to_proto(result.action)?),
+          }))));
+        let _ = sender.send(event).await;
+        return;
+      }
+      changed = progress_rx.changed(), if progress_open => {
+        if changed.is_err() { progress_open = false; continue; }
+        let progress = *progress_rx.borrow_and_update();
+        if let Some(progress) = progress {
+          let event = response(Event::Progress(proto::ScrollMotionProgress {
+            sample_index: progress.sample_index,
+            scheduled_elapsed: Some(duration_to_proto(progress.scheduled_elapsed)),
+            delivered: Some(proto::Scroll { delta_x: progress.delivered.delta_x, delta_y: progress.delivered.delta_y }),
+          }));
+          if sender.send(Ok(event)).await.is_err() { return; }
+        }
+      }
+    }
+  }
+}
+
+/// Runs one live scroll stream. Caller requests steer the shared control;
+/// a half-closed request stream stops (ramping down), an invalid or failed
+/// request cancels. Dropping this future (client disconnect) aborts the native
+/// task, whose cancellation guard stops the next sample.
+async fn relay_scroll_stream(
+  session: auv_driver::LocalDriverSession,
+  window: auv_driver::Window,
+  point: auv_driver::WindowPoint,
+  stream: auv_driver::ScrollStreamOptions,
+  options: auv_driver::ScrollOptions,
+  mut requests: tonic::Streaming<proto::StreamScrollRequest>,
+  sender: tokio::sync::mpsc::Sender<Result<proto::StreamScrollResponse, Status>>,
+) {
+  use proto::stream_scroll_request::Event as Request;
+  use proto::stream_scroll_response::Event;
+  let response = |event| proto::StreamScrollResponse { event: Some(event) };
+  let started = response(Event::Started(proto::StreamScrollStarted {
+    window: Some(window_to_proto(window.clone())),
+    point: Some(window_point_to_proto(point)),
+  }));
+  if sender.send(Ok(started)).await.is_err() {
+    return;
+  }
+  let control = auv_driver::ScrollStreamControl::new();
+  let native_control = control.clone();
+  let (progress_tx, mut progress_rx) = tokio::sync::watch::channel(None);
+  let mut tasks = tokio::task::JoinSet::new();
+  tasks.spawn(run_input_blocking(move || {
+    session.window().scroll_stream(&window, point, &native_control, stream, options, &mut |progress| {
+      progress_tx.send_replace(Some(progress));
+    })
+  }));
+  let (mut progress_open, mut requests_open) = (true, true);
+  loop {
+    tokio::select! {
+      biased;
+      result = tasks.join_next() => {
+        let event = result.expect("one native scroll stream task")
+          .map_err(|error| Status::internal(format!("input task failed: {error}")))
+          .and_then(|result| result)
+          .and_then(|result| Ok(response(Event::Completed(proto::StreamScrollCompleted {
+            delivered: Some(proto::Scroll { delta_x: result.delivered.delta_x, delta_y: result.delivered.delta_y }),
+            action: result.action.map(input_action_to_proto).transpose()?,
+            reason: scroll_stream_stop_reason_to_proto(result.reason) as i32,
+            elapsed: Some(duration_to_proto(result.elapsed)),
+          }))));
+        let _ = sender.send(event).await;
+        return;
+      }
+      request = requests.next(), if requests_open => {
+        match request.transpose() {
+          Ok(Some(proto::StreamScrollRequest { event: Some(Request::SetVelocity(update)) })) => {
+            let velocity = update.velocity.unwrap_or_default();
+            if let Err(error) = control.set_velocity(auv_driver::ScrollVelocity::new(velocity.delta_x_per_second, velocity.delta_y_per_second)) {
+              control.cancel();
+              let _ = sender.send(Err(driver_status(error))).await;
+              return;
+            }
+          }
+          Ok(Some(proto::StreamScrollRequest { event: Some(Request::Stop(_)) })) => control.stop(),
+          Ok(Some(proto::StreamScrollRequest { event: Some(Request::Cancel(_)) })) => control.cancel(),
+          Ok(Some(_)) => {
+            control.cancel();
+            let _ = sender.send(Err(Status::invalid_argument("StreamScroll accepts begin once, then set_velocity, stop, or cancel"))).await;
+            return;
+          }
+          // Half-close without an explicit stop: finish gracefully.
+          Ok(None) => { control.stop(); requests_open = false; }
+          Err(_) => { control.cancel(); requests_open = false; }
+        }
+      }
+      changed = progress_rx.changed(), if progress_open => {
+        if changed.is_err() { progress_open = false; continue; }
+        let progress = *progress_rx.borrow_and_update();
+        if let Some(progress) = progress {
+          let event = response(Event::Progress(proto::StreamScrollProgress {
+            elapsed: Some(duration_to_proto(progress.elapsed)),
+            delivered: Some(proto::Scroll { delta_x: progress.delivered.delta_x, delta_y: progress.delivered.delta_y }),
+            velocity: Some(proto::ScrollVelocity {
+              delta_x_per_second: progress.velocity.delta_x_per_second,
+              delta_y_per_second: progress.velocity.delta_y_per_second,
+            }),
+          }));
+          if sender.send(Ok(event)).await.is_err() { return; }
+        }
+      }
+    }
+  }
+}
+
+fn scroll_stream_stop_reason_to_proto(reason: auv_driver::ScrollStreamStopReason) -> proto::ScrollStreamStopReason {
+  match reason {
+    auv_driver::ScrollStreamStopReason::Stopped => proto::ScrollStreamStopReason::Stopped,
+    auv_driver::ScrollStreamStopReason::Cancelled => proto::ScrollStreamStopReason::Cancelled,
+    auv_driver::ScrollStreamStopReason::LeaseExpired => proto::ScrollStreamStopReason::LeaseExpired,
+  }
+}
+
 fn move_mouse_stream_event(event: MouseMotionEvent) -> proto::MoveMouseStreamResponse {
   use proto::move_mouse_stream_response::Event;
   proto::MoveMouseStreamResponse {
@@ -1327,6 +1551,49 @@ fn scroll_from_proto(scroll: Option<proto::Scroll>) -> Result<auv_driver::Scroll
     return Err(Status::invalid_argument("scroll requires a non-zero delta_x or delta_y"));
   }
   Ok(auv_driver::Scroll::new(scroll.delta_x, scroll.delta_y))
+}
+
+fn scroll_motion_from_proto(motion: Option<proto::ScrollMotion>) -> Result<auv_driver::ScrollMotion, Status> {
+  let motion = motion.ok_or_else(|| Status::invalid_argument("motion is required"))?;
+  let total = scroll_from_proto(motion.total)?;
+  let timing = match motion.timing {
+    Some(proto::scroll_motion::Timing::FixedDuration(timing)) => auv_driver::MotionTiming::FixedDuration {
+      duration: duration_from_proto(timing.duration, std::time::Duration::ZERO, "motion.fixed_duration.duration")?,
+      function: motion_timing_function_from_proto(timing.function)?,
+    },
+    None => return Err(Status::invalid_argument("motion.timing is required")),
+  };
+  Ok(auv_driver::ScrollMotion {
+    total,
+    timing,
+    sample_rate_hz: motion.sample_rate_hz,
+  })
+}
+
+fn motion_timing_function_from_proto(function: Option<proto::MotionTimingFunction>) -> Result<auv_driver::TimingFunction, Status> {
+  use proto::motion_timing_function::Function;
+  let Some(function) = function.and_then(|function| function.function) else {
+    return Ok(auv_driver::TimingFunction::Linear);
+  };
+  let function = match function {
+    Function::Standard(value) => match proto::StandardMotionTimingFunction::try_from(value) {
+      Ok(proto::StandardMotionTimingFunction::Linear) => auv_driver::TimingFunction::Linear,
+      Ok(proto::StandardMotionTimingFunction::EaseInCubic) => auv_driver::TimingFunction::EaseInCubic,
+      Ok(proto::StandardMotionTimingFunction::EaseOutCubic) => auv_driver::TimingFunction::EaseOutCubic,
+      Ok(proto::StandardMotionTimingFunction::EaseInOutCubic) => auv_driver::TimingFunction::EaseInOutCubic,
+      Ok(proto::StandardMotionTimingFunction::Unspecified) | Err(_) => {
+        return Err(Status::invalid_argument("motion timing function is unknown"));
+      }
+    },
+    Function::CubicBezier(value) => auv_driver::TimingFunction::CubicBezier {
+      x1: value.x1,
+      y1: value.y1,
+      x2: value.x2,
+      y2: value.y2,
+    },
+  };
+  function.validate().map_err(driver_status)?;
+  Ok(function)
 }
 
 fn scroll_options_from_proto(options: Option<proto::ScrollOptions>) -> Result<auv_driver::ScrollOptions, Status> {

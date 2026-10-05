@@ -437,6 +437,16 @@ security epoch** is a separate signed trust level: daemons reject helpers below
 their minimum epoch, which revokes vulnerable builds. Either failure surfaces as
 the `HOST_INCOMPATIBLE` Device entry reason. See
 [helper compatibility and revocation](ai/references/session-api/2026-10-02-macos-helper-protocol-compatibility.md).
+On Windows, the **Helper Host** is the LocalSystem `AuvHelper` service
+(`auv-helper.exe --service`) that `auv setup windows-helper` installs. It owns
+only the privileged effects: physical-console observation, the protected PIN
+vault, and placement of the one-shot `auv-helper.exe` **worker** in the
+selected console session. It has no listener, pairing store, policy, or audit.
+The daemon is an ordinary `auv serve` that runs as the logged-in user and owns
+those. It calls the Helper Host over a machine-local pipe, and the host serves
+an account-scoped request only for the caller's own SID. The daemon lifecycle
+is separate from Helper setup. See
+[Windows Helper and daemon split](ai/references/session-api/2026-10-06-windows-helper-daemon-split.md).
 The target retains a local audit record of each remote entry request with
 the authenticated paired Device ID, selected OS user or login session,
 request time, and typed outcome. Credentials, secret-bearing key events,
@@ -1350,6 +1360,36 @@ and the SDKs; see the
 for per-platform evidence.
 A delivered wheel event is not a scroll: occluded Chromium renderers can accept
 the event without moving, so scroll success still needs observation evidence.
+
+## Scroll Motion
+
+Scroll motion is one scroll total spread over time by a timing function
+(linear, cubic ease-in/out/in-out, or CSS `cubic-bezier`) at a sample rate.
+Each platform quantizes the cumulative target in its native wheel unit:
+
+- macOS: 1 px;
+- Windows: 1/120 notch;
+- Linux uinput: one high-resolution unit;
+- Linux portal: one notch.
+
+So the delivered total is exact, even when one sample is smaller than one
+unit. The first non-empty sample selects the delivery path, and later samples
+reuse it. Progress and completion are delivery evidence only. Applications
+and compositors can still smooth, hold back, or round wheel input, so the
+observed speed curve needs observation. See the
+[scroll motion design](ai/references/driver/2026-10-06-scroll-motion-design.md).
+
+## Scroll Stream
+
+A scroll stream is live wheel scrolling steered by caller velocity updates
+(logical px/s). The driver integrates velocity at a fixed sample rate,
+optionally limits acceleration, and quantizes the cumulative position like
+scroll motion. Every update renews a lease. Without renewal, the stream ramps
+to zero and completes as `lease_expired`. A stop also ramps to zero; a cancel
+ends at the next sample. Caller code (for example a JS generator that observes
+the page) stays client-side, and only velocity data crosses the Runner
+protocol. See the
+[scroll motion design](ai/references/driver/2026-10-06-scroll-motion-design.md).
 
 ## Prepare For Input Options
 

@@ -676,3 +676,86 @@ fn scroll_options_projection_keeps_policy_candidate_order_and_settle() {
   );
   assert_eq!(options.settle.expect("settle").nanos, 120_000_000);
 }
+
+#[test]
+fn scroll_motion_projection_keeps_total_duration_function_and_rate() {
+  let motion = scroll_motion_to_proto(auv_driver::ScrollMotion {
+    total: auv_driver::Scroll::new(-20.0, 480.0),
+    timing: auv_driver::MotionTiming::FixedDuration {
+      duration: std::time::Duration::from_millis(750),
+      function: auv_driver::TimingFunction::CubicBezier {
+        x1: 0.2,
+        y1: 0.8,
+        x2: 0.2,
+        y2: 1.0,
+      },
+    },
+    sample_rate_hz: 90,
+  })
+  .expect("valid motion");
+  assert_eq!(motion.total.unwrap().delta_y, 480.0);
+  assert_eq!(motion.sample_rate_hz, 90);
+  let Some(proto::scroll_motion::Timing::FixedDuration(timing)) = motion.timing else {
+    panic!("fixed duration timing");
+  };
+  assert_eq!(timing.duration.unwrap().nanos, 750_000_000);
+  assert_eq!(
+    timing.function.unwrap().function,
+    Some(proto::motion_timing_function::Function::CubicBezier(proto::CubicBezierMotionTimingFunction {
+      x1: 0.2,
+      y1: 0.8,
+      x2: 0.2,
+      y2: 1.0,
+    }))
+  );
+}
+
+#[test]
+fn scroll_motion_events_require_their_payloads() {
+  let completed = scroll_motion_event_from_proto(proto::ScrollWindowPointMotionResponse {
+    event: Some(proto::scroll_window_point_motion_response::Event::Completed(proto::ScrollMotionCompleted {
+      delivered: Some(proto::Scroll {
+        delta_x: 0.0,
+        delta_y: 300.0,
+      }),
+      action: None,
+    })),
+  })
+  .expect_err("completed without delivery evidence");
+  assert!(matches!(completed, CapabilityError::InvalidResponse(_)));
+}
+
+#[test]
+fn scroll_stream_completion_maps_reason_and_optional_action() {
+  let completed = scroll_stream_event_from_proto(proto::StreamScrollResponse {
+    event: Some(proto::stream_scroll_response::Event::Completed(proto::StreamScrollCompleted {
+      delivered: Some(proto::Scroll::default()),
+      action: None,
+      reason: proto::ScrollStreamStopReason::LeaseExpired as i32,
+      elapsed: Some(prost_types::Duration {
+        seconds: 1,
+        nanos: 0,
+      }),
+    })),
+  })
+  .expect("idle stream completion");
+  assert_eq!(
+    completed,
+    ScrollStreamEvent::Completed {
+      delivered: auv_driver::Scroll::new(0.0, 0.0),
+      action: None,
+      reason: auv_driver::ScrollStreamStopReason::LeaseExpired,
+      elapsed: std::time::Duration::from_secs(1),
+    }
+  );
+  let unknown = scroll_stream_event_from_proto(proto::StreamScrollResponse {
+    event: Some(proto::stream_scroll_response::Event::Completed(proto::StreamScrollCompleted {
+      delivered: Some(proto::Scroll::default()),
+      action: None,
+      reason: proto::ScrollStreamStopReason::Unspecified as i32,
+      elapsed: Some(prost_types::Duration::default()),
+    })),
+  })
+  .expect_err("unspecified reason");
+  assert!(matches!(unknown, CapabilityError::InvalidResponse(_)));
+}
