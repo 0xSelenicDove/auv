@@ -109,8 +109,9 @@ assert!(!delivery.verified); // Inspect a new observation to verify the UI effec
   to bind Ctrl+A to select-all; this is not universal (Tk defaults differ).
 - `input().key_down/key_up/hold_keys`: bounded held combinations using the
   shared reverse-order release controller.
-- `input().scroll_at`: whole wheel detents (positive X right, positive Y down),
-  at most 1024 detents per axis per call. No pixel-scroll conversion is implied.
+- `input().scroll_at`: logical-pixel deltas (positive X right, positive Y down),
+  converted to XTEST wheel detents at 120 pixels per notch with sub-notch
+  remainder carried within one session; at most 1024 detents per axis per call.
 
 The same screen-point wheel operation is available through the Runner
 `ScrollScreenPoint` RPC and `auv invoke input.scrollPoint X Y DX DY`.

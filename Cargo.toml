@@ -20,6 +20,7 @@ members = [
   "crates/auv-tracing-otel",
   "crates/auv-scan",
   "supported/apps/auv-qqmusic",
+  "crates/auv-auto-loop",
   "crates/auv-driver",
   "crates/auv-driver-common",
   "crates/auv-driver-linux",
@@ -49,7 +50,7 @@ default-members = [ "crates/auv-cli" ]
 resolver = "2"
 
 [workspace.package]
-version = "0.0.27"
+version = "0.0.28"
 authors = [ "Moeru AI" ]
 edition = "2024"
 rust-version = "1.91"

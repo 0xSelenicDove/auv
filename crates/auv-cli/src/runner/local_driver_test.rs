@@ -852,6 +852,106 @@ fn click_rpc_decodes_all_buttons_and_rejects_unknown_before_delivery() {
 }
 
 #[test]
+fn scroll_rpc_accepts_only_finite_non_zero_deltas_before_delivery() {
+  let scroll = scroll_from_proto(Some(proto::Scroll {
+    delta_x: -40.0,
+    delta_y: 300.0,
+  }))
+  .unwrap();
+  assert_eq!(scroll, auv_driver::Scroll::new(-40.0, 300.0));
+
+  for malformed in [
+    None,
+    Some(proto::Scroll::default()),
+    Some(proto::Scroll {
+      delta_x: 0.0,
+      delta_y: f64::NAN,
+    }),
+    Some(proto::Scroll {
+      delta_x: f64::INFINITY,
+      delta_y: 10.0,
+    }),
+  ] {
+    assert_eq!(scroll_from_proto(malformed).unwrap_err().code(), tonic::Code::InvalidArgument);
+  }
+}
+
+#[tokio::test]
+async fn screen_scroll_rpc_reuses_window_scroll_validation_before_delivery() {
+  let service = LocalInputService {
+    session: auv_driver::open_local().unwrap(),
+  };
+  let point = proto::ScreenPoint { x: 10.0, y: 20.0 };
+  for scroll in [
+    None,
+    Some(proto::Scroll {
+      delta_x: 0.0,
+      delta_y: 0.0,
+    }),
+    Some(proto::Scroll {
+      delta_x: 0.0,
+      delta_y: f64::NAN,
+    }),
+  ] {
+    let error = service
+      .scroll_screen_point(Request::new(proto::ScrollScreenPointRequest {
+        point: Some(point.clone()),
+        scroll,
+        settle: None,
+      }))
+      .await
+      .unwrap_err();
+    assert_eq!(error.code(), tonic::Code::InvalidArgument);
+  }
+}
+
+#[test]
+fn scroll_rpc_preserves_candidate_order_and_rejects_unknown_or_repeated_candidates() {
+  assert_eq!(scroll_options_from_proto(None).unwrap(), auv_driver::ScrollOptions::default());
+
+  let options = scroll_options_from_proto(Some(proto::ScrollOptions {
+    policy: proto::InputPolicy::BackgroundOnly as i32,
+    delivery_candidates: vec![
+      proto::ScrollDeliveryCandidate::WindowTargetedWheel as i32,
+      proto::ScrollDeliveryCandidate::AxScroll as i32,
+    ],
+    settle: Some(prost_types::Duration {
+      seconds: 0,
+      nanos: 250_000_000,
+    }),
+  }))
+  .unwrap();
+  assert_eq!(options.policy, auv_driver::InputPolicy::BackgroundOnly);
+  assert_eq!(
+    options.delivery_strategy.candidates,
+    vec![
+      auv_driver::ScrollDeliveryCandidate::WindowTargetedWheel,
+      auv_driver::ScrollDeliveryCandidate::AxScroll,
+    ]
+  );
+  assert_eq!(options.settle, std::time::Duration::from_millis(250));
+
+  let empty = scroll_options_from_proto(Some(proto::ScrollOptions::default())).unwrap();
+  assert_eq!(empty.delivery_strategy, auv_driver::ScrollDeliveryStrategy::default());
+
+  for candidates in [
+    vec![proto::ScrollDeliveryCandidate::Unspecified as i32],
+    vec![99],
+    vec![
+      proto::ScrollDeliveryCandidate::ForegroundHid as i32,
+      proto::ScrollDeliveryCandidate::ForegroundHid as i32,
+    ],
+  ] {
+    let error = scroll_options_from_proto(Some(proto::ScrollOptions {
+      delivery_candidates: candidates,
+      ..Default::default()
+    }))
+    .unwrap_err();
+    assert_eq!(error.code(), tonic::Code::InvalidArgument);
+  }
+}
+
+#[test]
 fn malformed_position_is_an_invalid_argument() {
   let error = position_from_proto(proto::Position::default()).unwrap_err();
   assert_eq!(error.code(), tonic::Code::InvalidArgument);

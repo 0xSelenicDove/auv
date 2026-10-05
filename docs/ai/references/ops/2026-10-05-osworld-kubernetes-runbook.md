@@ -271,13 +271,22 @@ Choose either section 6A or 6B for an episode. If changing topology without
 recreating the runtime Pod, stop the old guest daemon first so it does not keep
 the Unix socket or TCP port.
 
+Current `auv serve` uses `--no-register` for a temporary daemon that does not
+replace the user's default local registration; older builds used
+`--no-discovery`. Every HTTP listener, including loopback, now requires a
+paired Device bearer. The explicit Unix listener below is the owner channel
+that can create the first pairing token. The commands in sections 6A/6B were
+originally live-validated with the older binary and must be rerun with a build
+containing this listener-authentication change before claiming a fresh guest
+pass.
+
 ## 6A. Run AUV entirely inside the guest
 
 This is the non-paired topology. Launch the daemon with the guest X11 display
 and a guest Unix socket:
 
 ```bash
-curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["env","DISPLAY=:0","XDG_SESSION_TYPE=x11","/home/user/auv","serve","--listen","unix:///home/user/auv.sock","--store-root","/home/user/.local/share/auv-osworld","--no-discovery"],"shell":false}' http://127.0.0.1:5000/setup/launch
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["env","DISPLAY=:0","XDG_SESSION_TYPE=x11","/home/user/auv","serve","--listen","unix:///home/user/auv.sock","--store-root","/home/user/.local/share/auv-osworld","--no-register"],"shell":false}' http://127.0.0.1:5000/setup/launch
 ```
 
 Use `/setup/execute` only to start the installed AUV client. Screenshot and
@@ -316,7 +325,7 @@ If another process owns 8080, stop that non-benchmark media service first or
 keep using guest-local mode. Then launch AUV:
 
 ```bash
-curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["env","DISPLAY=:0","XDG_SESSION_TYPE=x11","/home/user/auv","serve","--listen","unix:///home/user/auv.sock","--listen","http://0.0.0.0:8080","--pairing-store","/home/user/.local/share/auv-osworld/pairings.json","--store-root","/home/user/.local/share/auv-osworld","--no-discovery"],"shell":false}' http://127.0.0.1:5000/setup/launch
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["env","DISPLAY=:0","XDG_SESSION_TYPE=x11","/home/user/auv","serve","--listen","unix:///home/user/auv.sock","--listen","http://0.0.0.0:8080","--pairing-store","/home/user/.local/share/auv-osworld/pairings.json","--store-root","/home/user/.local/share/auv-osworld","--no-register"],"shell":false}' http://127.0.0.1:5000/setup/launch
 ```
 
 Create the short-lived token through the owner-authorized Unix socket:

@@ -12,6 +12,7 @@ use std::{
 #[derive(Clone, Debug)]
 pub struct X11DriverSession {
   pub(crate) input: Arc<Mutex<Enigo>>,
+  pub(crate) wheel_remainder: Arc<Mutex<(f64, f64)>>,
   environment: Environment,
 }
 
@@ -75,6 +76,7 @@ pub(crate) fn open() -> DriverResult<X11DriverSession> {
   .map_err(backend)?;
   Ok(X11DriverSession {
     input: Arc::new(Mutex::new(input)),
+    wheel_remainder: Arc::new(Mutex::new((0.0, 0.0))),
     environment,
   })
 }

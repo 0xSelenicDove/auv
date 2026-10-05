@@ -34,15 +34,15 @@ fn pointer_position_has_no_arguments_and_reports_logical_screen_coordinates() {
 }
 
 #[test]
-fn scroll_parses_and_validates_screen_wheel_input() {
+fn scroll_parses_and_validates_screen_logical_pixel_input() {
   let crate::InvokeCommandCliParse::Invoke {
     inputs, typed_args, ..
   } = scroll_point_invoke_command()
     .parse_cli_args(&[
       "640".into(),
       "360".into(),
-      "-2".into(),
-      "6".into(),
+      "-240".into(),
+      "120".into(),
       "--settle-ms".into(),
       "25".into(),
     ])
@@ -50,12 +50,21 @@ fn scroll_parses_and_validates_screen_wheel_input() {
   else {
     panic!("expected parsed invocation");
   };
-  assert_eq!(inputs["delta_x"], "-2.0");
-  assert_eq!(inputs["delta_y"], "6.0");
-  let args = typed_args.get::<ScrollArgs>().expect("typed scroll args");
-  assert_eq!(args.validated().unwrap().1, auv_driver::Scroll::new(-2.0, 6.0));
+  assert_eq!(inputs["delta_x"], "-240.0");
+  assert_eq!(inputs["delta_y"], "120.0");
+  let args = typed_args.get::<ScreenScrollArgs>().expect("typed scroll args");
+  assert_eq!(args.validated().unwrap().1, auv_driver::Scroll::new(-240.0, 120.0));
 
-  let invalid: ScrollArgs = serde_json::from_value(serde_json::json!({
+  let zero = ScreenScrollArgs {
+    x: 10.0,
+    y: 20.0,
+    delta_x: 0.0,
+    delta_y: 0.0,
+    settle_ms: 0,
+  };
+  assert_eq!(zero.validated().unwrap_err(), "input.scrollPoint requires at least one non-zero delta");
+
+  let invalid: ScreenScrollArgs = serde_json::from_value(serde_json::json!({
     "x": 10.0,
     "y": 20.0,
     "delta_x": 0.0,
@@ -940,4 +949,118 @@ fn drag_dry_run_reports_resolved_endpoints_without_delivery() {
   assert_eq!(field_value(report, "Verification"), "validation_only");
   assert_eq!(field_value(report, "Screen start"), "110.0,70.0");
   assert_eq!(field_value(report, "Window ID"), "window-1");
+}
+
+fn scroll_input(inputs: &[(&str, &str)], target: Option<crate::ExecutionTarget>) -> InvokeCommandInput {
+  InvokeCommandInput {
+    command_id: "input.scroll".into(),
+    target,
+    inputs: inputs.iter().map(|(key, value)| ((*key).to_string(), (*value).to_string())).collect(),
+    typed_args: None,
+    dry_run: true,
+    cancellation: Default::default(),
+  }
+}
+
+fn scroll_window_target() -> Option<crate::ExecutionTarget> {
+  Some(crate::ExecutionTarget::Window {
+    id: "window-1".to_string(),
+  })
+}
+
+// CLI arguments, MCP inputs, and Runner dispatch must decode to one plan,
+// including negative deltas that look like flags.
+#[test]
+fn scroll_cli_and_protocol_inputs_decode_to_the_same_plan() {
+  let crate::InvokeCommandCliParse::Invoke {
+    inputs, typed_args, ..
+  } = scroll_invoke_command()
+    .parse_cli_args(&[
+      "10".into(),
+      "20".into(),
+      "--dy".into(),
+      "-300".into(),
+      "--dx".into(),
+      "15".into(),
+      "--input-policy".into(),
+      "background-only".into(),
+      "--settle-ms".into(),
+      "50".into(),
+    ])
+    .unwrap()
+  else {
+    panic!("expected parsed invocation");
+  };
+  assert_eq!(inputs["dy"], "-300.0");
+
+  let protocol: ScrollArgs = crate::command::decode_args(&scroll_input(
+    &[
+      ("x", "10"),
+      ("y", "20"),
+      ("dx", "15"),
+      ("dy", "-300"),
+      ("input-policy", "background-only"),
+      ("settle-ms", "50"),
+    ],
+    scroll_window_target(),
+  ))
+  .unwrap();
+  let typed = typed_args.get::<ScrollArgs>().unwrap().clone();
+  for args in [protocol, typed] {
+    let plan = args.plan(scroll_window_target().as_ref()).unwrap();
+    assert_eq!(plan.point, auv_driver::Point::new(10.0, 20.0));
+    assert_eq!(plan.scroll, auv_driver::Scroll::new(15.0, -300.0));
+    assert_eq!(plan.options.policy, auv_driver::InputPolicy::BackgroundOnly);
+    assert_eq!(plan.options.settle, std::time::Duration::from_millis(50));
+    assert_eq!(plan.options.delivery_strategy, auv_driver::ScrollDeliveryStrategy::default());
+  }
+}
+
+#[test]
+fn scroll_plan_rejects_invalid_requests_before_io() {
+  let app = Some(crate::ExecutionTarget::Application {
+    id: "com.example.App".to_string(),
+  });
+  let display = Some(crate::ExecutionTarget::Display {
+    id: "primary".to_string(),
+  });
+  for (inputs, target, expected) in [
+    (vec![("dy", "100")], None, "input.scroll requires --target app: or window:"),
+    (vec![("dy", "100")], display, "input.scroll requires --target app: or window:"),
+    (vec![("dy", "100"), ("title", "Doc")], scroll_window_target(), "input.scroll --title requires --target app:"),
+    (vec![], app.clone(), "input.scroll requires a non-zero --dx or --dy"),
+    (vec![("dx", "NaN")], app.clone(), "input.scroll requires finite --dx and --dy"),
+    (vec![("dy", "10"), ("normalized", "true")], app.clone(), "input.scroll --normalized coordinates must be within 0..=1"),
+    (vec![("dy", "10"), ("settle-ms", "30001")], app, "input.scroll --settle-ms must be within 0..=30000"),
+  ] {
+    let mut all = vec![("x", "40"), ("y", "50")];
+    all.extend(inputs);
+    let input = scroll_input(&all, target);
+    let error = crate::command::decode_args::<ScrollArgs>(&input).unwrap().plan(input.target.as_ref()).unwrap_err();
+    assert_eq!(error, expected);
+  }
+}
+
+#[test]
+fn scroll_plan_resolves_window_point_and_reports_screen_point() {
+  let input = scroll_input(
+    &[
+      ("x", "0.5"),
+      ("y", "0.25"),
+      ("normalized", "true"),
+      ("dy", "120"),
+    ],
+    scroll_window_target(),
+  );
+  let plan = crate::command::decode_args::<ScrollArgs>(&input).unwrap().plan(input.target.as_ref()).unwrap();
+  let mut window = test_window();
+  window.frame.origin = auv_driver::Point::new(100.0, 50.0);
+
+  let point = plan.window_point(&window).unwrap();
+  assert_eq!(point.point(), auv_driver::Point::new(640.0, 180.0));
+  let result = plan.result(window, point);
+  assert_eq!(result.screen_point.point(), auv_driver::Point::new(740.0, 230.0));
+  assert_eq!(result.scroll, auv_driver::Scroll::new(0.0, 120.0));
+  assert_eq!(result.policy, auv_driver::InputPolicy::BackgroundPreferred);
+  assert!(result.action.is_none());
 }

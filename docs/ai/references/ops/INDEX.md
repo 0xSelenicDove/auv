@@ -2,7 +2,7 @@
 
 Setup, tooling, feature gates, cross-cutting notes
 
-Count: **28**
+Count: **29**
 
 - [`2026-05-12-setup.md`](2026-05-12-setup.md)
 - [`2026-05-13-airi-desktop-reuse.md`](2026-05-13-airi-desktop-reuse.md)
@@ -32,6 +32,7 @@ Count: **28**
 - [`2026-09-23-crates-io-publication-reference.md`](2026-09-23-crates-io-publication-reference.md)
 - [`2026-10-05-osworld-kubernetes-x11-evidence.md`](2026-10-05-osworld-kubernetes-x11-evidence.md): Live paired and shared-socket X11 evidence, OSWorld action mapping, direct QEMU Pod design, and KubeVirt/CDI decision boundary.
 - [`2026-10-05-osworld-kubernetes-runbook.md`](2026-10-05-osworld-kubernetes-runbook.md): Operator runbook for booting retained OSWorld V1/V2.1 qcow2 images on ihome, reaching the guest, installing AUV, and exercising guest-local or paired control.
+- [`2026-10-06-osworld-auv-infrastructure-plan.md`](2026-10-06-osworld-auv-infrastructure-plan.md): Ordered TODO and acceptance gates for aligning the X11 PR, mapping OSWorld actions, revalidating official guests, batching tasks, and evaluating an agent.
 
 ## Related
 

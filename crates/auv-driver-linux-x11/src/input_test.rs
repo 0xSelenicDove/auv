@@ -216,6 +216,22 @@ fn sampled_motion_rounds_subpixel_path_points_to_x11_root_pixels() {
 }
 
 #[test]
+fn logical_scroll_pixels_accumulate_to_x11_wheel_detents() {
+  // ROOT CAUSE:
+  //
+  // Before alignment with the shared Scroll contract, X11 treated deltas as
+  // whole detents while the other Linux routes treated them as logical pixels.
+  // This conversion preserves the common sign and carries a sub-notch amount
+  // across calls in the same session.
+  assert_eq!(wheel_notches((0.0, 0.0), Scroll::new(120.0, -240.0)).unwrap(), ((1, -2), (0.0, 0.0)));
+  let (notches, remainder) = wheel_notches((0.0, 0.0), Scroll::new(0.0, 60.0)).unwrap();
+  assert_eq!(notches, (0, 0));
+  assert_eq!(wheel_notches(remainder, Scroll::new(0.0, 60.0)).unwrap(), ((0, 1), (0.0, 0.0)));
+  assert!(wheel_notches((0.0, 0.0), Scroll::new(f64::NAN, 1.0)).is_err());
+  assert!(wheel_notches((0.0, 0.0), Scroll::new(0.0, 0.0)).is_err());
+}
+
+#[test]
 fn delivery_does_not_claim_semantic_success_or_clipboard_changes() {
   let result = delivered(true);
   assert!(!result.verified);

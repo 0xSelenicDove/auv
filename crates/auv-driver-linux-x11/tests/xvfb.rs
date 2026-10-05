@@ -59,6 +59,13 @@ def select_all(event):
 entry.bind('<Control-a>', select_all)
 canvas = tk.Canvas(root, background='#ff0000', highlightthickness=0)
 canvas.place(x=200, y=150, width=100, height=100)
+listbox = tk.Listbox(root)
+listbox.place(x=400, y=300, width=200, height=200)
+for i in range(100):
+    listbox.insert(tk.END, 'item '+str(i))
+def record_scroll(event):
+    root.after(50, lambda: (p/'scroll_position').write_text(str(listbox.yview()[0])))
+listbox.bind('<Button-5>', record_scroll, add='+')
 def submit(event):
     (p/'text').write_text(entry.get())
     canvas.configure(background='#0000ff')
@@ -126,7 +133,13 @@ root.mainloop()
   assert_eq!(fs::read_to_string(fixture.directory.join("text")).unwrap(), "AUV Ω");
   wait_for(|| session.display().capture(CaptureOptions::default()).unwrap().capture.image.get_pixel(220, 170).0 == [0, 0, 255, 255]);
   input.click_button_at(Point::new(450.0, 450.0), MouseButton::Right, Click::Single, ClickModifiers::default()).unwrap();
-  input.scroll_at(Point::new(450.0, 450.0), Scroll::new(1.0, 1.0), Duration::ZERO).unwrap();
+  input.scroll_at(Point::new(450.0, 450.0), Scroll::new(120.0, 120.0), Duration::ZERO).unwrap();
+  wait_for(|| {
+    fs::read_to_string(fixture.directory.join("scroll_position"))
+      .ok()
+      .and_then(|position| position.parse::<f64>().ok())
+      .is_some_and(|position| position > 0.0)
+  });
   input.drag(Point::new(450.0, 450.0), Point::new(500.0, 500.0), MouseButton::Left).unwrap();
   assert_eq!(input.current_position().unwrap(), Point::new(500.0, 500.0));
   let (point, _) = input.move_mouse(MoveMouseRequest::direct(Point::new(520.0, 520.0)), |_| true).unwrap();

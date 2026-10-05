@@ -214,25 +214,29 @@ impl InputApi<'_> {
     with_button(&mut *input, mouse_button(button), |input| input.move_mouse(end_x, end_y, Coordinate::Abs).map_err(backend))?;
     Ok(delivered(true))
   }
-  /// Scrolls whole wheel detents: positive X is right, positive Y is down.
-  /// Fractional/pixel scrolling is unsupported; each axis is limited to 1024 detents.
+  /// Converts logical pixels to whole XTEST wheel detents, carrying sub-notch
+  /// remainder across calls on clones of this session.
   pub fn scroll_at(&self, point: Point, scroll: Scroll, settle: Duration) -> DriverResult<InputActionResult> {
     let (x, y) = coordinates(point)?;
-    let dx = integral(scroll.delta_x)?;
-    let dy = integral(scroll.delta_y)?;
+    let mut input = self.session.lock_input()?;
+    let mut remainder = self.session.wheel_remainder.lock().map_err(|_| backend("X11 wheel remainder mutex poisoned"))?;
+    let ((dx, dy), next_remainder) = wheel_notches(*remainder, scroll)?;
     // Enigo expands detents into individual XTEST events and calls i32::abs.
     // Bound work before moving, including rejecting i32::MIN overflow.
     if dx.unsigned_abs() > 1024 || dy.unsigned_abs() > 1024 {
       return Err(invalid("scroll is limited to 1024 wheel detents per axis"));
     }
-    let mut input = self.session.lock_input()?;
     input.move_mouse(x, y, Coordinate::Abs).map_err(backend)?;
+    // NOTICE(x11-partial-wheel): XTEST sends one button click per detent and
+    // each axis separately. A later failure can leave earlier wheel events
+    // delivered; do not infer rollback or retry this operation automatically.
     if dx != 0 {
       input.scroll(dx, Axis::Horizontal).map_err(backend)?;
     }
     if dy != 0 {
       input.scroll(dy, Axis::Vertical).map_err(backend)?;
     }
+    *remainder = next_remainder;
     std::thread::sleep(settle);
     Ok(delivered(true))
   }
@@ -441,9 +445,26 @@ fn validate_foreground(target: &InputTarget, policy: InputPolicy, unsupported: &
 
 fn integral(value: f64) -> DriverResult<i32> {
   if !value.is_finite() || value.fract() != 0.0 || value < f64::from(i32::MIN) || value > f64::from(i32::MAX) {
-    return Err(invalid("X11 input requires finite integral coordinates or wheel detents"));
+    return Err(invalid("X11 input requires finite integral coordinates"));
   }
   Ok(value as i32)
+}
+
+// NOTICE(x11-wheel-unit): XTEST exposes discrete wheel buttons, not pixel
+// motion. Match the current Linux driver conversion (120 logical px/notch)
+// until a receiver test demonstrates a different X11 application scaling.
+// TODO(x11-hi-res-wheel): sub-notch deltas persist only in one X11 session;
+// add a pixel-precise path if an X11 consumer requires exact small deltas.
+fn wheel_notches(remainder: (f64, f64), scroll: Scroll) -> DriverResult<((i32, i32), (f64, f64))> {
+  if !scroll.delta_x.is_finite() || !scroll.delta_y.is_finite() || (scroll.delta_x == 0.0 && scroll.delta_y == 0.0) {
+    return Err(invalid("X11 scroll requires finite, non-zero logical-pixel deltas"));
+  }
+  let x = remainder.0 + scroll.delta_x / 120.0;
+  let y = remainder.1 + scroll.delta_y / 120.0;
+  if x.abs() > f64::from(i32::MAX) || y.abs() > f64::from(i32::MAX) {
+    return Err(invalid("X11 scroll exceeds the wheel notch range"));
+  }
+  Ok(((x.trunc() as i32, y.trunc() as i32), (x.fract(), y.fract())))
 }
 fn coordinates(point: Point) -> DriverResult<(i32, i32)> {
   let x = integral(point.x)?;
