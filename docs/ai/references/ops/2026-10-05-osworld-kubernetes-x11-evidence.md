@@ -15,16 +15,19 @@ topologies:
 
 Both paths captured the 1920x1080 XFCE desktop through `xcap.x11` and delivered
 click, keyboard, wheel, and sampled drag events to an independent Tk receiver.
-This is live driver and transport evidence, not a completed OSWorld benchmark
-task. Full OSWorld and OSWorld-V2 evaluation additionally require their pinned
-desktop images, setup/evaluator services, task assets, websites, reset policy,
-and an AUV action adapter.
+The official KVM-backed OSWorld V1 and OSWorld-V2.1 images then each completed
+task `7767eef2-56a3-4cea-8c9f-48c070c7d65b` with an upstream evaluator score of
+`1.0`; V2 completed it once through each requested topology from independent
+ephemeral overlays. This is one real benchmark task, not a claim that the full
+suite passes. Full-suite evaluation additionally requires every task asset,
+the V2 mocked websites and GitLab, reset scheduling, and a typed AUV action
+adapter.
 
 The recommended progression is:
 
 1. Keep the current direct Xorg Pod as the fast AUV contract fixture.
-2. Run the official OSWorld QEMU runtime directly as a Kubernetes Pod on
-   `liet-gpu-1`, mounting its qcow2 from a PVC and `/dev/kvm` from the host.
+2. Use the now-validated direct QEMU Pod on `liet-gpu-1` for the first task
+   subset, with a cold archive PVC, node-local hot qcow2, and `/dev/kvm`.
 3. Install KubeVirt plus CDI only when VM-native import, snapshots, cloning,
    or declarative VM lifecycle justify the extra controllers.
 
@@ -106,6 +109,67 @@ This topology does not cross a VM boundary. A Kubernetes sidecar cannot share
 the X11 socket inside a QEMU or KubeVirt guest. For an official OSWorld VM, the
 equivalent non-paired topology must run both the AUV daemon and the harness
 client inside the guest, sharing a guest Unix socket and guest X11 socket.
+
+## Official OSWorld-V2.1 task result
+
+The pinned V2.1 Ubuntu qcow2 and runtime image were then exercised on
+`liet-gpu-1`. The release archive matched SHA256
+`14b08aa7ba6c023ecb91d46de8df5de32af4d1d6bd75ea925519caf9677fc8b3`.
+The running QEMU command included `accel=kvm`, `-enable-kvm`, and `-cpu host`.
+The guest reported Ubuntu 22.04.3, Xorg display `:0`, and a 1920x1080
+`Virtual-1` display to the installed AUV `0.0.27`.
+
+Task `7767eef2-56a3-4cea-8c9f-48c070c7d65b` asks the harness to change GIMP's
+theme from Dark to Light. It was run twice from a fresh ephemeral qcow2 overlay:
+
+| Topology | Final capture Run | PNG SHA256 | Official evaluator |
+| --- | --- | --- | --- |
+| guest-local installed client without pairing | `01a10935-d0b2-76fc-b6f7-0c7107ab8434` | `bab1f60253408090fdb4c8caf8ddb4edd8fe0ff6c788b1cb7cafd35443317bf9` | `1.0` |
+| paired Mac client to guest Device `a149adece47f` | `9c9ff484-d588-7355-cc3b-42d9fd68a94a` | `3e9d922625cb80f804ee85453444aff31e104aa2b2acf8cb2219709880dfe440` | `1.0` |
+
+The guest-local socket topology was independently exercised with
+`AUV_ENDPOINT=unix:///home/user/auv.sock` by Run
+`01a10937-1ae6-7147-b15e-d1793dcf585b`. For each task run, OSWorld's setup API
+only launched GIMP and installed or retrieved harness material. AUV performed
+every screenshot, click, and `Control+Q` input. After GIMP persisted its state,
+the exact upstream `check_config_status` function evaluated the retrieved
+`gimprc`; both runs contained `(theme "Light")` and scored `1.0`.
+
+The initial direct-Pod manifest failed with qemu-docker exit code 88 even though
+`/dev/kvm` was mounted: a plain hostPath does not grant the container device
+cgroup access. The validation Pod required `privileged: true`. A production
+direct-Pod design should use a KVM device plugin or equivalent constrained
+device allocation; KubeVirt's handlers already own this host-device boundary.
+
+qemu-docker also forwards guest ports through tap/iptables for traffic sent to
+the Pod IP; it does not bind the corresponding ports on the container loopback
+interface. Kubernetes Services and kubelet probes worked, while direct
+`kubectl port-forward` failed because it connects to container `127.0.0.1`.
+A temporary in-cluster TCP proxy made the Service reachable to a local
+port-forward. The runtime should also use a startup probe: its readiness briefly
+reported success during guest reboot before the setup API was durably ready.
+
+## Official OSWorld V1 task result
+
+The current V1 Ubuntu archive was also extracted to a separate node-local hot
+PVC and booted with KVM. The unpinned `happysixd/osworld-docker` tag resolved at
+run time to
+`docker.io/happysixd/osworld-docker@sha256:0e6497a9295647cf05bf2b2af522fdd79bdeba2737595259cab310a3bcf6baa9`,
+the same image digest pinned by V2.1. The extracted V1 qcow2 was
+24,460,197,888 bytes.
+
+The same GIMP task was then executed through the guest-local AUV. Its final
+capture Run was `01a10958-6583-719b-8792-4c0416275c64`, with PNG SHA256
+`2e3c93bcd643f184c9f1f25718a163b710e090be7c19fc1b955f6fffb6002cb9`.
+After AUV delivered `Control+Q`, the V1 repository's own
+`check_config_status` evaluated the retrieved `(theme "Light")` setting as
+`1.0`.
+
+The V1 archive was checked against the 12,273,896,463-byte LFS size and fully
+read by `zipfile`, which validates the member CRC while extracting. Unlike the
+V2 archive, its declared LFS SHA256 was not independently recomputed during
+this run; do not describe the V1 archive digest as live-verified evidence. The
+importer should hash while downloading on the next clean import.
 
 ### Sampled-drag regression found by the live run
 
@@ -201,12 +265,43 @@ LFS pointer observed for this validation fixes the downloaded input at
 Record the resolved container image ID as part of every V1 run because the
 upstream provider does not do so.
 
+The released Linux binary built on Debian 13 was not suitable for the Ubuntu
+22.04 guest because its glibc baseline was newer. A guest-compatible validation
+binary was therefore linked against Jammy libraries and identified by SHA256
+`7bc1f4256fa903d1bb660f73901d34c8aa2c0c85ed948473b9f8809b049cdc26`.
+Jammy's packaged PipeWire `0.3.48` headers are too old for the workspace's
+current `libspa` dependency, so this X11-only validation build used newer
+PipeWire/SPA headers while retaining Jammy runtime libraries. This is an
+isolated validation workaround, not evidence that the normal Linux release
+artifact supports Ubuntu 22.04. A distributable artifact needs an explicit
+minimum-glibc and optional-backend build policy.
+
 Use a large RWO PVC for the archive and extracted qcow2. Keep the qcow2 on the
 PVC, not container overlay: an earlier desktop Pod was evicted after consuming
 about 21 GiB of ephemeral storage. The same rule applies to Cargo targets,
 benchmark assets, browser profiles, and run evidence. Do not synchronously
 write UI receiver state to remote iSCSI from an event callback; the fixture
 became visibly unresponsive until its hot state moved to `emptyDir`.
+
+Import also exposed a storage-throughput constraint. A single sequential
+download was faster than reading the completed archive back from `tns-iscsi`
+for SHA256 verification, and concurrent V1/V2 verification approximately
+halved each reader's throughput. Importers should be serialized per storage
+backend, and a production importer should calculate the digest while streaming
+the download instead of performing a second full remote-volume read. Replacing
+an importer Pod preserved partial bytes on its PVC, but detach/remount took
+several minutes; retry policy should therefore live inside the importer rather
+than rely on Pod churn.
+
+For this cluster, separate cold and hot image tiers. Keep the immutable release
+archive on `tns-iscsi` (digest-verified before production use), but extract the
+runtime qcow2 to a `local-path` PVC bound to the KVM node. The V2 archive
+contains an almost uncompressed 14,891,810,816-byte qcow2, so extracting it
+back onto the same iSCSI volume performs another complete remote read and write
+without reducing the payload. A node-local hot PVC avoids carrying that latency
+into QEMU reads and episode startup. It is deliberately node-affine and not
+highly available; the cold archive remains the recovery source and must be
+digest-verified before production use.
 
 OSWorld-V2 also requires self-hosted mocked websites and GitLab for the task
 families that refer to them. A booted desktop and working AUV loop are necessary
@@ -289,6 +384,23 @@ the separate semantic authority.
 9. Run a small task subset before provisioning mocked websites and GitLab.
 10. Add KubeVirt/CDI only if snapshot/reset throughput or VM lifecycle is the
    measured bottleneck.
+
+## Cluster state after validation
+
+The disposable V1/V2 QEMU runtime Pods, TCP proxy, and Services were deleted
+after evidence capture. The fast `auv-osworld-x11` fixture remains running on
+`neko-gpu-1`. Four image PVCs were retained for reviewer reruns:
+
+| PVC | Class | Capacity | Purpose |
+| --- | --- | --- | --- |
+| `osworld-v1-image` | `tns-iscsi` | 64 GiB | V1 cold release archive |
+| `osworld-v1-hot` | `local-path` | 32 GiB | V1 node-local qcow2 on `liet-gpu-1` |
+| `osworld-v2-image` | `tns-iscsi` | 80 GiB | V2.1 cold release archive |
+| `osworld-v2-hot` | `local-path` | 32 GiB | V2.1 node-local qcow2 on `liet-gpu-1` |
+
+Deleting a `local-path` PVC deletes its only hot copy. The immutable cold
+archive is the recovery source, so remove hot PVCs only when the rerun latency
+is acceptable.
 
 ## Sources
 
