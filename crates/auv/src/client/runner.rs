@@ -1384,6 +1384,51 @@ impl InputClient {
       .map(|actions| actions.map(|mut actions| actions.remove(0)))
   }
 
+  /// Presses a bounded key combination until `key_up` or the Runner's release
+  /// deadline. The returned ID belongs to this Runner and must be released on
+  /// the same route; dropping it does not send a release request.
+  pub async fn key_down(
+    &self,
+    target: &auv_driver::InputTarget,
+    keys: Vec<String>,
+    policy: auv_driver::InputPolicy,
+    timeout: std::time::Duration,
+  ) -> Result<(auv_driver::KeyboardHoldId, auv_driver::InputActionResult), CapabilityError> {
+    if timeout.is_zero() || timeout > std::time::Duration::from_secs(30) {
+      return Err(CapabilityError::InvalidArgument("keyboard hold timeout must be in (0, 30s]".into()));
+    }
+
+    let response = proto::input_service_client::InputServiceClient::new(self.runner.transport()?)
+      .key_down(proto::KeyDownRequest {
+        target: Some(input_target_to_proto(target)),
+        keys,
+        policy: input_policy_to_proto(policy) as i32,
+        timeout: Some(duration_to_proto(timeout)?),
+      })
+      .await
+      .map_err(capability_status)?
+      .into_inner();
+    if response.hold_id == 0 {
+      return Err(CapabilityError::InvalidResponse("KeyDown returned zero hold ID".into()));
+    }
+    let action = input_action_result_from_proto(required(response.action, "KeyDown response omitted InputActionResult")?)?;
+    Ok((response.hold_id, action))
+  }
+
+  /// Releases one key hold on this Runner. A timed-out, already released hold
+  /// may return a no-op action from the Runner.
+  pub async fn key_up(&self, hold_id: auv_driver::KeyboardHoldId) -> Result<auv_driver::InputActionResult, CapabilityError> {
+    if hold_id == 0 {
+      return Err(CapabilityError::InvalidArgument("keyboard hold ID must be nonzero".into()));
+    }
+    let response = proto::input_service_client::InputServiceClient::new(self.runner.transport()?)
+      .key_up(proto::KeyUpRequest { hold_id })
+      .await
+      .map_err(capability_status)?
+      .into_inner();
+    input_action_result_from_proto(required(response.action, "KeyUp response omitted InputActionResult")?)
+  }
+
   /// Hold one key combination for a bounded duration and report its release.
   pub async fn hold_keys(
     &self,

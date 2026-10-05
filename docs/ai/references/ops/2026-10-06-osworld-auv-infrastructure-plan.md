@@ -80,12 +80,31 @@ step units to AUV logical pixels. Keep V2 `EXECUTE` in the benchmark control
 plane; do not expose arbitrary shell execution as AUV GUI input. Assert the
 observable AUV calls and native receiver state for each action family, plus
 error/cleanup behavior for unknown actions and interrupted holds.
+The existing Runner bounds one held key to 30 seconds. If an OSWorld action
+sequence requires a longer uninterrupted hold, report that case as unsupported
+and capture the sequence; do not silently release/repress or claim equivalent
+behavior.
 
-The protocol and Runner handler already have `KeyDown`/`KeyUp`, but the public
-Rust `InputClient` currently exposes `hold_keys` only, not separate down/up
-methods. Add the narrow typed client calls needed by this adapter and test
-their request/result mapping. Do not make the harness reach into generated
-gRPC stubs or invent a second hold-result schema.
+The protocol and Runner handler already had `KeyDown`/`KeyUp`, but the public
+Rust `InputClient` initially exposed `hold_keys` only. The narrow typed client
+calls needed by this adapter must map requests and results without making the
+harness reach into generated gRPC stubs or invent a second hold-result schema.
+
+The typed-client subtask is implemented but does not complete item 2:
+`InputClient::key_down` returns a hold ID and typed action result, and
+`key_up` releases by ID. A real gRPC fixture checks request mapping and
+Noop/NotFound result semantics. The adapter must still own these IDs and
+explicitly release them; the client does not provide an automatic release
+guard.
+
+Placement proposal for review: use a separate `evals/osworld/` harness area.
+`evals/auv-base/` currently documents Python-free, application-receiver
+evaluations and reserves its Linux platform directory for those tasks. The
+official OSWorld environment/evaluator is Python-based and owns QEMU reset and
+task assets, so putting its adapter in the X11 driver or the existing base
+receiver suite would conflate responsibilities. Confirm this boundary when the
+first adapter slice is implemented; the path is provisional, not a new core
+runtime crate.
 
 Before implementation, inspect the exact official V1/V2 action parser and
 current AUV APIs. The adapter should live with benchmark harness code, not in

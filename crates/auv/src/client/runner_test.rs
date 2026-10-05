@@ -65,6 +65,162 @@ fn route() -> auv_api_client::RunnerRoute {
   }
 }
 
+#[derive(Default)]
+struct KeyHoldService {
+  downs: std::sync::Mutex<Vec<proto::KeyDownRequest>>,
+  ups: std::sync::Mutex<Vec<auv_driver::KeyboardHoldId>>,
+}
+
+fn key_hold_action(path: proto::InputDeliveryPath) -> proto::InputActionResult {
+  proto::InputActionResult {
+    selected_path: path as i32,
+    attempts: vec![proto::InputAttempt {
+      path: path as i32,
+      succeeded: true,
+      message: None,
+    }],
+    mouse_disturbance: proto::DisturbanceLevel::None as i32,
+    focus_disturbance: proto::DisturbanceLevel::None as i32,
+    clipboard_disturbance: proto::DisturbanceLevel::None as i32,
+  }
+}
+
+macro_rules! key_hold_service_impl {
+  ($($name:ident($request:ty) -> $response:ty;)+) => {
+    #[tonic::async_trait]
+    impl proto::input_service_server::InputService for KeyHoldService {
+      async fn key_down(
+        &self,
+        request: tonic::Request<proto::KeyDownRequest>,
+      ) -> Result<tonic::Response<proto::KeyDownResponse>, tonic::Status> {
+        self.downs.lock().expect("down requests lock").push(request.into_inner());
+        Ok(tonic::Response::new(proto::KeyDownResponse {
+          hold_id: 42,
+          action: Some(key_hold_action(proto::InputDeliveryPath::ForegroundSystemEvents)),
+        }))
+      }
+
+      async fn key_up(&self, request: tonic::Request<proto::KeyUpRequest>) -> Result<tonic::Response<proto::KeyUpResponse>, tonic::Status> {
+        let hold_id = request.into_inner().hold_id;
+        let mut ups = self.ups.lock().expect("up requests lock");
+        let path = match hold_id {
+          42 if !ups.contains(&42) => proto::InputDeliveryPath::ForegroundSystemEvents,
+          42 | 43 => proto::InputDeliveryPath::Noop, // Already released or expired at the Runner.
+          _ => return Err(tonic::Status::not_found("unknown hold ID")),
+        };
+        ups.push(hold_id);
+        Ok(tonic::Response::new(proto::KeyUpResponse {
+          action: Some(key_hold_action(path)),
+        }))
+      }
+
+      $(async fn $name(&self, _: tonic::Request<$request>) -> Result<tonic::Response<$response>, tonic::Status> {
+        Err(tonic::Status::unimplemented("not used by the key-hold fixture"))
+      })+
+
+      type MoveMouseStream = tokio_stream::Empty<Result<proto::MoveMouseStreamResponse, tonic::Status>>;
+      async fn move_mouse(&self, _: tonic::Request<proto::MoveMouseRequest>) -> Result<tonic::Response<Self::MoveMouseStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("not used by the key-hold fixture"))
+      }
+
+      type StreamMouseMotionStream = tokio_stream::Empty<Result<proto::StreamMouseMotionResponse, tonic::Status>>;
+      async fn stream_mouse_motion(
+        &self,
+        _: tonic::Request<tonic::Streaming<proto::StreamMouseMotionRequest>>,
+      ) -> Result<tonic::Response<Self::StreamMouseMotionStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("not used by the key-hold fixture"))
+      }
+    }
+  };
+}
+
+key_hold_service_impl! {
+    get_mouse_position(proto::GetMousePositionRequest) -> proto::GetMousePositionResponse;
+    create_mouse(proto::CreateMouseRequest) -> proto::CreateMouseResponse;
+    remove_mouse(proto::RemoveMouseRequest) -> proto::RemoveMouseResponse;
+    mouse_down(proto::MouseDownRequest) -> proto::MouseDownResponse;
+    mouse_up(proto::MouseUpRequest) -> proto::MouseUpResponse;
+    drag_mouse(proto::DragMouseRequest) -> proto::DragMouseResponse;
+    input_keyboard(proto::InputKeyboardRequest) -> proto::InputKeyboardResponse;
+    press_keys(proto::PressKeysRequest) -> proto::PressKeysResponse;
+    hold_keys(proto::HoldKeysRequest) -> proto::HoldKeysResponse;
+    click_window_point(proto::ClickWindowPointRequest) -> proto::ClickWindowPointResponse;
+    click_screen_point(proto::ClickScreenPointRequest) -> proto::ClickScreenPointResponse;
+    scroll_screen_point(proto::ScrollScreenPointRequest) -> proto::ScrollScreenPointResponse;
+    scroll_window_point(proto::ScrollWindowPointRequest) -> proto::ScrollWindowPointResponse;
+    type_text(proto::TypeTextRequest) -> proto::TypeTextResponse;
+    paste_text(proto::PasteTextRequest) -> proto::PasteTextResponse;
+    press_key(proto::PressKeyRequest) -> proto::PressKeyResponse;
+}
+
+#[tokio::test]
+async fn typed_key_holds_preserve_target_policy_timeout_id_and_release_results() {
+  let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind key-hold fixture");
+  let address = listener.local_addr().expect("key-hold fixture address");
+  let service = std::sync::Arc::new(KeyHoldService::default());
+  let server_service = service.clone();
+  let server = tokio::spawn(async move {
+    tonic::transport::Server::builder()
+      .add_service(proto::input_service_server::InputServiceServer::from_arc(server_service))
+      .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
+      .await
+  });
+  tokio::task::yield_now().await;
+
+  let grpc = GrpcClient::connect(format!("http://{address}").parse().expect("fixture URI")).await.expect("connect key-hold fixture");
+  let input = RunnerClient::new(grpc, route()).expect("runner client").input();
+  let (hold_id, down) = input
+    .key_down(
+      &auv_driver::InputTarget::Foreground,
+      vec!["ctrl".into(), "shift".into()],
+      auv_driver::InputPolicy::ForegroundPreferred,
+      std::time::Duration::from_millis(1250),
+    )
+    .await
+    .expect("key down");
+  assert_eq!(hold_id, 42);
+  assert_eq!(down.selected_path, auv_driver::InputDeliveryPath::ForegroundSystemEvents);
+  let downs = service.downs.lock().expect("down requests lock");
+  assert_eq!(downs.len(), 1);
+  assert_eq!(downs[0].target, Some(input_target_to_proto(&auv_driver::InputTarget::Foreground)));
+  assert_eq!(downs[0].keys, ["ctrl", "shift"]);
+  assert_eq!(downs[0].policy, proto::InputPolicy::ForegroundPreferred as i32);
+  assert_eq!(
+    downs[0].timeout,
+    Some(prost_types::Duration {
+      seconds: 1,
+      nanos: 250_000_000
+    })
+  );
+  drop(downs);
+
+  assert_eq!(input.key_up(hold_id).await.expect("release").selected_path, auv_driver::InputDeliveryPath::ForegroundSystemEvents);
+  assert_eq!(input.key_up(hold_id).await.expect("already released").selected_path, auv_driver::InputDeliveryPath::Noop);
+  assert_eq!(input.key_up(43).await.expect("expired").selected_path, auv_driver::InputDeliveryPath::Noop);
+  let unknown = input.key_up(777).await.expect_err("unknown ID remains server NotFound");
+  assert_eq!(unknown.client_kind(), Some(crate::error::ClientErrorKind::NotFound));
+  assert_eq!(*service.ups.lock().expect("up requests lock"), [42, 42, 43]);
+
+  server.abort();
+}
+
+#[tokio::test]
+async fn typed_key_hold_rejects_invalid_timeout_and_id_without_transport() {
+  let input = RunnerClient::new(disconnected_client(), route()).expect("runner client").input();
+  for timeout in [
+    std::time::Duration::ZERO,
+    std::time::Duration::from_secs(31),
+  ] {
+    let error = input
+      .key_down(&auv_driver::InputTarget::Foreground, vec!["shift".into()], auv_driver::InputPolicy::ForegroundPreferred, timeout)
+      .await
+      .expect_err("invalid timeout must be rejected locally");
+    assert!(matches!(error, CapabilityError::InvalidArgument(_)));
+  }
+  let error = input.key_up(0).await.expect_err("zero ID must be rejected locally");
+  assert!(matches!(error, CapabilityError::InvalidArgument(_)));
+}
+
 #[tokio::test]
 async fn runner_hierarchy_rejects_an_empty_class_before_any_transport_call() {
   let error = RunnerClient::new(
