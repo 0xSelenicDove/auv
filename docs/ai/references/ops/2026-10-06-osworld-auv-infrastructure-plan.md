@@ -40,10 +40,17 @@ and guest installation route.
   `serve --listen URI` option, not a separate command. The next paired test
   must use the new registration/authentication flow instead of relying on a
   daemon created from the older PR head.
-- A read-only merge-tree check between PR #233 and current `main` reports two
-  content conflicts (`crates/auv-driver/Cargo.toml` and
-  `proto/auv/api/driver/v1/input.proto`). This is a forecast, not a completed
-  merge or validation.
+- The initial merge-tree check predicted two content conflicts
+  (`crates/auv-driver/Cargo.toml` and `proto/auv/api/driver/v1/input.proto`).
+  Both were resolved in merge commit `875e259e`; use the actual merged source
+  and its tests for current behavior, not that earlier forecast.
+- On 2026-10-06 the retained direct-Xorg Pod `auv-osworld-x11` is **Evicted**
+  on `neko-gpu-1` because its node crossed the ephemeral-storage threshold;
+  both containers are `ContainerStatusUnknown`. The node itself is Ready and
+  the retained PVCs remain Bound. This Pod is not a live receiver and must not
+  be used to claim a current X11 result. Recreate a task-owned fixture with
+  measured storage requests or use an isolated Linux/Xvfb receiver before the
+  official-guest rerun; preserve the existing PVCs.
 
 ## Ordered TODO and acceptance gates
 
@@ -80,6 +87,10 @@ step units to AUV logical pixels. Keep V2 `EXECUTE` in the benchmark control
 plane; do not expose arbitrary shell execution as AUV GUI input. Assert the
 observable AUV calls and native receiver state for each action family, plus
 error/cleanup behavior for unknown actions and interrupted holds.
+In particular, test interleaved modifier holds, held-key plus `HOTKEY`, and
+mouse down/move/up sequences. If the current driver cannot preserve an
+officially valid combination, report that exact combination as unsupported
+instead of synthesizing a different input sequence.
 The existing Runner bounds one held key to 30 seconds. If an OSWorld action
 sequence requires a longer uninterrupted hold, report that case as unsupported
 and capture the sequence; do not silently release/repress or claim equivalent
@@ -131,8 +142,14 @@ structured `computer_13` actions back to the guest's PyAutoGUI controller;
 the AUV harness must therefore own step/history/observation wiring rather
 than call that dispatch path for GUI input. Official `SCROLL` passes integer
 `dx`/`dy` to PyAutoGUI's horizontal/vertical wheel calls, while AUV's new
-contract is logical pixels. Measure the mapping with a receiver before fixing
-a step-to-pixel factor; sign conversion alone is not sufficient.
+contract is logical pixels. The task-owned Xvfb calibration at AUV head
+`20c43090` found one AUV 120-pixel step produced one matching X11 wheel-button
+event; PyAutoGUI's X11 backend emits one such event per integer step. The
+event-equivalent adapter mapping is `auv_dx = 120 * osworld_dx` and
+`auv_dy = -120 * osworld_dy`. Preserve the official horizontal-before-vertical
+order when sending separate calls. This does not establish exact displacement
+in a particular application's viewport or a current official-guest result;
+those remain item 3 receiver gates.
 
 ### 3. Re-run capability gates in both official guests — pending
 

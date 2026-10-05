@@ -315,7 +315,8 @@ An adapter is still required because OSWorld's `DRAG_TO` starts at the current
 cursor while `input.drag` names both endpoints, and down/up actions require a
 stable logical input owner across calls. OSWorld's positive vertical scroll is
 up, whereas AUV's positive Y scroll is down; the adapter must negate that
-axis. OSWorld also permits a click without coordinates at the current cursor
+axis and apply the X11 step conversion measured below. OSWorld also permits a
+click without coordinates at the current cursor
 and accepts floating-point coordinates. AUV now exposes the current pointer
 position and permits independent X11 key holds in one Runner, but the adapter
 must still define coordinate rounding and retain one Runner/session for
@@ -369,6 +370,42 @@ also returned `(321,234)` through the forwarded daemon in Run
 `6672f98c-6eb1-db53-1178-37bbe4bc0344`. This validates the read path in
 both local and paired topologies; it does not make a read-then-click sequence
 atomic or prove an official VM task result.
+
+### Scroll-step calibration after the shared scroll contract (2026-10-06)
+
+Pinned OSWorld [V1](https://github.com/xlang-ai/OSWorld/blob/b138d348256078fa634fc3b73567a7337c793e6b/desktop_env/controllers/python.py#L406-L418)
+and [V2.1](https://github.com/xlang-ai/OSWorld-V2/blob/acdd3493808e716825975b0f0208194bb2faf3c3/desktop_env/controllers/python.py#L872-L884)
+controllers send `SCROLL` integer steps through `pyautogui.hscroll(dx)` and
+then `pyautogui.vscroll(dy)`. The inspected PyAutoGUI 0.9.54
+[source tarball](https://files.pythonhosted.org/packages/65/ff/cdae0a8c2118a0de74b6cf4cbcdcaf8fd25857e6c3f205ce4b1794b27814/PyAutoGUI-0.9.54.tar.gz),
+SHA256 `dd1d29e8fd118941cb193f74df57e5c6ff8e9253b99c7b04f39cfc69f3ae04b2`,
+uses one X11 wheel-button click per integer step in
+`pyautogui/_pyautogui_x11.py` lines 42–65. No PyAutoGUI input was sent in this
+probe.
+
+The AUV binary was `0.0.28` from head
+`20c430902081b7da4b7fa02a228d36fb398a698c`, SHA256
+`76e421400bbdf4954bb08926bd7cc4a3e2ae4ab3c5aab3378792d390bc1abf4c`.
+The disposable Docker Xvfb fixture used `auv-x11-validation:local`, image ID
+`sha256:b08b6cefceb848bbe2e42818fd7d4bead6502b37716ce5489fe897a398897c99`
+(Debian 12, aarch64, `DISPLAY=:99`). The independent Tk/`xev` receiver saw:
+
+| AUV screen scroll | Run | Native event / receiver result |
+| --- | --- | --- |
+| `dx=0, dy=+240` | `01a10d9c-0ae4-7014-91bc-6dba7777f7b2` | Button 5 twice; Tk `yview` increased from about `0.4500` before the first event to `0.4599` after the second handler, including default Tk class scrolling between callbacks |
+| `dx=0, dy=-120` | `01a10d9c-3e98-7014-8317-f382e9ee8151` | Button 4 once; Tk `yview` decreased from about `0.4658` to `0.4638` in the custom handler |
+| `dx=+120, dy=0` | `01a10d9c-dbd9-73eb-9e29-76b22b2e9fcf` | Button 7 once |
+| `dx=-120, dy=0` | `01a10d9d-149a-7376-95f5-cfda7e26d390` | Button 6 once |
+| `dx=+120, dy=-240` | `01a10d9d-e56e-7156-8a8e-f6cbdce6c393` | Button 7 once, then Button 4 twice; horizontal-before-vertical order matches the pinned controller |
+
+For equivalent X11 wheel events, the OSWorld adapter can map
+`auv_dx = 120 * osworld_dx` and `auv_dy = -120 * osworld_dy` in AUV logical
+pixels. This is a source-backed inference joined to native receiver evidence,
+not a measurement of application-independent pixel displacement. The old
+`auv-osworld-x11` Pod was not reused: on 2026-10-06 it was Evicted from
+`neko-gpu-1` after an ephemeral-storage threshold breach. The task-owned
+Docker fixture was removed; retained PVCs were untouched. A fresh official
+V1/V2.1 guest test with the current binary is still required.
 
 ## Which OSWorld deployment model fits Kubernetes?
 
