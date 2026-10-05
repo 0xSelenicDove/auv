@@ -4,6 +4,9 @@ Date: 2026-10-05. Classification: owner-approved live validation and deployment
 design. Cluster: `k8s.ihome.cat`, kubeconfig
 `/Users/neko/.kube/config.d/ihome.conf`.
 
+For copy-paste operating steps, see the companion
+[Kubernetes runbook](2026-10-05-osworld-kubernetes-runbook.md).
+
 ## Verdict
 
 AUV's X11 computer-use seam works in Kubernetes through both requested

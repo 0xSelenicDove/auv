@@ -1,0 +1,442 @@
+# Run OSWorld on Kubernetes with AUV
+
+Date: 2026-10-05. This runbook turns the validated `k8s.ihome.cat`
+experiment into a repeatable operator flow. It covers OSWorld V1 and the
+recommended OSWorld-V2.1 release, QEMU/KVM startup, local access, AUV
+installation, the two AUV connection topologies, reset, and cleanup.
+
+The companion [evidence record](2026-10-05-osworld-kubernetes-x11-evidence.md)
+contains the observed Runs, image hashes, evaluator results, and design
+trade-offs. This document is an operating procedure; it does not claim that an
+unattended full-suite AUV harness exists.
+
+## Benchmark sizes
+
+| Benchmark | Pinned counting source | Tasks |
+| --- | --- | ---: |
+| OSWorld V1 | upstream `evaluation_examples/test_all.json` and setup guide | 369 |
+| OSWorld-V2.1 | `benchmark_releases/osworld-v2.1.json` `task_count` | 108 |
+
+These totals are not directly comparable measures of difficulty. V2 contains
+fewer, longer-horizon tasks and requires release-matched task classes, gated
+assets, mocked websites, and provider images. The V1 repository changes over
+time, so record the V1 Git commit used by every run. For V2, do not mix the
+`osworld-v2.1` code, tasks, assets, website, or VM image with another release.
+
+## Scope and safety boundary
+
+This procedure uses a privileged Pod because the tested cluster has no KVM
+device plugin and a plain `/dev/kvm` hostPath did not grant device-cgroup
+access. The Pod also receives `NET_ADMIN`, and the guest control API on port
+5000 can upload files and execute commands. Keep the namespace trusted and use
+only short-lived local port-forwards. Do not expose ports 5000 or 8080 through
+an unauthenticated Ingress or public LoadBalancer.
+
+The validated host is `liet-gpu-1`. `neko-gpu-1` does not have `/dev/kvm` and
+is only used for the fast container-native Xorg fixture. No GPU claim is needed
+for the official OSWorld VM.
+
+## Current ihome inventory
+
+The namespace is `auv-x11-hami-test`. The retained volumes are:
+
+| PVC | Storage | Contents |
+| --- | --- | --- |
+| `osworld-v1-image` | `tns-iscsi` | V1 cold release archive |
+| `osworld-v1-hot` | node-local on `liet-gpu-1` | extracted V1 `Ubuntu.qcow2` |
+| `osworld-v2-image` | `tns-iscsi` | V2.1 cold release archive |
+| `osworld-v2-hot` | node-local on `liet-gpu-1` | extracted V2.1 `osworld-v2-ubuntu-x86.qcow2` |
+| `auv-osworld-workspace` | `tns-iscsi` | AUV checkout and validation builds |
+
+The guest-compatible X11-only AUV binary currently lives at
+`/workspace/target-ubuntu2204-v2/release/auv` in the workspace volume. Its
+validated SHA256 is
+`7bc1f4256fa903d1bb660f73901d34c8aa2c0c85ed948473b9f8809b049cdc26`.
+This is a validation build, not a normal Linux release artifact: the regular
+Debian 13 build requires a newer glibc than Ubuntu 22.04.
+
+## 1. Set the local context
+
+The local machine needs `kubectl`, `curl`, `jq`, and `envsubst`. On macOS,
+`envsubst` is provided by `brew install gettext`. Every new shell must select
+the kubeconfig explicitly:
+
+```bash
+export KUBECONFIG=/Users/neko/.kube/config.d/ihome.conf
+export OSWORLD_NAMESPACE=auv-x11-hami-test
+kubectl config current-context
+kubectl get node liet-gpu-1
+kubectl -n "$OSWORLD_NAMESPACE" get pvc osworld-v1-hot osworld-v2-hot
+```
+
+Confirm that both hot PVCs are `Bound`. Confirm their node affinity before
+booting:
+
+```bash
+for pvc in osworld-v1-hot osworld-v2-hot; do pv=$(kubectl -n "$OSWORLD_NAMESPACE" get pvc "$pvc" -o jsonpath='{.spec.volumeName}'); kubectl get pv "$pv" -o jsonpath="$pvc{': '}{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]}{'\n'}"; done
+```
+
+Both lines should name `liet-gpu-1`.
+
+## 2. Select V1 or V2.1
+
+Start with V2.1 unless the purpose of the run is comparison with V1:
+
+```bash
+export OSWORLD_VERSION=v2
+```
+
+Set the runtime variables:
+
+```bash
+case "$OSWORLD_VERSION" in v1) export OSWORLD_POD=osworld-v1-runtime OSWORLD_PVC=osworld-v1-hot OSWORLD_QCOW=Ubuntu.qcow2 ;; v2) export OSWORLD_POD=osworld-v2-runtime OSWORLD_PVC=osworld-v2-hot OSWORLD_QCOW=osworld-v2-ubuntu-x86.qcow2 ;; *) echo "OSWORLD_VERSION must be v1 or v2" >&2; exit 2 ;; esac
+export OSWORLD_RUNTIME_IMAGE='happysixd/osworld-docker@sha256:0e6497a9295647cf05bf2b2af522fdd79bdeba2737595259cab310a3bcf6baa9'
+```
+
+V2.1 pins this runtime digest. V1 upstream uses a mutable image tag; this
+runbook intentionally reuses the digest observed during the successful V1 run
+so a reviewer rerun does not silently change the runtime.
+
+## 3. Boot the QEMU/KVM Pod
+
+`envsubst` substitutes only the variables listed in its first argument, leaving
+the manifest itself reviewable:
+
+```bash
+envsubst '${OSWORLD_NAMESPACE} ${OSWORLD_POD} ${OSWORLD_PVC} ${OSWORLD_QCOW} ${OSWORLD_RUNTIME_IMAGE}' <<'YAML' | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${OSWORLD_POD}
+  namespace: ${OSWORLD_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: osworld-runtime
+    app.kubernetes.io/instance: ${OSWORLD_POD}
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: liet-gpu-1
+  terminationGracePeriodSeconds: 30
+  containers:
+    - name: qemu
+      image: ${OSWORLD_RUNTIME_IMAGE}
+      imagePullPolicy: IfNotPresent
+      securityContext:
+        privileged: true
+      env:
+        - name: DISK_SIZE
+          value: 32G
+        - name: RAM_SIZE
+          value: 8G
+        - name: CPU_CORES
+          value: "4"
+      ports:
+        - { name: setup, containerPort: 5000 }
+        - { name: novnc, containerPort: 8006 }
+        - { name: chromium, containerPort: 9222 }
+        - { name: media, containerPort: 8080 }
+      resources:
+        requests: { cpu: "4", memory: 8Gi }
+        limits: { cpu: "8", memory: 12Gi }
+      startupProbe:
+        httpGet: { path: /screenshot, port: setup }
+        periodSeconds: 5
+        failureThreshold: 120
+      readinessProbe:
+        httpGet: { path: /screenshot, port: setup }
+        periodSeconds: 5
+        failureThreshold: 3
+      volumeMounts:
+        - name: image
+          mountPath: /System.qcow2
+          subPath: ${OSWORLD_QCOW}
+          readOnly: true
+        - name: kvm
+          mountPath: /dev/kvm
+  volumes:
+    - name: image
+      persistentVolumeClaim:
+        claimName: ${OSWORLD_PVC}
+    - name: kvm
+      hostPath:
+        path: /dev/kvm
+        type: CharDevice
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${OSWORLD_POD}
+  namespace: ${OSWORLD_NAMESPACE}
+spec:
+  selector:
+    app.kubernetes.io/instance: ${OSWORLD_POD}
+  ports:
+    - { name: setup, port: 5000, targetPort: setup }
+    - { name: novnc, port: 8006, targetPort: novnc }
+    - { name: chromium, port: 9222, targetPort: chromium }
+    - { name: media, port: 8080, targetPort: media }
+YAML
+```
+
+Wait for the guest, not just the container process:
+
+```bash
+kubectl -n "$OSWORLD_NAMESPACE" wait --for=condition=Ready "pod/$OSWORLD_POD" --timeout=15m
+kubectl -n "$OSWORLD_NAMESPACE" logs "$OSWORLD_POD" -c qemu --tail=100
+```
+
+The log should show KVM acceleration. An exit code 88 usually means that the
+container cannot open `/dev/kvm`; check the selected node and the privileged
+security context.
+
+## 4. Make the guest ports locally reachable
+
+The qemu-docker image forwards guest ports for packets addressed to the Pod IP,
+but does not bind equivalent listeners on container loopback. Consequently,
+direct `kubectl port-forward pod/$OSWORLD_POD ...` fails. Run an in-cluster TCP
+proxy that connects through the Service:
+
+```bash
+export OSWORLD_PROXY="${OSWORLD_POD}-proxy"
+envsubst '${OSWORLD_NAMESPACE} ${OSWORLD_POD} ${OSWORLD_PROXY}' <<'YAML' | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${OSWORLD_PROXY}
+  namespace: ${OSWORLD_NAMESPACE}
+spec:
+  restartPolicy: Never
+  containers:
+    - name: proxy
+      image: alpine:3.22.1
+      command: ["/bin/sh", "-ec"]
+      args:
+        - |
+          apk add --no-cache socat
+          socat TCP-LISTEN:5000,fork,reuseaddr TCP:${OSWORLD_POD}:5000 &
+          socat TCP-LISTEN:8006,fork,reuseaddr TCP:${OSWORLD_POD}:8006 &
+          socat TCP-LISTEN:9222,fork,reuseaddr TCP:${OSWORLD_POD}:9222 &
+          socat TCP-LISTEN:8080,fork,reuseaddr TCP:${OSWORLD_POD}:8080 &
+          wait
+      readinessProbe:
+        tcpSocket: { port: 5000 }
+        periodSeconds: 2
+        failureThreshold: 30
+YAML
+kubectl -n "$OSWORLD_NAMESPACE" wait --for=condition=Ready "pod/$OSWORLD_PROXY" --timeout=2m
+kubectl -n "$OSWORLD_NAMESPACE" port-forward "pod/$OSWORLD_PROXY" 5000:5000 8006:8006 9222:9222 8080:8080
+```
+
+Keep the last command running. In another shell:
+
+```bash
+curl --fail --output /tmp/osworld-screenshot.png http://127.0.0.1:5000/screenshot
+open http://127.0.0.1:8006/
+```
+
+The browser URL is the noVNC view. The setup endpoint is ready when the first
+command downloads a non-empty PNG.
+
+## 5. Upload the Ubuntu 22.04 AUV build
+
+Copy the validated binary out of the retained workspace Pod:
+
+```bash
+kubectl -n "$OSWORLD_NAMESPACE" cp auv-osworld-x11:/workspace/target-ubuntu2204-v2/release/auv /tmp/auv-ubuntu2204 -c desktop
+shasum -a 256 /tmp/auv-ubuntu2204
+```
+
+The digest must match the value in the inventory section. Uploading to the QEMU
+container with `kubectl cp` would not reach the guest. Use the guest setup API:
+
+```bash
+curl --fail-with-body -F 'file_path=/home/user/auv' -F 'file_data=@/tmp/auv-ubuntu2204' http://127.0.0.1:5000/setup/upload
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["mkdir","-p","/home/user/.local/share/auv-osworld"],"shell":false}' http://127.0.0.1:5000/setup/execute | jq
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["chmod","0700","/home/user/auv"],"shell":false}' http://127.0.0.1:5000/setup/execute | jq
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["sha256sum","/home/user/auv"],"shell":false}' http://127.0.0.1:5000/setup/execute | jq -r .output
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["/home/user/auv","--version"],"shell":false}' http://127.0.0.1:5000/setup/execute | jq
+```
+
+The validation guest also needed `libtesseract4`, `liblept5`, and
+`tesseract-ocr-eng`. Install them only if the AUV process reports missing
+libraries. V1 uses sudo password `password`; V2.1 uses
+`osworld-public-evaluation`.
+
+Choose either section 6A or 6B for an episode. If changing topology without
+recreating the runtime Pod, stop the old guest daemon first so it does not keep
+the Unix socket or TCP port.
+
+## 6A. Run AUV entirely inside the guest
+
+This is the non-paired topology. Launch the daemon with the guest X11 display
+and a guest Unix socket:
+
+```bash
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["env","DISPLAY=:0","XDG_SESSION_TYPE=x11","/home/user/auv","serve","--listen","unix:///home/user/auv.sock","--store-root","/home/user/.local/share/auv-osworld","--no-discovery"],"shell":false}' http://127.0.0.1:5000/setup/launch
+```
+
+Use `/setup/execute` only to start the installed AUV client. Screenshot and
+input delivery still go through AUV:
+
+```bash
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["env","DISPLAY=:0","XDG_SESSION_TYPE=x11","AUV_ENDPOINT=unix:///home/user/auv.sock","/home/user/auv","invoke","display.list","--json"],"shell":false}' http://127.0.0.1:5000/setup/execute | jq -r .output
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["env","DISPLAY=:0","XDG_SESSION_TYPE=x11","AUV_ENDPOINT=unix:///home/user/auv.sock","/home/user/auv","invoke","display.capture","--json"],"shell":false}' http://127.0.0.1:5000/setup/execute | jq -r .output
+```
+
+Use the same wrapper for typed input operations such as:
+
+```text
+/home/user/auv invoke input.clickPoint X Y --json
+/home/user/auv invoke input.typeText TEXT --json
+/home/user/auv invoke input.keys control q --json
+/home/user/auv invoke input.scrollPoint X Y DX DY --json
+/home/user/auv invoke input.drag X1 Y1 X2 Y2 --duration-ms 400 --json
+```
+
+Each call needs the `DISPLAY`, `XDG_SESSION_TYPE`, and `AUV_ENDPOINT`
+environment variables shown above.
+
+## 6B. Pair a Mac AUV client to the guest
+
+Use this topology when the decision loop runs on the Mac. Port 8080 is one of
+the guest ports already forwarded by qemu-docker. Verify that it is available
+inside the guest before replacing the local-only daemon with an HTTP listener:
+
+```bash
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["sh","-lc","ss -ltnp | grep :8080 || true"],"shell":false}' http://127.0.0.1:5000/setup/execute | jq -r .output
+```
+
+If another process owns 8080, stop that non-benchmark media service first or
+keep using guest-local mode. Then launch AUV:
+
+```bash
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["env","DISPLAY=:0","XDG_SESSION_TYPE=x11","/home/user/auv","serve","--listen","unix:///home/user/auv.sock","--listen","http://0.0.0.0:8080","--pairing-store","/home/user/.local/share/auv-osworld/pairings.json","--store-root","/home/user/.local/share/auv-osworld","--no-discovery"],"shell":false}' http://127.0.0.1:5000/setup/launch
+```
+
+Create the short-lived token through the owner-authorized Unix socket:
+
+```bash
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["env","AUV_ENDPOINT=unix:///home/user/auv.sock","/home/user/auv","devices","pair","create-token"],"shell":false}' http://127.0.0.1:5000/setup/execute | jq -r .output
+```
+
+On the Mac, consume the printed token and save a profile:
+
+```bash
+auv devices pair --endpoint http://127.0.0.1:8080 connect --token '<TOKEN>' --label 'OSWorld guest' --profile osworld
+auv devices list
+auv --device '<DEVICE_NAME>' invoke display.list --json
+auv --device '<DEVICE_NAME>' invoke display.capture --json
+```
+
+Client and guest AUV versions must match. A `0.0.26` client could list the
+`0.0.27` Device but could not create a remote Run.
+
+## 7. Run the validated GIMP task
+
+The task ID is `7767eef2-56a3-4cea-8c9f-48c070c7d65b`; its instruction is
+“Please help change GIMP's theme from dark to light.” Start GIMP through the
+setup plane:
+
+```bash
+curl --fail-with-body -H 'Content-Type: application/json' -d '{"command":["gimp"],"shell":false}' http://127.0.0.1:5000/setup/launch
+```
+
+Use only AUV `display.capture` and typed input operations to open GIMP
+Preferences, change the theme to Light, close the dialog, and send `Control+Q`
+so GIMP persists `gimprc`. The noVNC window is for observation and debugging;
+do not use it for input when recording an AUV-only result.
+
+Retrieve the evaluator input:
+
+```bash
+curl --fail-with-body -X POST -d 'file_path=/home/user/.config/GIMP/2.10/gimprc' http://127.0.0.1:5000/file --output /tmp/gimprc
+rg '^\(theme "Light"\)$' /tmp/gimprc
+```
+
+The `rg` command is a quick diagnostic. The official V1/V2 evaluator for this
+task calls `check_config_status` with key `theme` and value `"Light"`; it returns
+`1.0` when the retrieved configuration contains that exact setting. A full
+benchmark runner must call the release-matched upstream evaluator rather than
+substitute shell checks.
+
+## 8. Reset between tasks
+
+The source qcow2 is mounted read-only. qemu-docker keeps the writable guest
+state in the runtime Pod, so deleting and recreating the runtime Pod creates a
+fresh episode while preserving the hot base image:
+
+```bash
+kubectl -n "$OSWORLD_NAMESPACE" delete pod "$OSWORLD_PROXY" "$OSWORLD_POD"
+kubectl -n "$OSWORLD_NAMESPACE" delete service "$OSWORLD_POD"
+```
+
+Re-run sections 3 and 4. Do not delete `osworld-v1-hot` or `osworld-v2-hot`
+unless re-extraction from the cold archive is intended. A `local-path` PVC has
+no second hot copy.
+
+## 9. Prepare an upstream benchmark checkout
+
+For V1, pin the exact commit used by the evidence record:
+
+```bash
+git clone https://github.com/xlang-ai/OSWorld.git
+cd OSWorld
+git checkout b138d348256078fa634fc3b73567a7337c793e6b
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+```
+
+For V2.1, use its release tag and download the release-matched gated tasks and
+assets after accepting both Hugging Face access requests:
+
+```bash
+git clone --branch osworld-v2.1 https://github.com/xlang-ai/OSWorld-V2.git
+cd OSWorld-V2
+uv sync --frozen
+uvx --from huggingface_hub hf auth login
+uv run scripts/tools/download_osworld_v2_tasks.py --benchmark-release osworld-v2.1
+uv run scripts/tools/download_osworld_v2_assets.py --benchmark-release osworld-v2.1 --target-dir cache/osworld_v2_assets_v2.1
+export OSWORLD_FILE_BASE_URL="$(pwd)/cache/osworld_v2_assets_v2.1"
+export OSWORLD_BENCHMARK_RELEASE=osworld-v2.1
+```
+
+V2 tasks involving MailHub, CloudCRM, AWS Console, Overleaf, visa application,
+or other mocked sites also require a self-hosted
+`Task-Web/OSWorld-web@osworld-v2.1` deployment and a matching
+`WEBSITE_HOST_SUFFIX`. A booted VM alone cannot run all 108 tasks comparably.
+
+## 10. What remains manual
+
+This runbook reproduces the infrastructure and both AUV control topologies. It
+does not yet provide:
+
+- a typed adapter for every OSWorld action;
+- unattended iteration over 369 V1 or 108 V2.1 tasks;
+- V2 mocked-site and GitLab deployment;
+- per-task scheduling, timeout, reset, and result aggregation;
+- automatic retrieval and invocation of every release-matched evaluator.
+
+Until those pieces exist, run a small task subset, record the task ID, release,
+qcow2 and runtime digest, AUV Device ID, topology, Run IDs, capture artifacts,
+and official evaluator output for each episode.
+
+## Failure guide
+
+| Symptom | Check |
+| --- | --- |
+| Pod exits with code 88 | `/dev/kvm`, `liet-gpu-1`, and `privileged: true` |
+| PVC remains Pending | use `nodeSelector`, not `spec.nodeName`, for an unbound `WaitForFirstConsumer` PVC |
+| `/screenshot` briefly succeeds then fails | wait for the startup probe across the guest reboot |
+| direct Pod port-forward refuses connections | use the Service-backed proxy in section 4 |
+| AUV reports a newer glibc is required | use the Ubuntu 22.04 validation build, not the Debian 13 artifact |
+| remote Device lists but invocation fails | make the Mac and guest AUV versions identical |
+| local AUV cannot capture X11 | set `DISPLAY=:0` and `XDG_SESSION_TYPE=x11` on both daemon and client |
+| task evaluator cannot find assets | pin and download the matching release assets; set `OSWORLD_FILE_BASE_URL` |
+
+## Upstream references
+
+- [OSWorld V1 repository and setup](https://github.com/xlang-ai/OSWorld/tree/b138d348256078fa634fc3b73567a7337c793e6b)
+- [OSWorld V1 setup guide: 369 tasks](https://github.com/xlang-ai/OSWorld/blob/b138d348256078fa634fc3b73567a7337c793e6b/SETUP_GUIDELINE.md)
+- [OSWorld-V2.1 release manifest: 108 tasks](https://github.com/xlang-ai/OSWorld-V2/blob/osworld-v2.1/benchmark_releases/osworld-v2.1.json)
+- [OSWorld-V2.1 installation](https://github.com/xlang-ai/OSWorld-V2/tree/osworld-v2.1)
+- [Official Docker/QEMU provider](https://github.com/xlang-ai/OSWorld-V2/blob/osworld-v2.1/desktop_env/providers/docker/provider.py)
