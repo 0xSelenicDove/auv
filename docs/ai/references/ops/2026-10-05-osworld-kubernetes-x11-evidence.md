@@ -731,6 +731,57 @@ Do not interpret `InputActionResult.verified = false` as a task failure. It
 means delivery succeeded without semantic verification. OSWorld's evaluator is
 the separate semantic authority.
 
+## Bounded two-episode V1 AUV pilot (2026-10-06)
+
+This exploratory pilot used pinned OSWorld V1 revision `b138d348`, the
+official Xorg/KVM guest image on `liet-gpu-1`, and a fresh writable overlay of
+the retained read-only `osworld-v1-hot` image for **each** task. The runtime
+image digest began `0e6497a929`; guest AUV was built from source `25e23205`
+with binary SHA256
+`2a8e53eecfef1dcd8fa8368fa480d6df36e254527c7e60be3ac82802e7073427`.
+Each task had a fixed 10-minute AUV action window, independent of boot, setup,
+and evaluation time. The scheduled denominator was two, including the timed-out
+episode.
+
+| Episode | Topology and action window (UTC) | AUV evidence | Evaluator input and result |
+| --- | --- | --- | --- |
+| VLC `5ac2891a-eacd-4954-b339-98abba077adb` (task JSON SHA256 `4e038a7bb4c3770186209d68402e678ff723238cb31684fe452f0b0c6f4665da`) | Guest-local AUV via owner Unix socket and temporary key-only SSH for the harness; 2026-10-05 23:04:30–23:14:30, full window elapsed | Capture Run `01a10e4f-7838-76ec-9474-7e088828548f`, PNG SHA256 `b2bf00c08ef74d4ce904640a9af322462cc6eca0f40e9fd21a2ca93095f74519`; AUV Ctrl+P and clicks reached VLC, but Advanced Preferences partially redrew over the old pane | `vlcrc` SHA256 `9b24563be2e95f0df1f958b5f57126e6ed6206bf08ca978d74de645ebbfb32f2` still contained `play-and-exit=1`; exact pinned `check_play_and_exit` returned `0` |
+| Chrome `2ad9387a-65d8-4e33-ad5b-7580065a27ca` (task JSON SHA256 `4ddb526e5f3b9efa72a01e3ccae86ee4d698f480e4a526f9dfde85fd9499559c`) | Paired Mac AUV → guest Device `25d29d1e1aae`; window 2026-10-05 23:37:17–23:47:17, action completed around 23:40 | Pre-action capture Run `5d43fdf3-64e6-8beb-cf72-14d673b4257d`; saved-folder capture Run `f695f9bd-cd6a-908c-f85a-9d5560dcdca9` (PNG SHA256 `520d39a7d292cdc6f87cc7271e87e161e357e880dd2e3223a5b4defd06526c2a`); post-restart capture Run `d114301d-217c-8410-adcc-5054a0c2f7d8` (PNG SHA256 `0a9c3eecd46e662da196edfa63ab9cb906a44d356ae35b03d38ec12dde001ed8`) | After official `pkill`/relaunch/sleep postconfig, Bookmarks SHA256 `59feac785ced9e7ba5e79fe6ec96ed558e1e7bfad7d9165296645aedc59c6862`; exact pinned `is_expected_bookmarks` returned `1.0` for `Favorites` |
+
+The Chrome Mac-side AUV binary SHA256 was
+`cf9485c4a2ec0fbf14c0fa6f874ef77decba00f8c61ae704ec67b77915a3c08a`.
+Its paired `display.list` Run `caa49f3f-3ba9-5b56-aece-89a792cf2409`
+reported `Virtual-1` at 1920×1080. The evaluator source was audited before
+selection: neither task's reachable setup or evaluation path calls a
+PyAutoGUI input function. The upstream helper imports PyAutoGUI while
+resolving a guest path, but this pilot used the official setup/postconfig,
+getter-equivalent `/execute` path lookup and `/file` retrieval, then extracted
+and invoked the exact pinned metric functions. OSWorld `/execute` was **not**
+used to deliver AUV GUI input. The raw metric outputs were observed in the
+pilot tool session but were not retained as standalone JSON files; the
+evaluator inputs remain in task-local scratch under
+`/tmp/auv-v1-pilot-vlc-evaluator-input-20261006` and
+`/tmp/auv-v1-pilot-chrome-bookmarks-20261006.json`.
+An independent read of those retained inputs found
+`play-and-exit=1` at `vlcrc` line 4073 and exactly one bookmark-bar folder,
+`Favorites`, under `roots.bookmark_bar.children`. The pinned Chrome getter
+returns the `roots` object to the metric, matching that input shape.
+
+These are **metric-function results**, not runs of the full
+`DesktopEnv.evaluate()` runner. The selected-slice mean is `(0 + 1.0)/2 = 0.5`
+only as a two-task bookkeeping value; it is neither an official OSWorld score
+nor an estimate of AUV agent completion rate. VLC's observed failure layer
+was agent navigation/UI redraw within the fixed action window, not AUV
+transport. Chrome showed the requested folder before and after postconfig.
+
+In namespace `auv-x11-hami-test`, the task-owned VMs
+`auv-v1-pilot-vlc-20261006` and `auv-v1-pilot-chrome-20261006`, their
+same-named Services, `-proxy` Pods, and port-forwards were deleted and
+verified absent. The temporary Chrome pairing profile and VLC SSH key were
+removed. The retained hot PVC remained Bound. A durable scheduler, retained
+per-episode raw evaluator JSON, and full upstream runner integration remain
+next gates.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

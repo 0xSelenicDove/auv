@@ -207,7 +207,7 @@ V2.1 2.71 s). Exact test executable, binary, and result hashes are in the
 evidence note. This closes the guest-local adapter-delivery gate, not a full
 paired-remote episode or a task-evaluator gate.
 
-### 4. Batch scheduler and evaluator pilot — pending
+### 4. Batch scheduler and evaluator pilot — two-episode exploratory run complete; durable runner pending
 
 Only after action gates pass, run a small, reproducible official-task batch on
 fresh overlays. Each episode needs a known image revision, task assets and
@@ -282,10 +282,18 @@ commands in both setup and evaluator:
   setup launches VLC and writes `play-and-exit=1`; evaluation reads `vlcrc`
   and expects `0`.
 
-These are candidates, not evaluated results. Before selecting them, inspect
-their release-matched setup/evaluator implementation for indirect GUI actions
-and dependencies, then run each in a fresh overlay. A fixed AUV action script
-may test the scheduler/evaluator plumbing, but its score is not an agent score.
+The two candidates were audited and run on 2026-10-06 in separate official V1
+overlays. The VLC guest-local shared-socket episode exhausted its 10-minute
+action window and the pinned metric returned `0`; the Chrome paired-remote
+episode completed inside its window and the pinned metric returned `1.0`
+after official postconfig. The denominator is **2**; the arithmetic mean
+`0.5` describes only this selected two-task exploratory slice. The runs used
+release-matched getter-equivalent file retrieval and exact upstream metric
+functions, **not** the full `DesktopEnv.evaluate()` runner. They therefore do
+not establish an official benchmark score or general agent completion rate.
+See the [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md) for
+task hashes, AUV artifacts, timing, and cleanup. A durable batch scheduler,
+full-runner integration, and larger predeclared sample remain pending.
 
 For V2.1, a static audit of all 108 hash-verified task classes selected
 `Task099` as the first strict AUV-only pilot. Its setup only downloads
