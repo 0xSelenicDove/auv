@@ -7,5 +7,10 @@ license.workspace = true
 publish = false
 
 [dependencies]
+auv = { package = "auv-core", path = "../../crates/auv" }
+auv-driver = { path = "../../crates/auv-driver" }
 serde_json = "1"
 thiserror = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

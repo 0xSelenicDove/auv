@@ -75,7 +75,7 @@ existing window-scroll live evidence belongs to `main`; this merge did not
 repeat it. The PR disclosure and current guest revalidation are separate
 follow-ups.
 
-### 2. Build a typed OSWorld action adapter — pending
+### 2. Build a typed OSWorld action adapter — code complete, guest gate pending
 
 Make one harness-side consumer that maps the official structured action set to
 existing AUV Driver/Runner capabilities. Reuse one persistent Runner/session
@@ -115,7 +115,21 @@ wheel steps. Upstream `ACTION_SPACE` labels both scroll axes required, but its
 `execute_action` implementation permits either axis alone; the parser follows
 the executable behavior and normalizes the omitted axis to zero. Passing this
 parser is not evidence that an AUV/X11 backend can deliver every upstream key
-name. The persistent-session executor and live receipt gates remain pending.
+name.
+
+The persistent `ActionExecutor` now maps the validated GUI action variants
+through one public `auv::Client` Runner, owns cross-call key and mouse holds,
+converts scroll steps using the calibrated X11 mapping, and releases known
+holds on an error or explicit finish. It returns AUV delivery results with
+semantic verification unset. Simultaneous mouse-button chords are explicitly
+unsupported because the current MouseCoordinator permits one held button per
+desktop. The executor rejects key spellings without an exact X11 mapping;
+holds are bounded by the Runner's 30-second limit rather than silently
+extended. `cargo test -p auv-osworld-evals --lib` passed 8 unit tests; the
+public-Runner Xorg integration test is present but ignored until an isolated
+daemon is available. This is a code-level gate, not official-guest receiver
+evidence or a benchmark score. Item 3 must run the integration test and inspect
+independent desktop state in both official images.
 
 Placement proposal for review: use a separate `evals/osworld/` harness area.
 `evals/auv-base/` currently documents Python-free, application-receiver

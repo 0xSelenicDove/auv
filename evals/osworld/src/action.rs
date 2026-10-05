@@ -63,7 +63,7 @@ pub enum Action {
   MouseDown(Button),
   MouseUp(Button),
   DragTo(Point),
-  /// Raw PyAutoGUI wheel steps. No pixel conversion has been calibrated yet.
+  /// Raw PyAutoGUI wheel steps; the X11 executor maps one step to 120 AUV pixels.
   Scroll {
     dx: i64,
     dy: i64,

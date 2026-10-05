@@ -1002,8 +1002,11 @@ dependencies = [
 name = "auv-osworld-evals"
 version = "0.0.28"
 dependencies = [
+ "auv-core",
+ "auv-driver",
  "serde_json",
  "thiserror 2.0.21",
+ "tokio",
 ]
 
 [[package]]
