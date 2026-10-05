@@ -47,7 +47,7 @@ and guest installation route.
 
 ## Ordered TODO and acceptance gates
 
-### 1. Align PR #233 with current `main` — pending
+### 1. Align PR #233 with current `main` — code and local gates complete
 
 Merge or rebase the current base into the draft branch while preserving the
 X11-only screen-point scroll and the newly added window-targeted scroll as
@@ -58,6 +58,15 @@ Verify `cargo fmt
 --check`, targeted Rust tests, `buf lint`/breaking checks, and a Linux Xvfb
 receiver test. Do not infer that a clean merge means the two scroll routes have
 equivalent units or delivery behavior.
+
+Completed in merge commit `875e259e`: the two APIs remain distinct, X11
+screen-point deltas now use logical pixels, and the runbook uses the current
+listener syntax. Targeted Rust/Buf/SDK checks, X11 unit tests (17/17), and an
+Xvfb integration test (1/1) passed. The Tk receiver's `yview` increased after
+`+120`, proving downward motion but not an exact 120 px displacement. The
+existing window-scroll live evidence belongs to `main`; this merge did not
+repeat it. The PR disclosure and current guest revalidation are separate
+follow-ups.
 
 ### 2. Build a typed OSWorld action adapter — pending
 
