@@ -259,6 +259,19 @@ their release-matched setup/evaluator implementation for indirect GUI actions
 and dependencies, then run each in a fresh overlay. A fixed AUV action script
 may test the scheduler/evaluator plumbing, but its score is not an agent score.
 
+For V2.1, a static audit of all 108 hash-verified task classes selected
+`Task099` as the first strict AUV-only pilot. Its setup only downloads
+`task_099/my_image.png` to the guest Desktop; its evaluator only retrieves
+`position.txt` and scores coordinates. The required image was downloaded from
+the pinned gated asset revision into task-owned scratch storage (SHA256
+`6c99998e7275e2132c6e27d01f212eaabfbf1c10b0e9405d11aa125eb94a16c1`).
+The guest still needs Google Maps access, and a future agent must receive
+only the task instruction and AUV observations, **not** task source or
+evaluator ground truth. `Task100` is a better mouse-heavy second pilot, but
+requires a self-hosted SlidePuzzle backend; official setup uses CDP to open
+its initial page and its evaluator rejects agent CDP use. Neither task has
+been executed here, so no V2.1 task score follows from this selection.
+
 ### 5. Agent/harness evaluation — pending
 
 Once the infrastructure and batch pilot are repeatable, connect an agent that
