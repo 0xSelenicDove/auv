@@ -1,6 +1,6 @@
 {
   "name": "@auv-js/cli-darwin-arm64",
-  "version": "0.0.28",
+  "version": "0.0.29",
   "cpu": [
     "arm64"
   ],
