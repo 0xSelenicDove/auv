@@ -34,6 +34,7 @@ Count: **29**
 - [`2026-10-05-osworld-kubernetes-runbook.md`](2026-10-05-osworld-kubernetes-runbook.md): Operator runbook for booting retained OSWorld V1/V2.1 qcow2 images on ihome, reaching the guest, installing AUV, and exercising guest-local or paired control.
 - [`2026-10-06-osworld-auv-infrastructure-plan.md`](2026-10-06-osworld-auv-infrastructure-plan.md): Ordered TODO and acceptance gates for aligning the X11 PR, mapping OSWorld actions, revalidating official guests, batching tasks, and evaluating an agent.
 - [`2026-10-06-osworld-v2-assets-preflight.md`](2026-10-06-osworld-v2-assets-preflight.md): Pinned Hugging Face access, size and hash evidence for V2.1 Task099/044 assets, Task044 setup/evaluator audit, and a Shotcut live environment preflight without task scoring.
+- [`2026-10-06-osworld-v2-task044-episode.md`](2026-10-06-osworld-v2-task044-episode.md): One bounded blind AUV-only Task044 Shotcut attempt, partial evaluator score, protocol limitations, artifact hashes, and cleanup evidence.
 
 ## Related
 

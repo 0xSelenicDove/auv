@@ -337,9 +337,19 @@ supported one blinded AUV-only agent attempt. The agent navigated the image
 and Google Maps but was stopped at a disclosed ad-hoc limit before writing
 `position.txt`; exact pinned evaluation returned `0.0` because the answer
 file was absent. This is an incomplete single attempt, not a rate or a
-completed batch. Full upstream runner integration remains pending.
+completed batch. A separate selected V2.1 Task044 Shotcut blind attempt later
+produced both output files and returned `0.6000000000000001` through its
+exact pinned `Task044.evaluate()` method plus official file getter in a
+minimal transport adapter. The crop top was 90 px, outside the metric's
+75–85 px range. Its action stop was acknowledged five seconds after the
+fixed ten-minute deadline, though the final recorded AUV capture began four
+seconds before it; the evaluator environment also used a different OpenCV
+package/version than the pinned project. See the
+[Task044 episode evidence](2026-10-06-osworld-v2-task044-episode.md). These
+two independently selected V2.1 attempts do not form a predeclared batch or
+completion-rate denominator. Full upstream runner integration remains pending.
 
-### 5. Agent/harness evaluation — exploratory single attempt incomplete
+### 5. Agent/harness evaluation — two selected V2.1 attempts, no rate
 
 Once the infrastructure and batch pilot are repeatable, connect an agent that
 observes through AUV and selects typed adapter actions. Score it with the
