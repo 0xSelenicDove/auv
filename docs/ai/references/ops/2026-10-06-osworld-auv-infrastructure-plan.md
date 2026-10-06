@@ -640,6 +640,20 @@ policy behind the gateway, enforced tool isolation, guest-local gateway
 episode, or predeclared agent-scored batch. See the
 [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
 
+A subsequent **selected** Chrome V1 Codex sub-agent canary used the gateway
+on a fresh paired-remote VM. The first attempt exposed a 60-second
+interactive idle timeout during agent deliberation, before any action; the
+idle bound was raised to 240 seconds under the unchanged 570-second Run
+budget. A new Run then completed five agent-selected typed actions, six
+hash-verified AUV captures, and `finish` with no pending forward; the pinned
+evaluator returned raw `1.0`, and UID-safe cleanup retained the hot PVC/PV.
+The score is a one-task exploratory result, not a benchmark rate. The
+temporary attended relay does not enforce the agent's other tool access or
+pin a model version, and it is not yet a reusable model connector. Next:
+make the agent I/O boundary durable and enforce allowed tools, then add a
+guest-local gateway run and a predeclared multi-task cohort. See the
+[evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
+
 ## Operating rules
 
 - Work through these items in order; each item may be delegated to one bounded

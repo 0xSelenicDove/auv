@@ -675,6 +675,44 @@ failed. The observed raw Chrome score was `1.0`; the [evidence note](2026-10-05-
 records hashes and the exact boundary. This is one attended method-body
 evaluator result, not an unattended batch or OSWorld completion rate.
 
+### Attended one-Run agent gateway canary
+
+For an agent-selected task attempt, do not send unreviewed agent JSONL
+directly to `auv-osworld-action`. Keep one foreground interactive child under
+`agent_action_transport.py` and pass proposals through
+`agent_action_gateway.py`. The gateway requires a first AUV capture before
+any action, and each action must cite the latest checkpoint as
+`based_on: {run_id, path, sha256}`. It verifies the PNG bytes and Rust
+checkpoint/action/terminal sidecars, records receipts, and rejects stale or
+out-of-order proposals. Capture and action budgets are caller-declared. The
+agent selects actions; the relay must not silently substitute task-specific
+ones. Use a fresh episode directory and resource names for every retry.
+
+Run the `boot → install → setup` phases above, then keep `Episode.forward(auv=True)`
+open around the foreground child and agent proposal loop. Launch that
+operator-side relay in a PTY or another transport proven to keep stdin open:
+a non-PTY `exec_command` launch closed stdin immediately in one live attempt.
+Wait for `ready`, request the first `capture`, and show only its AUV PNG to the
+blind agent. Relay one typed action proposal, wait for its receipt, request a
+new `capture`, and repeat. The agent should explicitly `finish` or `abort`;
+EOF is not a successful terminal message. The Rust action child now allows
+240 seconds between requests, but its 570-second total deadline still applies.
+Operator stalls and model latency count against these deadlines. A timeout
+with no action receipt is infrastructure failure, not evidence of agent task
+failure. Prompt-only tool restrictions do not enforce a sub-agent sandbox;
+do not describe this as a fully isolated benchmark harness.
+
+After terminal receipt, compare `agent_decisions.json` with
+`action-requests.json`, `checkpoints.json`, `input-action-results.json`, and
+`action_evidence.json`; verify every PNG SHA256. Then run the pinned
+`evaluate` phase and UID-safe `reset` phase. Record the raw score separately
+from driver delivery (`succeeded` is not semantic verification). The first
+successful one-Run Codex canary is documented in the
+[evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md); its temporary
+relay is not a committed general-purpose model connector. Guest-local
+gateway, enforced tool isolation, model pinning, and a predeclared cohort
+still require separate work.
+
 ### Scripted Chrome V1 one-task batch
 
 For the fixed Chrome `Favorites` task only, `k8s_task_controller.py` now

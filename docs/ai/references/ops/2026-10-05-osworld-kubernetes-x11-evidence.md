@@ -1550,6 +1550,70 @@ matching Pods or Services. The hot V1 PVC/PV UIDs remained
 paired-remote **live gateway input/evidence path**, not a model/tool-sandbox
 test, agent task pass, guest-local gateway run, or benchmark rate.
 
+### One-Run blinded Codex gateway canary and idle-timeout regression
+
+On 2026-10-06, the operator predeclared one selected Chrome V1 `Favorites`
+canary with a fresh `fork_turns=none` Codex sub-agent, at most 32 actions and
+32 captures, and a 540-second agent wall budget. The [successful episode
+protocol](/private/tmp/auv-osworld-blind-gateway-chrome-1006d.C0wwiA/protocol.json)
+SHA256 was `11e7fe94fe65b4fc62bb3cfba2cf1f30df5ff376c04d3addb1e9496afef120a2`;
+the [episode config](/private/tmp/auv-osworld-blind-gateway-chrome-1006d.C0wwiA/chrome-blind-gw-1006d/config.json)
+SHA256 was `83fe9369c051b7b3d88f2b279f09493ac299e5049075bcfefdcf2d22f4270da3`.
+The attended temporary relay used `AgentActionGateway` and
+`ForegroundActionTransport`; its final SHA256 was
+`950d0d56b386fc7e7e033d75ad8772db9462d9a483333417e7d2050958ea5d3e`.
+It chose no GUI actions or evaluator results: the Codex sub-agent saw only
+the official instruction and AUV-generated PNG paths, and replied with one
+typed proposal per screenshot. The operator forwarded each proposal through
+the gateway and captured the next AUV screenshot. These tool restrictions
+were prompt-level, not a separately enforced sub-agent sandbox.
+
+Two aborted infrastructure attempts were excluded from the agent-result
+denominator. The first relay was launched without a PTY, received stdin EOF,
+and canceled Run `a150c1974208af858b1fd4908b62c38c` with no capture or
+action. The next fresh episode reached one capture, but the original
+60-second Rust interactive idle deadline expired during the agent's first
+deliberation. Run `11b836eb5522ddb6e5ef098435de0eef` had one checkpoint,
+no action receipt, a pending HOTKEY proposal, and no final artifact;
+its [decision trace](/private/tmp/auv-osworld-blind-gateway-chrome-1006c.H9wUJK/chrome-blind-gw-1006c/agent_decisions.json)
+SHA256 was `dbce1e0b467e9d8646418ebc8804b8dd7984f57b4647ade535de0e9e8bec2633`.
+The Rust idle bound was changed from 60 to 240 seconds while retaining the
+570-second total Run budget. Both aborted episodes were UID-safely reset
+before retry; neither was scored as an agent task failure.
+
+The final fresh `liet-gpu-1` QEMU/KVM overlay passed the pinned base-image,
+guest AUV install/pair, and official Chrome setup checks. One AUV Run
+`a7a7f62d543938f5afcff1f4977de8da` completed 12 ordered requests:
+six captures interleaved with five agent-selected typed inputs (`HOTKEY`,
+`RIGHT_CLICK`, `CLICK`, `TYPING`, `CLICK`), then `finish`. Every action cited
+the immediately preceding checkpoint's Run ID and byte SHA256. The
+[decision trace](/private/tmp/auv-osworld-blind-gateway-chrome-1006d.C0wwiA/chrome-blind-gw-1006d/agent_decisions.json)
+SHA256 was `ba793ef60ab279fb071b1b3884794e52714dd94cc80fa5b7c562bfec1db9b77a`:
+`status=finished`, 12 receipts, no pending request. It matched the Rust
+[request log](/private/tmp/auv-osworld-blind-gateway-chrome-1006d.C0wwiA/chrome-blind-gw-1006d/action-requests.json)
+SHA256 `ed1aab8cef5b20e170bd37bd44a6278e2c5da816033dd8add513926f50712233`,
+[input results](/private/tmp/auv-osworld-blind-gateway-chrome-1006d.C0wwiA/chrome-blind-gw-1006d/input-action-results.json)
+SHA256 `56b2ae5e60ce356787de98933cfc5ecad76e23520208e5432a0b06cf6f70bbb6`,
+and [terminal sidecar](/private/tmp/auv-osworld-blind-gateway-chrome-1006d.C0wwiA/chrome-blind-gw-1006d/action_evidence.json)
+SHA256 `fc7de3164cda5388405c2bd3e29b4adb46424ca930c0d24057735a94764edb5c`.
+All five driver deliveries reported `succeeded=true`, `verified=false`;
+their semantic outcome was assessed separately. The [final AUV
+PNG](/private/tmp/auv-osworld-blind-gateway-chrome-1006d.C0wwiA/chrome-blind-gw-1006d/final-screenshot.png)
+SHA256 was `ef411759b5eaace675aed410bb26e225a836352773db7a7e32ea52a33b8e6de6`.
+The pinned upstream Chrome evaluator (`b138d348256078fa634fc3b73567a7337c793e6b`,
+task SHA256 `4ddb526e5f3b9efa72a01e3ccae86ee4d698f480e4a526f9dfde85fd9499559c`)
+returned raw `1.0`.
+
+UID-preconditioned reset removed only this episode's proxy Pod
+`3bee5e44-13e9-489d-a193-f2ed9207403b`, Service
+`9c5b93a9-7ee1-4d38-a545-cdde3c915cff`, and QEMU Pod
+`6a1bde55-91fe-45b3-86d8-0707bb387e3c`. The V1 hot PVC/PV UIDs stayed
+`34143535-4ac2-42f2-a443-08db3f6b49ff` and
+`8e8e46f1-0670-4a55-b06a-8caebb4d5a73`. This is **one selected,
+exploratory agent success** through the paired-remote one-Run gateway, not
+a benchmark completion rate, enforced tool isolation, guest-local gateway
+evidence, or V2.1 agent-gateway evidence.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

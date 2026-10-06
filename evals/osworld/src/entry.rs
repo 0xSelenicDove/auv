@@ -30,7 +30,10 @@ const MAX_INTERACTIVE_REQUEST_BYTES: usize = 1024 * 1024;
 const MAX_INTERACTIVE_ACTIONS: usize = 1_000;
 const MAX_INTERACTIVE_CAPTURES: usize = 32;
 const INTERACTIVE_BUDGET: Duration = Duration::from_secs(570);
-const INTERACTIVE_IDLE: Duration = Duration::from_secs(60);
+// NOTICE: Agent reasoning between verified captures and the next action can
+// exceed one minute. Keep a shorter idle bound than the total Run budget, but
+// allow deliberation without canceling a healthy foreground session.
+const INTERACTIVE_IDLE: Duration = Duration::from_secs(240);
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "op", deny_unknown_fields)]
