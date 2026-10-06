@@ -871,6 +871,22 @@ absent. The [second ledger](/private/tmp/auv-osworld-v1-negative-live2.wn8vlp/ru
 has SHA256 `7d0c6b66633728e607a1156f700d240851da4f9795133664994c9fc3484f8fc2`.
 The corrected launch-response path has not yet been rechecked live.
 
+A third independently named episode, `osw-v1-neg-1006c`, ran at
+02:39:22–02:42:05 UTC. Boot and the measured backing-file checks passed in
+120.3 seconds. Installation got past `/setup/launch` but stopped after 8.7
+seconds because the pairing command's stdout was not exactly one token line.
+The original adapter did not record the guest command's `returncode` or safe
+stdout shape, so this run cannot distinguish a failed command from an empty or
+multiline success response. The pinned OSWorld `/setup/execute` can return
+HTTP 200 with `status=success` for a nonzero guest exit. Regression tests now
+require a zero exit and record only stderr/stdout hashes, byte counts, and
+token-line count on failure; bearer material is never printed. The
+[third ledger](/private/tmp/auv-osworld-v1-negative-live3.mcTGGX/run/ledger.json)
+records no AUV Run or score. Reset completed in 34.1 seconds, removing the
+task-owned VM Pod, proxy Pod, and Service by UID preconditions; the V1 hot
+PVC/PV remained Bound and the pairing profile was absent. The revised
+pairing diagnostics have not yet been rechecked live.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

@@ -109,12 +109,43 @@ class AdapterTest(unittest.TestCase):
                 adapter.load_config(path)
 
     def test_guest_control_rejects_osworld_relay_of_auv_gui_input(self):
-        with patch.object(self.episode, "_post") as post:
+        with patch.object(self.episode, "_post", return_value={
+            "status": "success", "output": "known", "error": "", "returncode": 0,
+        }) as post:
             with self.assertRaisesRegex(ValueError, "forbidden"):
                 self.episode.guest_control(["/home/user/auv", "invoke", "input.clickPoint", "10", "20"])
             post.assert_not_called()
             self.episode.guest_control(["sha256sum", "/home/user/auv"])
             post.assert_called_once_with("/setup/execute", {"command": ["sha256sum", "/home/user/auv"], "shell": False})
+
+    def test_guest_control_rejects_nonzero_command_behind_http_200_without_leaking_output(self):
+        # ROOT CAUSE:
+        # OSWorld /setup/execute returns HTTP 200 and status=success even when
+        # the guest command exits nonzero. Ignoring returncode hid the pairing
+        # failure behind an empty token output.
+        secret = "do-not-log-this-pairing-value"
+        response = {"status": "success", "output": "", "error": secret, "returncode": 1}
+        with patch.object(self.episode, "_post", return_value=response):
+            with self.assertRaisesRegex(RuntimeError, "returncode=1") as caught:
+                self.episode.guest_control(["env", "AUV_ENDPOINT=unix:///home/user/auv.sock", "/home/user/auv", "devices", "pair", "create-token"])
+        self.assertNotIn(secret, str(caught.exception))
+        self.assertIn("stderr_sha256=", str(caught.exception))
+
+    def test_pair_token_shape_failure_reports_metadata_not_bearer(self):
+        secret = "do-not-log-this-pairing-value"
+        reply = {"status": "success", "output": f"warning\n{secret}\n", "error": "", "returncode": 0}
+        good = lambda output: {"status": "success", "output": output, "error": "", "returncode": 0}
+        with patch.object(self.episode, "assert_identity"), \
+             patch.object(self.episode, "forward", return_value=nullcontext()), \
+             patch.object(adapter, "_run", return_value=""), \
+             patch.object(self.episode, "guest_control", side_effect=[
+                 good(""), good(adapter.GUEST_AUV_SHA256 + "  /home/user/auv"), good("auv 0.0.28"), reply,
+             ]), \
+             patch.object(self.episode, "_post", return_value="launched successfully"):
+            with self.assertRaisesRegex(ValueError, "stdout_lines=2") as caught:
+                self.episode.install()
+        self.assertNotIn(secret, str(caught.exception))
+        self.assertIn("stdout_sha256=", str(caught.exception))
 
     def test_launch_accepts_pinned_upstream_plain_text_success(self):
         # ROOT CAUSE:

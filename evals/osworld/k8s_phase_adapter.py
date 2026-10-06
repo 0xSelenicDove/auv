@@ -415,7 +415,20 @@ class Episode:
         )
         if command not in allowed:
             raise ValueError("unreviewed guest command or AUV GUI invoke is forbidden")
-        return self._post("/setup/execute", {"command": command, "shell": False})
+        result = self._post("/setup/execute", {"command": command, "shell": False})
+        if not isinstance(result, dict) or not isinstance(result.get("output"), str) or \
+           not isinstance(result.get("error"), str) or isinstance(result.get("returncode"), bool) or \
+           not isinstance(result.get("returncode"), int):
+            raise ValueError("pinned /setup/execute returned an invalid command result")
+        if result.get("status") != "success" or result["returncode"] != 0:
+            # The pinned endpoint reports HTTP 200 and status=success even
+            # when subprocess.run returned nonzero. Never expose stdout here:
+            # create-token would put a bearer token in that field on success.
+            error_digest = hashlib.sha256(result["error"].encode()).hexdigest()
+            raise RuntimeError(f"guest control failed: status={result.get('status')!r} "
+                               f"returncode={result['returncode']} stderr_sha256={error_digest} "
+                               f"stderr_bytes={len(result['error'].encode())}")
+        return result
 
     def boot(self) -> None:
         c = self.config
@@ -479,9 +492,13 @@ class Episode:
                       "--pairing-store", "/home/user/.local/share/auv-osworld/pairings.json",
                       "--store-root", "/home/user/.local/share/auv-osworld", "--no-register"]
             self._post("/setup/launch", {"command": daemon, "shell": False})
-            token = self.guest_control(["env", "AUV_ENDPOINT=unix:///home/user/auv.sock", "/home/user/auv", "devices", "pair", "create-token"]).get("output", "").strip()
+            token_output = self.guest_control(["env", "AUV_ENDPOINT=unix:///home/user/auv.sock", "/home/user/auv", "devices", "pair", "create-token"])["output"]
+            token = token_output.strip()
             if not token or "\n" in token:
-                raise ValueError("owner socket did not return one pairing token")
+                # Preserve only shape and digest; stdout could contain a bearer token.
+                raise ValueError(f"owner socket token shape invalid: stdout_bytes={len(token_output.encode())} "
+                                 f"stdout_lines={len(token.splitlines())} "
+                                 f"stdout_sha256={hashlib.sha256(token_output.encode()).hexdigest()}")
             env = {**os.environ, "AUV_CONFIG_PROFILES_FILE": str(profile_path),
                    "AUV_DISCOVERY_FILE": str(self.directory / "no-local-discovery.json")}
             result = _run([c["host_auv_binary"], "devices", "pair", "--endpoint",

@@ -281,11 +281,16 @@ disposable-disk lifecycle. Retain the failed episode and denominator in the
 
 A second, newly named episode passed the corrected live backing-file overlay
 audit and UID-stable boot. It stopped in install because the adapter parsed
-the pinned upstream `/setup/launch` success text as JSON. Reset succeeded and
-removed all task resources without changing the hot PVC/PV. A test-first
-response-contract fix now passes locally, but has not yet reached a live
-capture/evaluator gate. Both failed episodes remain in the evidence note;
-neither contributes a benchmark score.
+the pinned upstream `/setup/launch` success text as JSON. A third episode
+passed boot and the corrected launch parser, then stopped on an invalid
+pairing-token output shape. The pinned `/setup/execute` reports HTTP 200 even
+for a nonzero guest command; the old adapter ignored its exit code, so the
+third gate cannot establish whether the command failed or returned malformed
+stdout. Test-first changes now require zero exit and report only token-safe
+metadata on failure. Reset succeeded in both episodes and removed all task
+resources without changing the hot PVC/PV. All three failed episodes remain
+in the evidence note; none contributes a benchmark score. The revised
+pairing diagnostics still need a fresh live gate.
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
