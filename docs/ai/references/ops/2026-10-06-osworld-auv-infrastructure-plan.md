@@ -633,8 +633,10 @@ The relay does not enforce isolation from the agent's other tools, and this
 one-task attempt is not a cohort or completion rate. The Task044 setup and
 evaluator bridge now has pinned source, asset, and OpenCV checks plus offline
 boundary tests. A six-phase capture-only Task044 adapter and an attended
-`v2-task044` AUV relay route have also passed local tests, but neither has
-fresh live acceptance. A two-task V2.1 Codex-agent
+`v2-task044` AUV relay route have also passed local tests. The adapter then
+passed one fresh six-phase capture-only control: original raw Task044 score
+`0.0`, AUV PNG showing Shotcut's loading splash, and UID-safe cleanup.
+The agent relay remains untested live for Task044. A two-task V2.1 Codex-agent
 pilot has been [predeclared](2026-10-07-osworld-v2-codex-agent-cohort.md)
 before either cohort guest boots. It remains exploratory because Codex tool
 isolation is prompt-only; a verifiable model/tool boundary is still a later

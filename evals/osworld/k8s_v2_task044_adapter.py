@@ -106,7 +106,10 @@ class Episode(cluster.Episode):
         with self.forward(setup=True):
             output = cluster._run(command, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
         self.assert_identity()
-        result = json.loads(output.splitlines()[-1])
+        lines = output.splitlines(keepends=True)
+        if not lines:
+            raise ValueError("pinned V2 Task044 bridge returned no result")
+        result = json.loads(lines[-1])
         if result.get("phase") != ("prepare" if phase == "setup" else "evaluate") or \
                 result.get("task_sha256") != task044.TASK_SHA256 or \
                 result.get("upstream_revision") != task044.UPSTREAM_REV or \
@@ -120,6 +123,10 @@ class Episode(cluster.Episode):
                     isinstance(score, bool) or not isinstance(score, (int, float)) or \
                     not 0 <= raw <= 1 or score != raw:
                 raise ValueError("pinned V2 Task044 bridge returned no bounded raw float score")
+            # The original scorer prints diagnostic lines before the bridge's
+            # JSON receipt. Preserve them only after validating the receipt;
+            # batch_runner still consumes the last JSON line as the score.
+            print("".join(lines[:-1]), end="")
         print(json.dumps(result, sort_keys=True))
 
     def action(self) -> None:

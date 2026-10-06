@@ -130,6 +130,24 @@ class Task044AdapterTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "raw float score"):
                 self.episode.evaluator("evaluate")
 
+    def test_evaluator_preserves_upstream_diagnostics_before_final_json(self):
+        cluster.write_json(self.directory / "paired-device.json", {"guest_auv_sha256": adapter.GUEST_AUV_SHA256})
+        receipt = {"phase": "evaluate", "task_sha256": adapter.task044.TASK_SHA256,
+                   "upstream_revision": adapter.task044.UPSTREAM_REV,
+                   "asset_sha256": adapter.task044.ASSET_SHA256,
+                   "opencv_python": adapter.task044.OPENCV_DIST_VERSION,
+                   "result": 0.0, "score": 0.0}
+        diagnostics = "[Task044] Exported video promo_video_v1.mp4 not found → score=0.0\n"
+        output = io.StringIO()
+        with patch.object(self.episode, "assert_identity"), \
+             patch.object(self.episode, "forward", return_value=nullcontext()), \
+             patch.object(cluster, "_run", return_value=diagnostics + json.dumps(receipt) + "\n"), \
+             redirect_stdout(output):
+            self.episode.evaluator("evaluate")
+        lines = output.getvalue().splitlines()
+        self.assertEqual(lines[0], diagnostics.rstrip("\n"))
+        self.assertEqual(json.loads(lines[-1]), receipt)
+
     def test_action_is_inherited_auv_capture_with_byte_checked_png(self):
         cluster.write_json(self.directory / "paired-device.json", {"guest_auv_sha256": adapter.GUEST_AUV_SHA256,
                                                                  "device_id": "observed-device"})

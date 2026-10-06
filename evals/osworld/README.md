@@ -589,8 +589,10 @@ environment and a fresh config using the same common lifecycle fields as
 Task099, plus absolute `task_source`/`asset` paths and measured
 `host_auv_sha256`. The Task044 adapter does not take Task099's foreground
 action-binary fields. Inspect the manifest before running `batch_runner.py`.
+One fresh live Task044 control completed all six phases with raw missing-export
+`0.0`; its AUV PNG showed Shotcut still loading plugins. See the
+[acceptance record](../../docs/ai/references/ops/2026-10-07-osworld-v2-task044-control-acceptance.md).
 An attended blind-agent action phase can instead use
 `agent_action_relay.py --adapter v2-task044` after successful `boot`,
 `install`, and `setup`; the relay does not enforce tool isolation beyond its
-own AUV route. The adapter and relay have passed local tests but have not yet
-passed a fresh live Task044 episode.
+own AUV route. That blind agent path has not yet run for the predeclared pilot.

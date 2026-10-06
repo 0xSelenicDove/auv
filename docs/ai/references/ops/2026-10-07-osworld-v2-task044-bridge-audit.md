@@ -35,7 +35,8 @@ source, getter, asset, or OpenCV package before guest access. Offline tests
 exercise those pins, endpoint/path/command allowlists, exact setup receipts,
 the original scorer's crop/Center/size/resolution boundaries, legitimate
 missing-output zeroes, and evaluator failure layering. The complete
-`evals/osworld/tests` suite passed **151 tests, 10 skipped** under local
+`evals/osworld/tests` suite passed **152 tests, 10 skipped** after the
+raw-diagnostic regression test. The tests used local
 CPython 3.12.13 with `opencv-python==4.8.1.78`,
 `numpy==1.26.4`, and `requests==2.34.2`. The skips are unrelated optional
 fixtures; this is local test evidence, not live guest acceptance.
@@ -45,7 +46,8 @@ prove a reused local port-forward still reaches the original Pod. The new
 `k8s_v2_task044_adapter.py` uses the existing six-phase lifecycle to pin Pod
 identity, require a fresh overlay, capture through AUV, and perform
 UID-preconditioned task-owned cleanup. Its fixed action is capture-only, and
-it has **not** yet passed a live Task044 episode. The relay now accepts
+it subsequently passed a [live capture-only control](2026-10-07-osworld-v2-task044-control-acceptance.md).
+The relay now accepts
 `--adapter v2-task044` for a later attended agent action phase; it does not
 enforce isolation from the agent's other tools. The earlier exploratory Task044 score
 `0.6000000000000001` remains separate from any future cohort denominator.
