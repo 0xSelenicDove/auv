@@ -106,14 +106,13 @@ impl KeyboardHoldController {
     if backend.key_count() == 0 {
       return Err(invalid("keys must not be empty"));
     }
-    if let Some(identity) = &identity {
-      if identity.route.is_empty()
+    if let Some(identity) = &identity
+      && (identity.route.is_empty()
         || identity.keys.len() != backend.key_count()
         || identity.keys.iter().any(String::is_empty)
-        || identity.keys.iter().enumerate().any(|(index, key)| identity.keys[..index].contains(key))
-      {
-        return Err(invalid("independent keyboard hold requires a route and distinct native keys"));
-      }
+        || identity.keys.iter().enumerate().any(|(index, key)| identity.keys[..index].contains(key)))
+    {
+      return Err(invalid("independent keyboard hold requires a route and distinct native keys"));
     }
     let deadline = Instant::now() + timeout;
     let id = {
@@ -291,10 +290,7 @@ impl KeyboardHold {
     let deadline = Instant::now().checked_add(duration).ok_or_else(|| invalid("keyboard hold duration exceeds the platform clock range"))?;
     let mut state = self.controller.state.lock().unwrap();
     let mut cancelled = false;
-    loop {
-      let Some(held) = state.held.iter().find(|held| Some(held.id) == self.id) else {
-        break;
-      };
+    while let Some(held) = state.held.iter().find(|held| Some(held.id) == self.id) {
       cancelled = held.cancellation.as_ref().is_some_and(|flag| flag.is_cancelled());
       let remaining = deadline.saturating_duration_since(Instant::now());
       if cancelled || remaining.is_zero() {
