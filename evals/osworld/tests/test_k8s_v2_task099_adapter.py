@@ -188,6 +188,81 @@ class Task099AdapterTest(unittest.TestCase):
         self.assertEqual(uploads, 1)
         self.assertEqual(json.loads((self.directory / "paired-device.json").read_text())["device_id"], "paired-device")
 
+    def test_install_waits_for_exact_owner_socket_connect_failure(self):
+        # ROOT CAUSE:
+        # The failed cohort install's 60-byte stderr SHA256 matches the AUV
+        # CLI error for connecting to a nonexistent owner Unix socket. A
+        # launch receipt does not prove that socket is listening yet.
+        token_calls = 0
+
+        def post(route, value):
+            nonlocal token_calls
+            if route == "/setup/launch":
+                return "/home/user/auv serve launched successfully"
+            self.assertEqual(route, "/setup/execute")
+            command = value["command"]
+            if command == ["test", "-e", "/home/user/auv"]:
+                return {"status": "success", "output": "", "error": "", "returncode": 1}
+            if command == ["sha256sum", "/home/user/auv"]:
+                output = adapter.GUEST_AUV_SHA256 + "  /home/user/auv\n"
+            elif command == ["/home/user/auv", "--version"]:
+                output = "auv 0.0.28\n"
+            elif command[-3:] == ["devices", "pair", "create-token"]:
+                token_calls += 1
+                if token_calls < 3:
+                    return {"status": "success", "output": "",
+                            "error": "error: failed to connect to AUV API server: transport error\n", "returncode": 1}
+                output = "fixture-token\n"
+            else:
+                output = ""
+            return {"status": "success", "output": output, "error": "", "returncode": 0}
+
+        def run(command, **_kwargs):
+            if command[0] == "curl":
+                return ""
+            self.assertEqual(command[0], self.config["host_auv_binary"])
+            return json.dumps({"device_id": "paired-device"})
+
+        with patch.object(self.episode, "assert_identity"), \
+             patch.object(self.episode, "forward", return_value=nullcontext()), \
+             patch.object(cluster, "_run", side_effect=run), \
+             patch.object(self.episode, "_post", side_effect=post), \
+             patch.object(cluster.time, "sleep") as sleep, \
+             redirect_stdout(io.StringIO()):
+            self.episode.install()
+        self.assertEqual(token_calls, 3)
+        self.assertEqual(sleep.call_count, 2)
+        self.assertEqual(json.loads((self.directory / "paired-device.json").read_text())["device_id"], "paired-device")
+
+    def test_install_owner_socket_wait_expires_without_pairing(self):
+        token_calls = 0
+
+        def control(command):
+            nonlocal token_calls
+            if command == ["test", "-e", "/home/user/auv"]:
+                return {"returncode": 1}
+            if command == ["sha256sum", "/home/user/auv"]:
+                return {"output": adapter.GUEST_AUV_SHA256 + "  /home/user/auv\n"}
+            if command == ["/home/user/auv", "--version"]:
+                return {"output": "auv 0.0.28\n"}
+            if command[-3:] == ["devices", "pair", "create-token"]:
+                token_calls += 1
+                raise cluster.GuestControlError("success", 1, "error: failed to connect to AUV API server: transport error\n")
+            return {"output": ""}
+
+        with patch.object(self.episode, "assert_identity"), \
+             patch.object(self.episode, "forward", return_value=nullcontext()), \
+             patch.object(cluster, "_run", return_value=""), \
+             patch.object(self.episode, "guest_control", side_effect=control), \
+             patch.object(self.episode, "_post", return_value="/home/user/auv serve launched successfully"), \
+             patch.object(cluster.time, "monotonic", side_effect=[100.0, 100.0, 115.0]), \
+             patch.object(cluster.time, "sleep") as sleep:
+            with self.assertRaisesRegex(TimeoutError, "owner socket readiness deadline expired"):
+                self.episode.install()
+        self.assertEqual(token_calls, 2)
+        sleep.assert_called_once_with(0.25)
+        self.assertFalse((self.directory / "paired-profiles.json").exists())
+
     def test_install_rejects_existing_guest_binary_with_wrong_hash_before_chmod_or_upload(self):
         commands = []
 

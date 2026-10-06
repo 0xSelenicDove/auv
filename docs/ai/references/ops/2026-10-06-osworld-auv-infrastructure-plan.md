@@ -636,8 +636,8 @@ boundary tests. A six-phase capture-only Task044 adapter and an attended
 `v2-task044` AUV relay route have also passed local tests. The adapter then
 passed one fresh six-phase capture-only control: original raw Task044 score
 `0.0`, AUV PNG showing Shotcut's loading splash, and UID-safe cleanup.
-The agent relay remains untested live for Task044. A two-task V2.1 Codex-agent
-pilot was [predeclared](2026-10-07-osworld-v2-codex-agent-cohort.md)
+A two-task V2.1 Codex-agent pilot was
+[predeclared](2026-10-07-osworld-v2-codex-agent-cohort.md)
 before either cohort guest booted. It then ran with denominator 2:
 Task099 stopped during install/pairing before agent action and has **no
 score**; Task044 ran one Codex AUV Run with 22 actions/23 captures, ended
@@ -648,6 +648,19 @@ Codex tool isolation remained prompt-only. See the
 [fixed-control acceptance](2026-10-07-osworld-v2-task099-bridge-acceptance.md)
 and [agent attempt](2026-10-07-osworld-v2-task099-codex-agent-attempt.md),
 and the [Task044 bridge audit](2026-10-07-osworld-v2-task044-bridge-audit.md).
+
+Post-cohort Task099 diagnostics found that the failed owner-token call's
+redacted stderr exactly matches AUV's error when its Unix owner socket cannot
+be reached. The install adapter now checks the existing guest ELF hash before
+uploading and uses a 15-second retry deadline only for that exact connection
+error, checked between guest-control requests.
+Separate fresh-guest diagnostics covered a first install, a cross-process
+retry after an injected token-boundary stop, and a one-error-then-real-token
+recovery; all three cleaned their task-owned resources. This reduces the
+known installation block but does not establish why the original daemon was
+unreachable or alter the frozen two-task result. The next agent cohort needs
+a new pre-boot declaration; enforced model tool isolation and full upstream
+provider execution remain separate gates.
 
 ### 5. Agent/harness evaluation — two selected V2.1 attempts, no rate
 

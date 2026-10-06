@@ -36,6 +36,10 @@ RUNTIME_IMAGE = "happysixd/osworld-docker@sha256:0e6497a9295647cf05bf2b2af522fdd
 AUV_SOURCE = "25e2320570a72d3b9580451ea2917a9e03fa6b95"
 GUEST_AUV_SHA256 = "2a8e53eecfef1dcd8fa8368fa480d6df36e254527c7e60be3ac82802e7073427"
 HOST_AUV_SHA256 = "cf9485c4a2ec0fbf14c0fa6f874ef77decba00f8c61ae704ec67b77915a3c08a"
+# Captured from the pinned AUV CLI against an absent owner Unix socket. The
+# original Task099 install failure had this exact stderr digest and byte count.
+OWNER_SOCKET_CONNECT_ERROR_SHA256 = "3a4ad1a7afba61ab14d83c68bf3a9ebcdc830260319d0b76be521d6184f6281c"
+OWNER_SOCKET_CONNECT_ERROR_BYTES = 60
 # NOTICE: The pinned Ubuntu guest lacks libtesseract.so.4, which the pinned
 # Jammy AUV ELF needs even for --version. Install only the runbook-validated
 # packages in this disposable guest; remove this step when the guest image or
@@ -155,6 +159,18 @@ def _run(argv: list[str], *, env: dict | None = None, input_text: str | None = N
     if result.returncode:
         raise RuntimeError(f"{argv[0]} exited {result.returncode}: {result.stderr[-1000:]}")
     return result.stdout
+
+
+class GuestControlError(RuntimeError):
+    """Failed allowlisted guest command, with stderr represented only by metadata."""
+
+    def __init__(self, status: object, returncode: int, stderr: str):
+        self.status = status
+        self.returncode = returncode
+        self.stderr_sha256 = hashlib.sha256(stderr.encode()).hexdigest()
+        self.stderr_bytes = len(stderr.encode())
+        super().__init__(f"guest control failed: status={status!r} returncode={returncode} "
+                         f"stderr_sha256={self.stderr_sha256} stderr_bytes={self.stderr_bytes}")
 
 
 class Episode:
@@ -469,10 +485,7 @@ class Episode:
             # The pinned endpoint reports HTTP 200 and status=success even
             # when subprocess.run returned nonzero. Never expose stdout here:
             # create-token would put a bearer token in that field on success.
-            error_digest = hashlib.sha256(result["error"].encode()).hexdigest()
-            raise RuntimeError(f"guest control failed: status={result.get('status')!r} "
-                               f"returncode={result['returncode']} stderr_sha256={error_digest} "
-                               f"stderr_bytes={len(result['error'].encode())}")
+            raise GuestControlError(result.get("status"), result["returncode"], result["error"])
         return result
 
     def boot(self) -> None:
@@ -545,11 +558,28 @@ class Episode:
                       "--pairing-store", "/home/user/.local/share/auv-osworld/pairings.json",
                       "--store-root", "/home/user/.local/share/auv-osworld", "--no-register"]
             self._post("/setup/launch", {"command": daemon, "shell": False})
-            # TODO(osworld-owner-socket-readiness): The launch receipt only
-            # proves Popen accepted the daemon. A live V2.1 install returned
-            # create-token exit 1 before pairing; diagnose its redacted
-            # stderr and add bounded owner-socket readiness before retrying.
-            token_output = self.guest_control(["env", "AUV_ENDPOINT=unix:///home/user/auv.sock", "/home/user/auv", "devices", "pair", "create-token"])["output"]
+            # NOTICE: /setup/launch confirms only Popen, not owner-socket readiness.
+            # The original daemon failure cause is unknown. Retry only the measured
+            # connection-error fingerprint so unrelated failures remain visible.
+            # Remove this poll when the pinned guest exposes a reliable readiness
+            # signal or the daemon startup failure is diagnosed and fixed.
+            token_command = ["env", "AUV_ENDPOINT=unix:///home/user/auv.sock", "/home/user/auv", "devices", "pair", "create-token"]
+            deadline = time.monotonic() + 15
+            attempts = 0
+            while True:
+                attempts += 1
+                try:
+                    token_output = self.guest_control(token_command)["output"]
+                    break
+                except GuestControlError as error:
+                    if (error.status, error.returncode, error.stderr_sha256, error.stderr_bytes) != (
+                        "success", 1, OWNER_SOCKET_CONNECT_ERROR_SHA256, OWNER_SOCKET_CONNECT_ERROR_BYTES,
+                    ):
+                        raise
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError(f"owner socket readiness deadline expired after {attempts} attempts") from error
+                    time.sleep(min(0.25, remaining))
             token = token_output.strip()
             if not token or "\n" in token:
                 # Preserve only shape and digest; stdout could contain a bearer token.

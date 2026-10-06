@@ -109,7 +109,7 @@ uploading. If it exists, install reads its SHA256 and proceeds only when it
 matches the pinned guest binary. This prevents a retry from blindly writing
 over a possibly running AUV ELF. A regression test reproduced the observed
 sequence—first token creation fails, then a duplicate upload returns HTTP
-500—and passed after the change. The offline OSWorld suite passed 155 tests
+500—and passed after the change. The offline OSWorld suite passed 157 tests
 with 10 skips. This test models the observed HTTP failure; it does not prove
 the guest server's precise exception.
 
@@ -119,17 +119,53 @@ The source available locally for `osworld-server` revision
 checking whether the target already exists. Its exception handler returns
 HTTP 500 and attempts to remove the target. Writing a running ELF could
 therefore explain the retry failure, but the exact V2.1 guest server revision
-and HTTP response body were not captured. The original owner-socket token
-failure also has no confirmed root cause.
+and HTTP response body were not captured.
+
+The original token failure's recorded stderr was 60 bytes with SHA256
+`3a4ad1a7afba61ab14d83c68bf3a9ebcdc830260319d0b76be521d6184f6281c`.
+Running the pinned host AUV CLI's `devices pair create-token` against a
+deliberately nonexistent Unix socket produced the same length and digest;
+its stderr was `error: failed to connect to AUV API server: transport error`.
+This identifies the observable failure as an owner-socket connection failure,
+but does not distinguish a startup race from a daemon exit. The adapter now
+retries only that exact status/return code/stderr fingerprint with a 15-second
+deadline checked between requests; each `/setup/execute` request retains its
+30-second HTTP timeout. Different failures remain immediate. Offline tests
+cover a delayed success, deadline expiry, and an unrelated token failure.
+The bounded wait was subsequently exercised on a fresh guest with one
+task-local injected connection failure, as described below.
 
 A separate diagnostic episode, `v2diag099-a1`, used config SHA256
 `77c83e2d1bd3aae7e56f952c27c16108360914afd7b5fa697634ec0048c6cf6c`
 and a fresh KVM overlay on runtime Pod UID
 `2d1dc929-5276-4371-b379-fe2b5489d2fd`. Its first install and AUV pairing
 both succeeded. This establishes one fresh-guest success with the changed
-install path, not live coverage of the retry branch or a stability rate.
-No GUI task setup, action, or evaluator ran. Reset removed the diagnostic
-Pod, proxy, and Service with recorded UID preconditions; `osworld-v2-hot`
-remained Bound, no episode Pods or Services remained, and the local paired
-credential file was removed. These results do not change either cohort member
-or its denominator.
+install path, not a stability rate.
+
+A second, separately named diagnostic episode, `v2diag099-a2`, used config
+SHA256 `6bdeba9d6e08e492f504089e91f0022360a99fd0788fd3cd28d0f3e2a8f527a2`
+on fresh runtime Pod UID `5af7fa41-3096-42a7-b44c-f852774bf800`.
+After real upload, hash verification, package setup, and daemon launch, a
+task-local harness injected one exception immediately before owner-token
+creation. No local paired credential or device receipt existed at that point.
+An unpatched second adapter process then ran `install` against the same Pod
+and completed pairing with pinned guest hash
+`327afaf09f11dd5d8926ee5a16f58ac03e96818afe62e165971c046e45f6bd8e`.
+This is live evidence for recovery from an interrupted install with an existing
+correct ELF; the original cohort's daemon timing or exit was not reproduced
+or explained by the injected exception.
+
+A third independent episode, `v2diag099-a3`, used config SHA256
+`aa07042afe955afa995ed674bf2c825ee94654f38802fbdc865b3725860183b2`
+and fresh runtime Pod UID `5f8ff630-b4c0-4d67-a5d7-89aeecb910f5`.
+After real guest upload, hash verification, and daemon launch, the local
+harness returned the exact measured owner-socket connection error once at
+the token-call boundary. The new bounded wait then called the actual guest
+AUV CLI once, obtained a token without printing it, and completed pairing
+with the pinned binary hash. The injection verifies retry integration with
+a real guest; it does not recreate the original daemon startup timing.
+No GUI task setup, action, or evaluator ran in any diagnostic episode.
+All three resets removed task-owned Pod, proxy, and Service with recorded
+UID preconditions; `osworld-v2-hot` remained Bound, no diagnostic episode
+Pods or Services remained, and local paired credential files were removed.
+These results do not change either cohort member or its denominator.
