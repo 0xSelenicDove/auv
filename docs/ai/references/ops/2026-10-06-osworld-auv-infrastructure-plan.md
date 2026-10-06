@@ -279,6 +279,14 @@ test, but not yet rechecked live. Before retrying, verify the image's actual
 disposable-disk lifecycle. Retain the failed episode and denominator in the
 [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
 
+A second, newly named episode passed the corrected live backing-file overlay
+audit and UID-stable boot. It stopped in install because the adapter parsed
+the pinned upstream `/setup/launch` success text as JSON. Reset succeeded and
+removed all task resources without changing the hot PVC/PV. A test-first
+response-contract fix now passes locally, but has not yet reached a live
+capture/evaluator gate. Both failed episodes remain in the evidence note;
+neither contributes a benchmark score.
+
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
 approval.` After the owner approved access, read-only dry-runs at revision

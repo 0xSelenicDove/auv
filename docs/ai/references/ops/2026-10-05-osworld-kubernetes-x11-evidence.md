@@ -854,6 +854,23 @@ not yet been rechecked in a live episode. The next slice must verify the
 image's actual backing-file overlay mechanism before another attempt. Do not
 reuse this failed episode or report it as a capture-only evaluator control.
 
+A second, independently named episode at 02:27:20–02:30:00 UTC passed boot
+in 116.7 seconds. The [boot evidence](/private/tmp/auv-osworld-v1-negative-live2.wn8vlp/run/chrome-capture-only-b/boot.stdout)
+records QEMU PID 7 using `-enable-kvm -hda /boot.qcow2`, live `qemu-img`
+backing metadata pointing to `/System.qcow2`, the measured base SHA256,
+container-root `overlay` filesystem, an open QEMU FD to the boot file, and
+stable Pod/container identity. This supports a fresh backing-file overlay for
+that guest, not QEMU `-snapshot`. Install then failed after the guest returned
+a successful plain-text `/setup/launch` response: the adapter incorrectly
+called `json.load` on it. The pinned upstream handler explicitly returns
+`"... launched successfully"`; a regression test now reproduces and fixes
+that parsing error. No setup/action/evaluation, AUV Run, or score occurred.
+Reset completed in 34.1 seconds with UID-preconditioned deletion of all three
+resources; the retained hot PVC/PV stayed Bound and the pairing profile was
+absent. The [second ledger](/private/tmp/auv-osworld-v1-negative-live2.wn8vlp/run/ledger.json)
+has SHA256 `7d0c6b66633728e607a1156f700d240851da4f9795133664994c9fc3484f8fc2`.
+The corrected launch-response path has not yet been rechecked live.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

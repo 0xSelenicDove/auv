@@ -116,6 +116,31 @@ class AdapterTest(unittest.TestCase):
             self.episode.guest_control(["sha256sum", "/home/user/auv"])
             post.assert_called_once_with("/setup/execute", {"command": ["sha256sum", "/home/user/auv"], "shell": False})
 
+    def test_launch_accepts_pinned_upstream_plain_text_success(self):
+        # ROOT CAUSE:
+        # The pinned OSWorld /setup/launch returns plain text on HTTP 200.
+        # Parsing it as JSON rejected a successful daemon launch before
+        # pairing, so this response has a distinct explicit contract.
+        response = MagicMock()
+        response.status = 200
+        response.read.return_value = b"/home/user/auv serve launched successfully"
+        with patch.object(adapter.request, "urlopen") as urlopen:
+            urlopen.return_value.__enter__.return_value = response
+            result = self.episode._post("/setup/launch", {"command": ["/home/user/auv", "serve"], "shell": False})
+        self.assertEqual(result, "/home/user/auv serve launched successfully")
+
+    def test_launch_rejects_unconfirmed_text_while_execute_keeps_json_contract(self):
+        response = MagicMock()
+        response.status = 200
+        with patch.object(adapter.request, "urlopen") as urlopen:
+            urlopen.return_value.__enter__.return_value = response
+            response.read.return_value = b"unexpected launch response"
+            with self.assertRaisesRegex(ValueError, "no success confirmation"):
+                self.episode._post("/setup/launch", {"command": ["/home/user/auv", "serve"], "shell": False})
+            response.read.return_value = b'{"output":"known control response"}'
+            result = self.episode._post("/setup/execute", {"command": ["sha256sum", "/home/user/auv"], "shell": False})
+        self.assertEqual(result, {"output": "known control response"})
+
     def test_service_selects_runtime_not_proxy(self):
         created = []
         with patch.object(self.episode, "_retained_pvc", return_value={"name": "osworld-v1-hot"}), \

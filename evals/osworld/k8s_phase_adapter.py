@@ -372,10 +372,18 @@ class Episode:
             targets = ", ".join(f"{kind}/{name} uid={uid}" for (kind, name), uid in sorted(pending.items()))
             raise TimeoutError(f"UID-preconditioned deletion did not remove: {targets}")
 
-    def _post(self, route: str, value: dict) -> dict:
+    def _post(self, route: str, value: dict) -> dict | str:
         url = f"http://127.0.0.1:{self.config['setup_local_port']}{route}"
         body = json.dumps(value).encode()
         with request.urlopen(request.Request(url, data=body, headers={"Content-Type": "application/json"}), timeout=30) as response:
+            if route == "/setup/launch":
+                # NOTICE: The pinned V1 server returns plain text here, unlike
+                # /setup/execute. Keep its success contract explicit instead
+                # of treating a JSON parse failure as a launch failure.
+                launched = response.read().decode("utf-8")
+                if not launched.endswith(" launched successfully"):
+                    raise ValueError("pinned /setup/launch returned no success confirmation")
+                return launched
             return json.load(response)
 
     def _stable_guest_control(self) -> None:
