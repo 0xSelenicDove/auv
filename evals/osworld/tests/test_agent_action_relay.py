@@ -1,24 +1,21 @@
 """Offline relay checks use one fake AUV child and no Kubernetes connection."""
 
-from contextlib import contextmanager
 import hashlib
 import io
 import json
 import os
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
+from pathlib import Path
 from unittest.mock import patch
 
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-import agent_action_relay as relay  # noqa: E402
-import k8s_phase_adapter as phase  # noqa: E402
-import k8s_v2_task099_adapter as v2_phase  # noqa: E402
-import k8s_v2_task044_adapter as v2_task044  # noqa: E402
-from test_agent_action_transport import FAKE_CHILD  # noqa: E402
+from auv_osworld import agent_action_relay as relay
+from auv_osworld import k8s_phase_adapter as phase
+from auv_osworld import k8s_v2_task044_adapter as v2_task044
+from auv_osworld import k8s_v2_task099_adapter as v2_phase
+from test_agent_action_transport import FAKE_CHILD
 
 
 class FakeEpisode:
@@ -48,12 +45,24 @@ class AgentActionRelayTest(unittest.TestCase):
         self.binary.write_text(f"#!{sys.executable}\n" + FAKE_CHILD)
         self.binary.chmod(0o700)
         self.binary_hash = hashlib.sha256(self.binary.read_bytes()).hexdigest()
-        (self.directory / "paired-device.json").write_text(json.dumps({"device_id": "device-1",
-            "guest_auv_sha256": phase.GUEST_AUV_SHA256}))
+        (self.directory / "paired-device.json").write_text(
+            json.dumps({"device_id": "device-1", "guest_auv_sha256": phase.GUEST_AUV_SHA256})
+        )
         self.profile_path = self.directory / "paired-profiles.json"
-        self.profile_path.write_text(json.dumps({"profiles": {"episode-1": {
-            "device_id": "device-1", "device_name": "guest", "endpoint": "http://127.0.0.1:38001",
-            "device_credential": "test-secret"}}}))
+        self.profile_path.write_text(
+            json.dumps(
+                {
+                    "profiles": {
+                        "episode-1": {
+                            "device_id": "device-1",
+                            "device_name": "guest",
+                            "endpoint": "http://127.0.0.1:38001",
+                            "device_credential": "test-secret",
+                        }
+                    }
+                }
+            )
+        )
         self.config_patch = patch.object(phase, "load_config", return_value=self.config)
         self.config_patch.start()
         self.addCleanup(self.config_patch.stop)
@@ -75,23 +84,41 @@ class AgentActionRelayTest(unittest.TestCase):
         FakeEpisode.forwards.clear()
         with patch.object(phase, "Episode", FakeEpisode):
             try:
-                code = relay.relay(config, directory, binary, prepared,
-                                   max_actions=2, max_captures=2, input_fd=read_fd, output=output)
+                code = relay.relay(
+                    config, directory, binary, prepared, max_actions=2, max_captures=2, input_fd=read_fd, output=output
+                )
             finally:
                 os.close(read_fd)
         return code, [json.loads(line) for line in output.getvalue().splitlines()]
 
     def test_preflight_binds_episode_profile_device_and_binary(self):
         _, directory, _, context = self.prepare()
-        self.assertEqual(context["context"], {"kind": "paired", "device_id": "device-1",
-            "config_profile": "episode-1", "profiles_file": str(self.profile_path.resolve())})
+        self.assertEqual(
+            context["context"],
+            {
+                "kind": "paired",
+                "device_id": "device-1",
+                "config_profile": "episode-1",
+                "profiles_file": str(self.profile_path.resolve()),
+            },
+        )
         self.assertEqual(directory, self.directory.resolve())
         self.assertNotIn("test-secret", json.dumps(context))
         with self.assertRaisesRegex(ValueError, "operator-pinned"):
             relay.prepare(self.config_path, self.directory, self.binary, "0" * 64)
-        self.profile_path.write_text(json.dumps({"profiles": {"episode-1": {
-            "device_id": "different", "endpoint": "http://127.0.0.1:38001",
-            "device_credential": "test-secret"}}}))
+        self.profile_path.write_text(
+            json.dumps(
+                {
+                    "profiles": {
+                        "episode-1": {
+                            "device_id": "different",
+                            "endpoint": "http://127.0.0.1:38001",
+                            "device_credential": "test-secret",
+                        }
+                    }
+                }
+            )
+        )
         with self.assertRaisesRegex(ValueError, "does not match"):
             self.prepare()
 
@@ -102,11 +129,13 @@ class AgentActionRelayTest(unittest.TestCase):
         paired_path.write_text(json.dumps(paired))
         with self.assertRaisesRegex(ValueError, "different guest AUV"):
             self.prepare()
-        with patch.object(v2_phase, "load_config", return_value=self.config), \
-             patch.object(v2_phase, "Episode", FakeEpisode):
+        with (
+            patch.object(v2_phase, "load_config", return_value=self.config),
+            patch.object(v2_phase, "Episode", FakeEpisode),
+        ):
             config, directory, binary, context = relay.prepare(
-                self.config_path, self.directory, self.binary, self.binary_hash,
-                adapter="v2-task099")
+                self.config_path, self.directory, self.binary, self.binary_hash, adapter="v2-task099"
+            )
             self.assertEqual(context["context"]["device_id"], "device-1")
             read_fd, write_fd = os.pipe()
             os.write(write_fd, b'{"op":"abort","seq":1}\n')
@@ -114,9 +143,17 @@ class AgentActionRelayTest(unittest.TestCase):
             try:
                 output = io.StringIO()
                 FakeEpisode.forwards.clear()
-                code = relay.relay(config, directory, binary, {**context, "mode": "happy"},
-                                   max_actions=2, max_captures=2, input_fd=read_fd,
-                                   output=output, adapter="v2-task099")
+                code = relay.relay(
+                    config,
+                    directory,
+                    binary,
+                    {**context, "mode": "happy"},
+                    max_actions=2,
+                    max_captures=2,
+                    input_fd=read_fd,
+                    output=output,
+                    adapter="v2-task099",
+                )
             finally:
                 os.close(read_fd)
             self.assertEqual(code, 1)
@@ -128,11 +165,13 @@ class AgentActionRelayTest(unittest.TestCase):
         paired = json.loads(paired_path.read_text())
         paired["guest_auv_sha256"] = v2_task044.GUEST_AUV_SHA256
         paired_path.write_text(json.dumps(paired))
-        with patch.object(v2_task044, "load_config", return_value=self.config) as load_config, \
-             patch.object(v2_task044, "Episode", FakeEpisode):
+        with (
+            patch.object(v2_task044, "load_config", return_value=self.config) as load_config,
+            patch.object(v2_task044, "Episode", FakeEpisode),
+        ):
             config, directory, binary, context = relay.prepare(
-                self.config_path, self.directory, self.binary, self.binary_hash,
-                adapter="v2-task044")
+                self.config_path, self.directory, self.binary, self.binary_hash, adapter="v2-task044"
+            )
             load_config.assert_called_once_with(self.config_path.resolve())
             self.assertEqual(context["context"]["device_id"], "device-1")
             read_fd, write_fd = os.pipe()
@@ -141,9 +180,17 @@ class AgentActionRelayTest(unittest.TestCase):
             try:
                 output = io.StringIO()
                 FakeEpisode.forwards.clear()
-                code = relay.relay(config, directory, binary, {**context, "mode": "happy"},
-                                   max_actions=2, max_captures=2, input_fd=read_fd,
-                                   output=output, adapter="v2-task044")
+                code = relay.relay(
+                    config,
+                    directory,
+                    binary,
+                    {**context, "mode": "happy"},
+                    max_actions=2,
+                    max_captures=2,
+                    input_fd=read_fd,
+                    output=output,
+                    adapter="v2-task044",
+                )
             finally:
                 os.close(read_fd)
             self.assertEqual(code, 1)
@@ -152,9 +199,11 @@ class AgentActionRelayTest(unittest.TestCase):
 
     def test_help_describes_single_use_checkpoint_and_total_deadline(self):
         output = io.StringIO()
-        with patch.object(sys, "argv", ["agent_action_relay.py", "--help"]), \
-             patch.object(sys, "stdout", output), \
-             self.assertRaises(SystemExit) as exited:
+        with (
+            patch.object(sys, "argv", ["agent_action_relay.py", "--help"]),
+            patch.object(sys, "stdout", output),
+            self.assertRaises(SystemExit) as exited,
+        ):
             relay.main()
         self.assertEqual(exited.exception.code, 0)
         help_text = " ".join(output.getvalue().split())
@@ -187,23 +236,30 @@ class AgentActionRelayTest(unittest.TestCase):
         first_digest = hashlib.sha256(b"\x89PNG\r\n\x1a\n" + first_name.encode()).hexdigest()
         lines = [
             {"op": "capture", "seq": 1},
-            {"op": "action", "seq": 2, "action": {"action_type": "CLICK", "x": 2, "y": 3},
-             "based_on": {"run_id": "one-run", "path": first_name, "sha256": first_digest}},
+            {
+                "op": "action",
+                "seq": 2,
+                "action": {"action_type": "CLICK", "x": 2, "y": 3},
+                "based_on": {"run_id": "one-run", "path": first_name, "sha256": first_digest},
+            },
             {"op": "finish", "seq": 3},
         ]
         code, output = self.run_relay(("\n".join(json.dumps(line) for line in lines) + "\n").encode())
         self.assertEqual(code, 0)
         self.assertEqual(FakeEpisode.forwards, [(False, True)])
         self.assertEqual([item["op"] for item in output], ["ready", "receipt", "receipt", "receipt"])
-        self.assertEqual(output[0]["limits"], {"actions": 2, "captures": 2,
-            "proposal_idle_seconds": 180, "session_seconds": 540})
+        self.assertEqual(
+            output[0]["limits"], {"actions": 2, "captures": 2, "proposal_idle_seconds": 180, "session_seconds": 540}
+        )
         self.assertEqual(output[0]["rules"], {"action_checkpoint": "latest_verified_single_use"})
         self.assertEqual(output[1]["checkpoint_path"], str((self.directory / first_name).resolve()))
         self.assertEqual(output[1]["checkpoint_sha256"], first_digest)
         self.assertEqual(output[-1]["status"], "finished")
         self.assertEqual(json.loads((self.directory / "agent_decisions.json").read_text())["status"], "finished")
-        self.assertEqual([entry["op"] for entry in json.loads((self.directory / "action-requests.json").read_text())],
-                         ["capture", "action", "finish"])
+        self.assertEqual(
+            [entry["op"] for entry in json.loads((self.directory / "action-requests.json").read_text())],
+            ["capture", "action", "finish"],
+        )
 
     def test_explicit_abort_is_verified_terminal_failure_not_eof(self):
         code, output = self.run_relay(b'{"op":"abort","seq":1}\n')
@@ -214,9 +270,11 @@ class AgentActionRelayTest(unittest.TestCase):
         self.assertEqual(json.loads((self.directory / "agent_decisions.json").read_text())["status"], "aborted")
 
     def test_malformed_proposal_and_eof_close_child_and_trace(self):
-        for payload, status in [(b"not json\n", "failed-before-terminal"),
-                                (b'{"op":"shell","seq":1}\n', "failed-before-terminal"),
-                                (b"", "incomplete-eof")]:
+        for payload, status in [
+            (b"not json\n", "failed-before-terminal"),
+            (b'{"op":"shell","seq":1}\n', "failed-before-terminal"),
+            (b"", "incomplete-eof"),
+        ]:
             with self.subTest(payload=payload), tempfile.TemporaryDirectory() as temporary:
                 # Give each attempt fresh evidence; the relay forbids reuse.
                 original = self.directory
@@ -230,7 +288,9 @@ class AgentActionRelayTest(unittest.TestCase):
                 self.assertEqual(code, 1)
                 self.assertEqual(output[-1]["op"], "session_end")
                 self.assertEqual(json.loads((self.directory / "agent_decisions.json").read_text())["status"], status)
-                self.assertEqual(json.loads((self.directory / "action_evidence.json").read_text())["final_artifact"], None)
+                self.assertEqual(
+                    json.loads((self.directory / "action_evidence.json").read_text())["final_artifact"], None
+                )
                 self.directory = original
 
     def test_oversized_line_is_rejected_without_forwarding(self):
@@ -238,8 +298,9 @@ class AgentActionRelayTest(unittest.TestCase):
             code, output = self.run_relay(b" " * 40 + b"\n")
         self.assertEqual(code, 1)
         self.assertEqual(output[-1]["status"], "error")
-        self.assertEqual(json.loads((self.directory / "agent_decisions.json").read_text())["status"],
-                         "failed-before-terminal")
+        self.assertEqual(
+            json.loads((self.directory / "agent_decisions.json").read_text())["status"], "failed-before-terminal"
+        )
         self.assertFalse((self.directory / "action-requests.json").exists())
 
 

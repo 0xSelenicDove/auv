@@ -10,20 +10,25 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
-import k8s_phase_adapter as capture
-
+from . import k8s_phase_adapter as capture
 
 ACTION_ENTRY_SOURCE = "349e5c18812337ac9ee7088418eed9ecce53bde4"
 ACTION_SHA256 = "48eedb94c99f7296060aa88d55a9da0a41e2bac36b6c02bad307aa5d54bcd9e9"
 # NOTICE: These fixed byte hashes identify infrastructure-only typed moves,
 # not task-solving scripts. New actions require an operator-audited slice.
 TEMPLATES = {
-    capture.CHROME_TASK: ("chrome-infrastructure-v1.json", "a3e3d6042eab72c64ce01ce960aafcfeb2f7089883b42306438f21fd34fd5e53"),
-    capture.VLC_TASK: ("vlc-infrastructure-v1.json", "ef06daed0d5c5479413d4f5217a4dc95e4dba45c30f228348d7609ca287d0ed0"),
+    capture.CHROME_TASK: (
+        "chrome-infrastructure-v1.json",
+        "a3e3d6042eab72c64ce01ce960aafcfeb2f7089883b42306438f21fd34fd5e53",
+    ),
+    capture.VLC_TASK: (
+        "vlc-infrastructure-v1.json",
+        "ef06daed0d5c5479413d4f5217a4dc95e4dba45c30f228348d7609ca287d0ed0",
+    ),
 }
 TOPOLOGY = "paired-remote-typed-action-infrastructure-trial"
 
@@ -37,7 +42,12 @@ def template(task_id: str) -> dict:
     if hashlib.sha256(data).hexdigest() != digest:
         raise ValueError("action template bytes differ from audited SHA256")
     value = json.loads(data)
-    if not isinstance(value, dict) or set(value) != {"version", "actions"} or value["version"] != 1 or not isinstance(value["actions"], list):
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"version", "actions"}
+        or value["version"] != 1
+        or not isinstance(value["actions"], list)
+    ):
         raise ValueError("audited action template has an invalid schema")
     return value
 
@@ -62,7 +72,10 @@ def _batch(path: Path) -> tuple[str, list[Path], Path]:
 
 def _config_identity(batch_id: str, paths: list[Path]) -> list[dict]:
     configs = [json.loads(path.read_text()) for path in paths]
-    if any(not isinstance(item, dict) or item.get("batch_id") != batch_id or item.get("task_id") not in TEMPLATES for item in configs):
+    if any(
+        not isinstance(item, dict) or item.get("batch_id") != batch_id or item.get("task_id") not in TEMPLATES
+        for item in configs
+    ):
         raise ValueError("both episode configs require this batch and explicit pinned task IDs")
     if {item["task_id"] for item in configs} != set(TEMPLATES):
         raise ValueError("exactly one Chrome and one VLC task are required")
@@ -94,14 +107,33 @@ def manifest(batch_path: Path) -> dict:
             raise ValueError("capture manifest identity differs from batch config")
         identity = built["identity"]
         config_sha256 = capture.sha256(path)
-        identity.update({"topology": TOPOLOGY, "runner_identity": "k8s_typed_action_adapter.py fixed paired action",
-                         "action_binary_sha256": ACTION_SHA256, "action_entry_source": ACTION_ENTRY_SOURCE,
-                         "action_template_sha256": TEMPLATES[task_id][1], "episode_config_sha256": config_sha256})
+        identity.update(
+            {
+                "topology": TOPOLOGY,
+                "runner_identity": "k8s_typed_action_adapter.py fixed paired action",
+                "action_binary_sha256": ACTION_SHA256,
+                "action_entry_source": ACTION_ENTRY_SOURCE,
+                "action_template_sha256": TEMPLATES[task_id][1],
+                "episode_config_sha256": config_sha256,
+            }
+        )
         for phase_name in capture.PHASES:
             built["phases"][phase_name] = {
-                "argv": [sys.executable, str(Path(__file__).resolve()), "phase", phase_name,
-                         "--config", str(path), "--config-sha256", config_sha256,
-                         "--task-id", task_id, "--action-binary", str(binary)],
+                "argv": [
+                    sys.executable,
+                    "-m",
+                    "auv_osworld.k8s_typed_action_adapter",
+                    "phase",
+                    phase_name,
+                    "--config",
+                    str(path),
+                    "--config-sha256",
+                    config_sha256,
+                    "--task-id",
+                    task_id,
+                    "--action-binary",
+                    str(binary),
+                ],
                 "timeout_seconds": capture.TIMEOUTS[phase_name],
             }
         episodes.append(built)
@@ -122,9 +154,16 @@ def action(config: dict, directory: Path, binary: Path) -> None:
     profiles = directory / "paired-profiles.json"
     if not profiles.is_file():
         raise ValueError("install did not record paired profiles")
-    plan = {"version": 1, "context": {"kind": "paired", "device_id": device_id,
-                                      "config_profile": config["episode_id"], "profiles_file": str(profiles)},
-            "actions": audited["actions"]}
+    plan = {
+        "version": 1,
+        "context": {
+            "kind": "paired",
+            "device_id": device_id,
+            "config_profile": config["episode_id"],
+            "profiles_file": str(profiles),
+        },
+        "actions": audited["actions"],
+    }
     plan_path = directory / "typed-action-plan.json"
     if plan_path.exists():
         raise FileExistsError("refusing to reuse typed action plan")

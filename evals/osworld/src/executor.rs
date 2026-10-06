@@ -34,12 +34,23 @@ pub struct ActionOutcome {
 }
 
 impl ActionOutcome {
-  fn delivered(delivery: Vec<InputActionResult>) -> Self {
-    Self {
+  fn delivered(delivery: Vec<InputActionResult>) -> Result<Self, ExecuteError> {
+    if delivery.is_empty() {
+      return Err(ExecuteError::DeliveryEvidence("input action produced no delivery evidence".into()));
+    }
+    for result in &delivery {
+      result.validate().map_err(ExecuteError::DeliveryEvidence)?;
+      if !result.attempts.iter().any(|attempt| attempt.succeeded) {
+        return Err(ExecuteError::DeliveryEvidence(
+          result.fallback_reason().unwrap_or("input action has no successful delivery attempt").to_owned(),
+        ));
+      }
+    }
+    Ok(Self {
       delivery,
       control: None,
       semantic_verification: None,
-    }
+    })
   }
 
   fn control(control: ControlSignal) -> Self {
@@ -59,6 +70,8 @@ pub enum ExecuteError {
   UnsupportedKey(String),
   #[error("AUV Runner input delivery failed: {0}")]
   Delivery(#[from] CapabilityError),
+  #[error("AUV input delivery evidence is unsuccessful: {0}")]
+  DeliveryEvidence(String),
   #[error("AUV Run lifecycle failed: {0}")]
   Placement(#[from] PlacementError),
   #[error("{primary}; cleanup also failed: {cleanup}")]
@@ -142,7 +155,7 @@ impl ActionExecutor {
         let mut stream = input.move_mouse(request).await?;
         while let Some(event) = stream.next().await? {
           if let auv::client::runner::MouseMotionEvent::Completed { action, .. } = event {
-            return Ok(ActionOutcome::delivered(vec![action]));
+            return ActionOutcome::delivered(vec![action]);
           }
         }
         Err(ExecuteError::InvalidState("MoveMouse stream ended without completion evidence".into()))
@@ -174,7 +187,7 @@ impl ActionExecutor {
           _ => return Err(ExecuteError::InvalidState("click count is outside 1..=3".into())),
         };
         let result = input.click_screen_point(point, mouse_button(button), click, ClickModifiers::default()).await?;
-        Ok(ActionOutcome::delivered(vec![result.action]))
+        ActionOutcome::delivered(vec![result.action])
       }
       Action::MouseDown(button) => {
         if self.mouse_hold.is_some() {
@@ -188,7 +201,7 @@ impl ActionExecutor {
         // press was absent, and cleanup must attempt to release this mouse.
         self.mouse_hold = Some((button, mouse));
         let result = input.mouse_down(&InputTarget::Foreground, mouse, point, mouse_button(button), HOLD_LIMIT).await?;
-        Ok(ActionOutcome::delivered(vec![result]))
+        ActionOutcome::delivered(vec![result])
       }
       Action::MouseUp(button) => {
         let Some((held_button, mouse)) = self.mouse_hold else {
@@ -200,7 +213,7 @@ impl ActionExecutor {
         let released = input.mouse_up(mouse).await?;
         let removed = input.remove_mouse(mouse).await?;
         self.mouse_hold = None;
-        Ok(ActionOutcome::delivered(vec![released, removed]))
+        ActionOutcome::delivered(vec![released, removed])
       }
       Action::DragTo(end) => {
         if self.mouse_hold.is_some() {
@@ -223,18 +236,18 @@ impl ActionExecutor {
           curve_tolerance: 0.5,
         };
         let (_, action) = input.drag_mouse(request, MouseButton::Left).await?;
-        Ok(ActionOutcome::delivered(vec![action]))
+        ActionOutcome::delivered(vec![action])
       }
       Action::Scroll { dx, dy } => {
         if self.mouse_hold.is_some() {
           return Err(ExecuteError::InvalidState("SCROLL while a mouse button is held is ambiguous".into()));
         }
         let Some(scroll) = scroll_delta(dx, dy)? else {
-          return Ok(ActionOutcome::delivered(Vec::new()));
+          return Err(ExecuteError::InvalidState("SCROLL must move at least one axis".into()));
         };
         let point = input.current_position().await?;
         let result = input.scroll_screen_point(point, scroll, Duration::ZERO).await?;
-        Ok(ActionOutcome::delivered(vec![result.action]))
+        ActionOutcome::delivered(vec![result.action])
       }
       Action::Typing(text) => {
         let result = input
@@ -246,7 +259,7 @@ impl ActionExecutor {
             },
           )
           .await?;
-        Ok(ActionOutcome::delivered(vec![result]))
+        ActionOutcome::delivered(vec![result])
       }
       Action::Press(key) => {
         let key = delivery_key(&key)?;
@@ -254,7 +267,7 @@ impl ActionExecutor {
           return Err(ExecuteError::InvalidState(format!("PRESS overlaps held key {key:?}")));
         }
         let result = input.press_keys(&InputTarget::Foreground, press_options(vec![key]), InputPolicy::ForegroundPreferred, false).await?;
-        Ok(ActionOutcome::delivered(vec![result.expect("non-dry-run PressKeys returns evidence")]))
+        ActionOutcome::delivered(vec![result.expect("non-dry-run PressKeys returns evidence")])
       }
       Action::KeyDown(key) => {
         let key = delivery_key(&key)?;
@@ -268,7 +281,7 @@ impl ActionExecutor {
         let (hold, result) =
           input.key_down(&InputTarget::Foreground, vec![key.clone()], InputPolicy::ForegroundPreferred, HOLD_LIMIT).await?;
         self.key_holds.insert(key, hold);
-        Ok(ActionOutcome::delivered(vec![result]))
+        ActionOutcome::delivered(vec![result])
       }
       Action::KeyUp(key) => {
         let key = delivery_key(&key)?;
@@ -276,7 +289,7 @@ impl ActionExecutor {
           *self.key_holds.get(&key).ok_or_else(|| ExecuteError::InvalidState(format!("KEY_UP without matching KEY_DOWN for {key:?}")))?;
         let result = input.key_up(hold).await?;
         self.key_holds.remove(&key);
-        Ok(ActionOutcome::delivered(vec![result]))
+        ActionOutcome::delivered(vec![result])
       }
       Action::Hotkey(keys) => {
         let keys = keys.iter().map(delivery_key).collect::<Result<Vec<_>, _>>()?;
@@ -290,7 +303,7 @@ impl ActionExecutor {
           return Err(ExecuteError::InvalidState("HOTKEY contains duplicate native keys".into()));
         }
         let result = input.press_keys(&InputTarget::Foreground, press_options(keys), InputPolicy::ForegroundPreferred, false).await?;
-        Ok(ActionOutcome::delivered(vec![result.expect("non-dry-run PressKeys returns evidence")]))
+        ActionOutcome::delivered(vec![result.expect("non-dry-run PressKeys returns evidence")])
       }
     }
   }
@@ -379,7 +392,28 @@ fn delivery_key(key: &Key) -> Result<String, ExecuteError> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use auv_driver::{DisturbanceLevel, InputAttempt, InputDeliveryPath};
   use serde_json::json;
+
+  #[test]
+  fn rejects_empty_and_unsuccessful_delivery_evidence() {
+    assert!(matches!(ActionOutcome::delivered(Vec::new()), Err(ExecuteError::DeliveryEvidence(_))));
+    let failed = InputActionResult {
+      selected_path: InputDeliveryPath::Unsupported,
+      attempts: vec![InputAttempt::failure(
+        InputDeliveryPath::Unsupported,
+        "backend unavailable",
+      )],
+      verified: false,
+      mouse_disturbance: DisturbanceLevel::None,
+      focus_disturbance: DisturbanceLevel::None,
+      clipboard_disturbance: DisturbanceLevel::None,
+    };
+    assert!(matches!(
+      ActionOutcome::delivered(vec![failed]),
+      Err(ExecuteError::DeliveryEvidence(message)) if message == "backend unavailable"
+    ));
+  }
 
   #[test]
   fn rounds_half_pixels_and_calibrates_key_aliases() {

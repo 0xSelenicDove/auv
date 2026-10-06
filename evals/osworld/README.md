@@ -1,6 +1,10 @@
 # OSWorld benchmark-local execution
 
-`batch_runner.py` is a local process/ledger gate for a predeclared OSWorld
+This directory is an installable Python package with a Pixi-locked development
+environment. From `evals/osworld`, run `pixi install` once and use
+`pixi run check` for formatting, lint, package build, and offline tests.
+
+`auv_osworld.batch_runner` is a local process/ledger gate for a predeclared OSWorld
 task set. It does **not** provision Kubernetes, certify that a task uses only
 AUV for GUI input, or produce a benchmark-wide completion rate. The manifest
 is trusted, operator-audited input. Audit every phase command and its reachable
@@ -12,7 +16,7 @@ adapter for this runner.
 The module interface is:
 
 ```text
-python3 evals/osworld/batch_runner.py --manifest MANIFEST.json --output-dir NEW_DIRECTORY
+pixi run auv-osworld-batch --manifest MANIFEST.json --output-dir NEW_DIRECTORY
 ```
 
 The output directory must not exist. All episodes are written to `ledger.json`
@@ -127,7 +131,7 @@ call the evaluator, or choose GUI actions. Give it absolute paths and an
 independently measured binary digest:
 
 ```bash
-python3 evals/osworld/agent_action_relay.py \
+pixi run auv-osworld-relay \
   --config /absolute/episode/config.json \
   --episode-dir /absolute/episode \
   --action-binary /absolute/auv-osworld-action \
@@ -392,10 +396,10 @@ for Run and artifact hashes.
 ### Scripted VLC V1 controller and selected two-task batch
 
 `k8s_vlc_task_controller.py` accepts only the pinned VLC `play-and-exit`
-task. Its batch input has the same fields as Chrome's plus
-`"ffmpeg_binary": "/absolute/path/to/pinned/ffmpeg"` for the 11×11
-checkbox crops. The controller verifies the action/OCR/ffmpeg/policy bytes
-before manifest generation. Within one paired AUV Run, its bounded state
+task. Its batch input has the same fields as Chrome's. Pillow performs the
+fixed crop and pixel operations, and pytesseract owns OCR invocation; the
+controller verifies the action/OCR/policy bytes before manifest generation.
+Within one paired AUV Run, its bounded state
 machine requires MAIN, SIMPLE, a fully redrawn Advanced right pane, the
 search query and Playlist result, and the target label plus same-frame
 checked/unchecked pixel controls. A stale or ambiguous redraw can cause a
@@ -479,7 +483,7 @@ For a freshly booted, task-owned guest with a local port-forward to its control
 server, use the same episode directory and endpoint for both commands:
 
 ```bash
-python3 evals/osworld/v2_task099_evaluator.py prepare \
+pixi run auv-osworld-v2-task099 prepare \
   --upstream /absolute/clean/OSWorld-V2 \
   --task-source /absolute/pinned/task_099.py \
   --asset /absolute/pinned/task_099/my_image.png \
@@ -487,7 +491,7 @@ python3 evals/osworld/v2_task099_evaluator.py prepare \
   --endpoint http://127.0.0.1:5000
 
 # Perform the Task099 action phase through AUV only, then:
-python3 evals/osworld/v2_task099_evaluator.py evaluate \
+pixi run auv-osworld-v2-task099 evaluate \
   --upstream /absolute/clean/OSWorld-V2 \
   --task-source /absolute/pinned/task_099.py \
   --asset /absolute/pinned/task_099/my_image.png \
@@ -516,9 +520,9 @@ interpreter that can import `requests`, inspect its one episode and all six
 phase argv entries, then run:
 
 ```sh
-python3 evals/osworld/k8s_v2_task099_adapter.py manifest \
+pixi run python -m auv_osworld.k8s_v2_task099_adapter manifest \
   --config /absolute/fresh/config.json > /absolute/fresh/manifest.json
-python3 evals/osworld/batch_runner.py \
+pixi run auv-osworld-batch \
   --manifest /absolute/fresh/manifest.json \
   --output-dir /absolute/new/run
 ```
@@ -555,7 +559,7 @@ export paths; it prints the raw float and a batch-ledger score projection.
 It never calls `/execute` or a GUI-action endpoint.
 
 ```sh
-python3 evals/osworld/v2_task044_evaluator.py prepare \
+pixi run auv-osworld-v2-task044 prepare \
   --upstream /absolute/clean/OSWorld-V2 \
   --task-source /absolute/pinned/task_044.py \
   --asset /absolute/pinned/task_044/promo_video.mp4 \
@@ -563,7 +567,7 @@ python3 evals/osworld/v2_task044_evaluator.py prepare \
   --endpoint http://127.0.0.1:5000
 
 # Perform the Task044 action phase through AUV only, then:
-python3 evals/osworld/v2_task044_evaluator.py evaluate \
+pixi run auv-osworld-v2-task044 evaluate \
   --upstream /absolute/clean/OSWorld-V2 \
   --task-source /absolute/pinned/task_044.py \
   --asset /absolute/pinned/task_044/promo_video.mp4 \

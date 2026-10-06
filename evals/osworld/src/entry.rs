@@ -168,6 +168,15 @@ impl Plan {
     }
     self.context.validate()?;
     let actions = self.actions.iter().map(parse_action).collect::<Result<Vec<_>, _>>().map_err(|error| error.to_string())?;
+    let terminals = actions
+      .iter()
+      .enumerate()
+      .filter(|(_, action)| matches!(action, Action::Done | Action::Fail))
+      .map(|(index, _)| index)
+      .collect::<Vec<_>>();
+    if terminals.len() != 1 || terminals[0] + 1 != actions.len() {
+      return Err("action plan must end with exactly one DONE or FAIL control signal".into());
+    }
     Ok(ValidatedPlan {
       context: self.context,
       actions,
@@ -670,6 +679,26 @@ mod tests {
     }))
     .unwrap();
     assert_eq!(plan.validate().unwrap().actions.len(), 2);
+  }
+
+  #[test]
+  fn fixed_plan_requires_one_terminal_control_signal_at_the_end() {
+    let context = json!({"kind":"guest-local","device_id":"device","daemon_endpoint":"unix:///tmp/auv.sock"});
+    for actions in [
+      json!([{"action_type":"CLICK","x":1,"y":1}]),
+      json!(["DONE", {"action_type":"CLICK","x":1,"y":1}]),
+      json!(["DONE", "FAIL"]),
+    ] {
+      let plan: Plan = serde_json::from_value(json!({"version":1,"context":context,"actions":actions})).unwrap();
+      assert!(plan.validate().is_err());
+    }
+    let plan: Plan = serde_json::from_value(json!({
+      "version":1,
+      "context":context,
+      "actions":[{"action_type":"CLICK","x":1,"y":1}, "DONE"]
+    }))
+    .unwrap();
+    assert!(plan.validate().is_ok());
   }
 
   #[test]

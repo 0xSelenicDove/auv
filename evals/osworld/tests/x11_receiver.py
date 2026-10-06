@@ -7,7 +7,6 @@ import json
 import os
 import tkinter as tk
 
-
 log = open(os.environ["AUV_OSWORLD_RECEIVER_LOG"], "a", encoding="utf-8", buffering=1)
 root = tk.Tk()
 root.title("AUV OSWorld action receiver")

@@ -9,21 +9,21 @@ from __future__ import annotations
 
 import argparse
 import ast
-from datetime import datetime
 import hashlib
 import json
 import logging
 import math
 import os
-from pathlib import Path
-import re
 import subprocess
 import types
-from typing import Any, Dict, List, Optional, Set, Union
-from urllib.error import HTTPError, URLError
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Optional, Union
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
 
+import requests
+
+from .integrity import verified_bytes
 
 UPSTREAM_REV = "3d778a3c9a34a079316f70df023b166700445792"
 TASK_SHA256 = "58c460fdfecf518f64714fdc21933b60818d8cf28ec02f9fa15a10e56ef02e32"
@@ -35,14 +35,6 @@ IMAGE_VM_PATH = "/home/user/Desktop/my_image.png"
 POSITION_VM_PATH = "/home/user/Desktop/position.txt"
 
 
-def _verify_sha(path: Path, expected: str) -> bytes:
-    raw = path.read_bytes()
-    actual = hashlib.sha256(raw).hexdigest()
-    if actual != expected:
-        raise ValueError(f"{path.name} SHA256 {actual} differs from pinned {expected}")
-    return raw
-
-
 def load_task(upstream: Path, task_source: Path, asset: Path):
     """Reject source/asset drift before constructing any guest transport."""
     revision = subprocess.check_output(["git", "-C", str(upstream), "rev-parse", "HEAD"], text=True).strip()
@@ -50,10 +42,10 @@ def load_task(upstream: Path, task_source: Path, asset: Path):
         raise ValueError(f"OSWorld-V2.1 revision {revision} is not pinned {UPSTREAM_REV}")
     if subprocess.check_output(["git", "-C", str(upstream), "status", "--porcelain"], text=True).strip():
         raise ValueError("OSWorld-V2.1 checkout has uncommitted changes")
-    source = _verify_sha(task_source, TASK_SHA256)
+    source = verified_bytes(task_source, TASK_SHA256)
     getter_source = upstream / "desktop_env" / "evaluators" / "getters" / "file.py"
-    _verify_sha(getter_source, GETTER_SHA256)
-    image = _verify_sha(asset, ASSET_SHA256)
+    verified_bytes(getter_source, GETTER_SHA256)
+    image = verified_bytes(asset, ASSET_SHA256)
     if len(image) != ASSET_BYTES:
         raise ValueError("Task099 asset size differs from pinned release")
 
@@ -64,12 +56,21 @@ def load_task(upstream: Path, task_source: Path, asset: Path):
     if len(getters) != 1:
         raise ValueError("pinned get_vm_file definition is missing or ambiguous")
     getter_ns = {
-        "__builtins__": __builtins__, "os": os, "datetime": datetime,
-        "Any": Any, "Dict": Dict, "List": List, "Optional": Optional, "Set": Set, "Union": Union,
+        "__builtins__": __builtins__,
+        "os": os,
+        "datetime": datetime,
+        "Any": Any,
+        "Dict": dict,
+        "List": list,
+        "Optional": Optional,
+        "Set": set,
+        "Union": Union,
         "logger": logging.getLogger("desktopenv.getter.file"),
     }
-    exec(compile(ast.fix_missing_locations(ast.Module(body=getters, type_ignores=[])),
-                 str(getter_source), "exec"), getter_ns)
+    exec(
+        compile(ast.fix_missing_locations(ast.Module(body=getters, type_ignores=[])), str(getter_source), "exec"),
+        getter_ns,
+    )
 
     builtin_import = __import__
 
@@ -77,10 +78,12 @@ def load_task(upstream: Path, task_source: Path, asset: Path):
         if name == "desktop_env.task_base" and tuple(fromlist) == ("BaseTask",):
             return types.SimpleNamespace(BaseTask=object)
         if name == "desktop_env.file_source" and tuple(fromlist) == ("asset",):
+
             def pinned_asset(relative):
                 if relative != ASSET_RELATIVE_PATH:
                     raise ValueError("Task099 requested an unreviewed asset")
                 return str(asset)
+
             return types.SimpleNamespace(asset=pinned_asset)
         if name == "desktop_env.evaluators.getters" and tuple(fromlist) == ("get_vm_file",):
             return types.SimpleNamespace(get_vm_file=getter_ns["get_vm_file"])
@@ -102,9 +105,16 @@ class FileTransport:
 
     def __init__(self, endpoint: str):
         parsed = urlsplit(endpoint)
-        if (parsed.scheme != "http" or parsed.hostname not in ("127.0.0.1", "localhost")
-                or not parsed.port or parsed.path not in ("", "/") or parsed.query or parsed.fragment
-                or parsed.username or parsed.password):
+        if (
+            parsed.scheme != "http"
+            or parsed.hostname not in ("127.0.0.1", "localhost")
+            or not parsed.port
+            or parsed.path not in ("", "/")
+            or parsed.query
+            or parsed.fragment
+            or parsed.username
+            or parsed.password
+        ):
             raise ValueError("endpoint must be a loopback HTTP origin with an explicit port")
         self.endpoint = endpoint.rstrip("/")
         self.transport_error: Exception | None = None
@@ -113,24 +123,14 @@ class FileTransport:
     def get_file(self, path: str) -> bytes | None:
         if path not in (IMAGE_VM_PATH, POSITION_VM_PATH):
             raise ValueError("Task099 requested an unreviewed guest file")
-        body = f"file_path={path.replace('/', '%2F')}".encode("ascii")
-        request = Request(self.endpoint + "/file", data=body,
-                          headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST")
         try:
-            with urlopen(request, timeout=30) as response:
-                if response.status != 200:
-                    raise RuntimeError(f"guest file endpoint returned {response.status}")
-                content = response.read()
-                if path == POSITION_VM_PATH:
-                    self.last_position_bytes = content
-                return content
-        except HTTPError as error:
-            if error.code == 404:
-                error.close()
+            response = requests.post(self.endpoint + "/file", data={"file_path": path}, timeout=30)
+            if response.status_code == 404:
                 return None
-            self.transport_error = RuntimeError(f"guest file endpoint returned HTTP {error.code}")
-            error.close()
-            raise self.transport_error from error
+            response.raise_for_status()
+            if path == POSITION_VM_PATH:
+                self.last_position_bytes = response.content
+            return response.content
         except Exception as error:
             self.transport_error = RuntimeError("guest file transport failed")
             raise self.transport_error from error
@@ -138,20 +138,16 @@ class FileTransport:
     def download(self, files: list[dict[str, str]], image: bytes, asset: Path):
         if files != [{"url": str(asset), "path": IMAGE_VM_PATH}]:
             raise ValueError("Task099 setup requested an unreviewed download")
-        boundary = "auv-osworld-task099-pinned-upload"
-        body = (
-            f"--{boundary}\r\nContent-Disposition: form-data; name=\"file_path\"\r\n\r\n{IMAGE_VM_PATH}\r\n"
-            f"--{boundary}\r\nContent-Disposition: form-data; name=\"file_data\"; filename=\"my_image.png\"\r\n"
-            "Content-Type: image/png\r\n\r\n"
-        ).encode() + image + f"\r\n--{boundary}--\r\n".encode()
-        request = Request(self.endpoint + "/setup/upload", data=body,
-                          headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}, method="POST")
         try:
-            with urlopen(request, timeout=120) as response:
-                result = response.read().decode()
-                if response.status != 200 or result != f"File Uploaded: {ASSET_BYTES} bytes":
-                    raise RuntimeError("Task099 upload was not confirmed by guest")
-        except (HTTPError, URLError, TimeoutError, OSError) as error:
+            response = requests.post(
+                self.endpoint + "/setup/upload",
+                data={"file_path": IMAGE_VM_PATH},
+                files={"file_data": ("my_image.png", image, "image/png")},
+                timeout=120,
+            )
+            if response.status_code != 200 or response.text != f"File Uploaded: {ASSET_BYTES} bytes":
+                raise RuntimeError("Task099 upload was not confirmed by guest")
+        except requests.RequestException as error:
             raise RuntimeError("Task099 upload transport failed") from error
         observed = self.get_file(IMAGE_VM_PATH)
         if observed is None or hashlib.sha256(observed).hexdigest() != ASSET_SHA256:
@@ -162,6 +158,7 @@ def prepare(task, image: bytes, asset: Path, transport: FileTransport) -> None:
     class Setup:
         def download(self, files):
             transport.download(files, image, asset)
+
     task.setup(Setup(), use_proxy=False)
 
 
@@ -192,13 +189,18 @@ def main() -> None:
     parser.add_argument("--episode-dir", type=Path, required=True)
     parser.add_argument("--endpoint", default="http://127.0.0.1:5000")
     args = parser.parse_args()
-    task, image = load_task(args.upstream.resolve(strict=True), args.task_source.resolve(strict=True),
-                            args.asset.resolve(strict=True))
+    task, image = load_task(
+        args.upstream.resolve(strict=True), args.task_source.resolve(strict=True), args.asset.resolve(strict=True)
+    )
     transport = FileTransport(args.endpoint)
     marker = args.episode_dir / "prepared.json"
-    identity = {"boundary": "V2.1 Task099 file-only; GUI actions must use AUV",
-                "upstream_revision": UPSTREAM_REV, "task_sha256": TASK_SHA256,
-                "asset_sha256": ASSET_SHA256, "endpoint": transport.endpoint}
+    identity = {
+        "boundary": "V2.1 Task099 file-only; GUI actions must use AUV",
+        "upstream_revision": UPSTREAM_REV,
+        "task_sha256": TASK_SHA256,
+        "asset_sha256": ASSET_SHA256,
+        "endpoint": transport.endpoint,
+    }
     # TODO: The marker cannot prove that a reconnected port-forward still
     # reaches the same Pod. A later batch scheduler must pin the Pod UID.
     if args.phase == "prepare":

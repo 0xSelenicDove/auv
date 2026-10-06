@@ -1,18 +1,12 @@
 """The agent gate rejects stale decisions before the AUV JSONL pipe is called."""
 
 import hashlib
-import importlib.util
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
-
-MODULE = Path(__file__).resolve().parents[1] / "agent_action_gateway.py"
-spec = importlib.util.spec_from_file_location("agent_action_gateway", MODULE)
-gateway_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(gateway_module)
-AgentActionGateway = gateway_module.AgentActionGateway
+from auv_osworld.agent_action_gateway import AgentActionGateway
 
 
 class FakeAuv:
@@ -88,7 +82,12 @@ class AgentActionGatewayTest(unittest.TestCase):
             {"op": "shell", "seq": 2, "command": "xdotool click 1"},
             {"op": "action", "seq": 2, "action": "pyautogui.click(1, 2)", "based_on": provenance},
             {"op": "action", "seq": 2, "action": {"command": "xdotool click 1"}, "based_on": provenance},
-            {"op": "action", "seq": 2, "action": {"action_type": "EXECUTE", "command": "xdotool click 1"}, "based_on": provenance},
+            {
+                "op": "action",
+                "seq": 2,
+                "action": {"action_type": "EXECUTE", "command": "xdotool click 1"},
+                "based_on": provenance,
+            },
             {"op": "action", "seq": 2, "action": {"action_type": "WAIT"}, "based_on": provenance},
             {"op": "action", "seq": 1, "action": {"action_type": "CLICK", "x": 1, "y": 2}, "based_on": provenance},
             {"op": "capture", "seq": True},
@@ -125,7 +124,9 @@ class AgentActionGatewayTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "response sequence"):
             self.capture(2)
         self.assertTrue(self.gateway.closed)
-        self.assertEqual(json.loads((self.directory / "agent_decisions.json").read_text())["status"], "failed-after-forward")
+        self.assertEqual(
+            json.loads((self.directory / "agent_decisions.json").read_text())["status"], "failed-after-forward"
+        )
 
     def test_tampered_capture_bytes_fail_closed_after_forward(self):
         def tampered(request):
@@ -144,9 +145,9 @@ class AgentActionGatewayTest(unittest.TestCase):
         provenance = self.gateway.latest_checkpoint.copy()
         (self.directory / provenance["path"]).write_bytes(b"changed after capture")
         with self.assertRaisesRegex(ValueError, "checkpoint bytes"):
-            self.gateway.submit({"op": "action", "seq": 2,
-                                 "action": {"action_type": "CLICK", "x": 1, "y": 2},
-                                 "based_on": provenance})
+            self.gateway.submit(
+                {"op": "action", "seq": 2, "action": {"action_type": "CLICK", "x": 1, "y": 2}, "based_on": provenance}
+            )
         self.assertEqual(len(self.auv.requests), 1)
 
     def test_rejects_invalid_budget_and_existing_trace(self):
@@ -174,16 +175,20 @@ class AgentActionGatewayTest(unittest.TestCase):
             (lambda response: {}, "different Run or schema"),
             (lambda response: {**response, "run_ids": ["other-run"]}, "different Run or schema"),
             (lambda response: {**response, "final_artifact": None}, "lacks its final screenshot"),
-            (lambda response: {**response, "final_artifact": {"path": "../other.png", "sha256": "0" * 64}},
-             "lacks its final screenshot"),
+            (
+                lambda response: {**response, "final_artifact": {"path": "../other.png", "sha256": "0" * 64}},
+                "lacks its final screenshot",
+            ),
         ]:
             with self.subTest(error=error):
                 temporary = tempfile.TemporaryDirectory()
                 self.addCleanup(temporary.cleanup)
                 directory = Path(temporary.name)
                 auv = FakeAuv(directory)
+
                 def exchanged(request):
                     return response_change(auv(request))
+
                 gateway = AgentActionGateway(directory, self.ready, exchanged, max_actions=1, max_captures=1)
                 with self.assertRaisesRegex(ValueError, error):
                     gateway.submit({"op": "finish", "seq": 1})
@@ -202,10 +207,12 @@ class AgentActionGatewayTest(unittest.TestCase):
                 self.addCleanup(temporary.cleanup)
                 directory = Path(temporary.name)
                 auv = FakeAuv(directory)
+
                 def exchanged(request):
                     response = auv(request)
                     tamper(directory)
                     return response
+
                 gateway = AgentActionGateway(directory, self.ready, exchanged, max_actions=1, max_captures=1)
                 with self.assertRaisesRegex(ValueError, error):
                     gateway.submit({"op": "finish", "seq": 1})
@@ -222,17 +229,24 @@ class AgentActionGatewayTest(unittest.TestCase):
                 self.addCleanup(temporary.cleanup)
                 directory = Path(temporary.name)
                 auv = FakeAuv(directory)
+
                 def exchanged(request):
                     response = auv(request)
                     if request["op"] == "action":
                         tamper(directory / "input-action-results.json")
                     return response
+
                 gateway = AgentActionGateway(directory, self.ready, exchanged, max_actions=1, max_captures=1)
                 artifact = gateway.submit({"op": "capture", "seq": 1})["artifact"]
                 with self.assertRaisesRegex(ValueError, error):
-                    gateway.submit({"op": "action", "seq": 2,
-                                    "action": {"action_type": "CLICK", "x": 1, "y": 2},
-                                    "based_on": {"run_id": "run-1", **artifact}})
+                    gateway.submit(
+                        {
+                            "op": "action",
+                            "seq": 2,
+                            "action": {"action_type": "CLICK", "x": 1, "y": 2},
+                            "based_on": {"run_id": "run-1", **artifact},
+                        }
+                    )
                 self.assertTrue(gateway.closed)
                 trace = json.loads((directory / "agent_decisions.json").read_text())
                 self.assertEqual(trace["status"], "failed-after-forward")

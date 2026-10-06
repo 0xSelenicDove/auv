@@ -1,19 +1,16 @@
 """Offline V2.1 Task099 six-phase adapter checks; every cluster edge is mocked."""
 
-from contextlib import nullcontext, redirect_stdout
 import io
 import json
 import os
-from pathlib import Path
-import sys
 import tempfile
 import unittest
+from contextlib import nullcontext, redirect_stdout
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import k8s_phase_adapter as cluster  # noqa: E402
-import k8s_v2_task099_adapter as adapter  # noqa: E402
+from auv_osworld import k8s_phase_adapter as cluster
+from auv_osworld import k8s_v2_task099_adapter as adapter
 
 
 def configuration(root: Path) -> dict:
@@ -31,16 +28,29 @@ def configuration(root: Path) -> dict:
     asset = root / "my_image.png"
     asset.write_bytes(b"fixture")
     return {
-        "batch_id": "v2-control", "episode_id": "task099-control", "namespace": "bench",
-        "kubeconfig": paths["kubeconfig"], "context": "ihome", "node": "liet-gpu-1",
-        "runtime_pod": "task099-vm", "runtime_service": "task099-service", "proxy_pod": "task099-proxy",
+        "batch_id": "v2-control",
+        "episode_id": "task099-control",
+        "namespace": "bench",
+        "kubeconfig": paths["kubeconfig"],
+        "context": "ihome",
+        "node": "liet-gpu-1",
+        "runtime_pod": "task099-vm",
+        "runtime_service": "task099-service",
+        "proxy_pod": "task099-proxy",
         "proxy_image": "example/proxy@sha256:" + "a" * 64,
-        "base_pvc": "osworld-v2-hot", "base_qcow_sha256": adapter.V2_BASE_QCOW_SHA256,
-        "guest_auv_binary": paths["guest_auv_binary"], "host_auv_binary": paths["host_auv_binary"],
-        "host_auv_sha256": "b" * 64, "action_binary": paths["action_binary"],
-        "action_binary_sha256": "c" * 64, "action_source_commit": "d" * 40,
-        "upstream_checkout": str(upstream), "task_source": str(task_source), "asset": str(asset),
-        "setup_local_port": 25099, "auv_local_port": 28099,
+        "base_pvc": "osworld-v2-hot",
+        "base_qcow_sha256": adapter.V2_BASE_QCOW_SHA256,
+        "guest_auv_binary": paths["guest_auv_binary"],
+        "host_auv_binary": paths["host_auv_binary"],
+        "host_auv_sha256": "b" * 64,
+        "action_binary": paths["action_binary"],
+        "action_binary_sha256": "c" * 64,
+        "action_source_commit": "d" * 40,
+        "upstream_checkout": str(upstream),
+        "task_source": str(task_source),
+        "asset": str(asset),
+        "setup_local_port": 25099,
+        "auv_local_port": 28099,
     }
 
 
@@ -58,15 +68,19 @@ class Task099AdapterTest(unittest.TestCase):
 
     def digests(self, path):
         path = str(path)
-        return {self.config["guest_auv_binary"]: adapter.GUEST_AUV_SHA256,
-                self.config["host_auv_binary"]: self.config["host_auv_sha256"],
-                self.config["action_binary"]: self.config["action_binary_sha256"],
-                str(self.config_path.resolve()): "e" * 64}[path]
+        return {
+            self.config["guest_auv_binary"]: adapter.GUEST_AUV_SHA256,
+            self.config["host_auv_binary"]: self.config["host_auv_sha256"],
+            self.config["action_binary"]: self.config["action_binary_sha256"],
+            str(self.config_path.resolve()): "e" * 64,
+        }[path]
 
     def test_manifest_pins_all_six_phases_and_cannot_select_gui_command(self):
-        with patch.object(cluster, "sha256", side_effect=self.digests), \
-             patch.object(adapter.task099, "load_task") as load_task, \
-             patch.object(adapter.subprocess, "run", return_value=MagicMock(returncode=0)):
+        with (
+            patch.object(cluster, "sha256", side_effect=self.digests),
+            patch.object(adapter.task099, "load_task") as load_task,
+            patch.object(adapter.subprocess, "run", return_value=MagicMock(returncode=0)),
+        ):
             manifest = adapter.manifest(self.config_path)
         load_task.assert_called_once()
         episode = manifest["episodes"][0]
@@ -77,7 +91,7 @@ class Task099AdapterTest(unittest.TestCase):
         self.assertEqual(episode["identity"]["qcow2"], "sha256:" + adapter.V2_BASE_QCOW_SHA256)
         self.assertEqual(set(episode["phases"]), set(cluster.PHASES))
         for name in cluster.PHASES:
-            self.assertEqual(episode["phases"][name]["argv"][2:4], ["phase", name])
+            self.assertEqual(episode["phases"][name]["argv"][3:5], ["phase", name])
             self.assertEqual(episode["phases"][name]["argv"][-2:], ["--config-sha256", "e" * 64])
         self.assertEqual(adapter.FIXED_ACTIONS, [{"action_type": "DOUBLE_CLICK", "x": 1850, "y": 880}, "DONE"])
 
@@ -103,14 +117,26 @@ class Task099AdapterTest(unittest.TestCase):
         with patch.object(cluster, "sha256", side_effect=lambda path: "0" * 64):
             with self.assertRaisesRegex(ValueError, "guest Ubuntu AUV"):
                 adapter.load_config(self.config_path)
-        with patch.object(cluster, "sha256", side_effect=lambda path: adapter.GUEST_AUV_SHA256 if str(path) == self.config["guest_auv_binary"] else "0" * 64):
+        with patch.object(
+            cluster,
+            "sha256",
+            side_effect=lambda path: (
+                adapter.GUEST_AUV_SHA256 if str(path) == self.config["guest_auv_binary"] else "0" * 64
+            ),
+        ):
             with self.assertRaisesRegex(ValueError, "paired host AUV"):
                 adapter.load_config(self.config_path)
-        with patch.object(cluster, "sha256", side_effect=lambda path: self.digests(path) if str(path) != self.config["action_binary"] else "0" * 64):
+        with patch.object(
+            cluster,
+            "sha256",
+            side_effect=lambda path: self.digests(path) if str(path) != self.config["action_binary"] else "0" * 64,
+        ):
             with self.assertRaisesRegex(ValueError, "foreground action binary"):
                 adapter.load_config(self.config_path)
-        with patch.object(cluster, "sha256", side_effect=self.digests), \
-             patch.object(adapter.task099, "load_task", side_effect=ValueError("task source SHA256 mismatch")):
+        with (
+            patch.object(cluster, "sha256", side_effect=self.digests),
+            patch.object(adapter.task099, "load_task", side_effect=ValueError("task source SHA256 mismatch")),
+        ):
             with self.assertRaisesRegex(ValueError, "task source SHA256"):
                 adapter.load_config(self.config_path)
 
@@ -120,7 +146,9 @@ class Task099AdapterTest(unittest.TestCase):
         self.assertNotEqual(adapter.APT_UPDATE, cluster.GUEST_APT_UPDATE)
         self.assertIn("osworld-public-evaluation", adapter.APT_UPDATE[-1])
         self.assertEqual(self.episode.apt_install, adapter.APT_INSTALL)
-        with patch.object(self.episode, "_post", return_value={"status": "success", "output": "", "error": "", "returncode": 0}) as post:
+        with patch.object(
+            self.episode, "_post", return_value={"status": "success", "output": "", "error": "", "returncode": 0}
+        ) as post:
             self.episode.guest_control(adapter.APT_UPDATE)
             post.assert_called_once()
             with self.assertRaisesRegex(ValueError, "forbidden"):
@@ -137,16 +165,14 @@ class Task099AdapterTest(unittest.TestCase):
         launched = False
 
         def run(command, **_kwargs):
-            nonlocal uploads
-            if command[0] == "curl":
-                self.assertIn("file_path=/home/user/auv", command)
-                self.assertIn(f"file_data=@{self.config['guest_auv_binary']}", command)
-                uploads += 1
-                if uploads > 1:
-                    raise RuntimeError("curl exited 22: HTTP 500 /setup/upload")
-                return ""
             self.assertEqual(command[0], self.config["host_auv_binary"])
             return json.dumps({"device_id": "paired-device"})
+
+        def upload():
+            nonlocal uploads
+            uploads += 1
+            if uploads > 1:
+                raise RuntimeError("HTTP 500 /setup/upload")
 
         def post(route, value):
             nonlocal token_calls, launched
@@ -167,16 +193,18 @@ class Task099AdapterTest(unittest.TestCase):
                 self.assertTrue(launched)
                 token_calls += 1
                 if token_calls == 1:
-                    return {"status": "success", "output": "", "error": "owner socket unavailable",
-                            "returncode": 1}
+                    return {"status": "success", "output": "", "error": "owner socket unavailable", "returncode": 1}
                 output = "fixture-token\n"
             return {"status": "success", "output": output, "error": "", "returncode": 0}
 
-        with patch.object(self.episode, "assert_identity"), \
-             patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(cluster, "_run", side_effect=run), \
-             patch.object(self.episode, "_post", side_effect=post), \
-             redirect_stdout(io.StringIO()):
+        with (
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(cluster, "_run", side_effect=run),
+            patch.object(self.episode, "_upload_guest_binary", side_effect=upload),
+            patch.object(self.episode, "_post", side_effect=post),
+            redirect_stdout(io.StringIO()),
+        ):
             with self.assertRaisesRegex(RuntimeError, "returncode=1"):
                 self.episode.install()
             self.assertEqual(uploads, 1)
@@ -210,25 +238,30 @@ class Task099AdapterTest(unittest.TestCase):
             elif command[-3:] == ["devices", "pair", "create-token"]:
                 token_calls += 1
                 if token_calls < 3:
-                    return {"status": "success", "output": "",
-                            "error": "error: failed to connect to AUV API server: transport error\n", "returncode": 1}
+                    return {
+                        "status": "success",
+                        "output": "",
+                        "error": "error: failed to connect to AUV API server: transport error\n",
+                        "returncode": 1,
+                    }
                 output = "fixture-token\n"
             else:
                 output = ""
             return {"status": "success", "output": output, "error": "", "returncode": 0}
 
         def run(command, **_kwargs):
-            if command[0] == "curl":
-                return ""
             self.assertEqual(command[0], self.config["host_auv_binary"])
             return json.dumps({"device_id": "paired-device"})
 
-        with patch.object(self.episode, "assert_identity"), \
-             patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(cluster, "_run", side_effect=run), \
-             patch.object(self.episode, "_post", side_effect=post), \
-             patch.object(cluster.time, "sleep") as sleep, \
-             redirect_stdout(io.StringIO()):
+        with (
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(cluster, "_run", side_effect=run),
+            patch.object(self.episode, "_upload_guest_binary"),
+            patch.object(self.episode, "_post", side_effect=post),
+            patch.object(cluster.time, "sleep") as sleep,
+            redirect_stdout(io.StringIO()),
+        ):
             self.episode.install()
         self.assertEqual(token_calls, 3)
         self.assertEqual(sleep.call_count, 2)
@@ -247,16 +280,21 @@ class Task099AdapterTest(unittest.TestCase):
                 return {"output": "auv 0.0.28\n"}
             if command[-3:] == ["devices", "pair", "create-token"]:
                 token_calls += 1
-                raise cluster.GuestControlError("success", 1, "error: failed to connect to AUV API server: transport error\n")
+                raise cluster.GuestControlError(
+                    "success", 1, "error: failed to connect to AUV API server: transport error\n"
+                )
             return {"output": ""}
 
-        with patch.object(self.episode, "assert_identity"), \
-             patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(cluster, "_run", return_value=""), \
-             patch.object(self.episode, "guest_control", side_effect=control), \
-             patch.object(self.episode, "_post", return_value="/home/user/auv serve launched successfully"), \
-             patch.object(cluster.time, "monotonic", side_effect=[100.0, 100.0, 115.0]), \
-             patch.object(cluster.time, "sleep") as sleep:
+        with (
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(cluster, "_run", return_value=""),
+            patch.object(self.episode, "_upload_guest_binary"),
+            patch.object(self.episode, "guest_control", side_effect=control),
+            patch.object(self.episode, "_post", return_value="/home/user/auv serve launched successfully"),
+            patch.object(cluster.time, "monotonic", side_effect=[100.0, 100.0, 115.0]),
+            patch.object(cluster.time, "sleep") as sleep,
+        ):
             with self.assertRaisesRegex(TimeoutError, "owner socket readiness deadline expired"):
                 self.episode.install()
         self.assertEqual(token_calls, 2)
@@ -272,14 +310,15 @@ class Task099AdapterTest(unittest.TestCase):
             if value["command"] == ["test", "-e", "/home/user/auv"]:
                 return {"status": "success", "output": "", "error": "", "returncode": 0}
             if value["command"] == ["sha256sum", "/home/user/auv"]:
-                return {"status": "success", "output": "0" * 64 + "  /home/user/auv\n",
-                        "error": "", "returncode": 0}
+                return {"status": "success", "output": "0" * 64 + "  /home/user/auv\n", "error": "", "returncode": 0}
             self.fail("unexpected guest mutation before hash validation")
 
-        with patch.object(self.episode, "assert_identity"), \
-             patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(cluster, "_run") as upload, \
-             patch.object(self.episode, "_post", side_effect=post):
+        with (
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(self.episode, "_upload_guest_binary") as upload,
+            patch.object(self.episode, "_post", side_effect=post),
+        ):
             with self.assertRaisesRegex(ValueError, "guest-installed AUV bytes differ"):
                 self.episode.install()
         upload.assert_not_called()
@@ -287,64 +326,106 @@ class Task099AdapterTest(unittest.TestCase):
 
     def test_evaluator_projects_raw_zero_without_masking_failure(self):
         cluster.write_json(self.directory / "paired-device.json", {"guest_auv_sha256": adapter.GUEST_AUV_SHA256})
-        raw = {"phase": "evaluate", "task_sha256": adapter.task099.TASK_SHA256,
-               "result": {"score": 0.0, "partial_scores": {"distance": {"score": 0.0}}}}
+        raw = {
+            "phase": "evaluate",
+            "task_sha256": adapter.task099.TASK_SHA256,
+            "result": {"score": 0.0, "partial_scores": {"distance": {"score": 0.0}}},
+        }
         output = io.StringIO()
-        with patch.object(self.episode, "assert_identity"), \
-             patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(cluster, "_run", return_value=json.dumps(raw)) as run, redirect_stdout(output):
+        with (
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(cluster, "_run", return_value=json.dumps(raw)) as run,
+            redirect_stdout(output),
+        ):
             self.episode.evaluator("evaluate")
         result = json.loads(output.getvalue())
         self.assertEqual(result["score"], 0.0)
         self.assertEqual(result["result"], raw["result"])
-        self.assertIn("v2_task099_evaluator.py", run.call_args.args[0][1])
-        with patch.object(self.episode, "assert_identity"), \
-             patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(cluster, "_run", side_effect=RuntimeError("file transport failed")):
+        self.assertEqual(run.call_args.args[0][1:3], ["-m", "auv_osworld.v2_task099_evaluator"])
+        with (
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(cluster, "_run", side_effect=RuntimeError("file transport failed")),
+        ):
             with self.assertRaisesRegex(RuntimeError, "file transport failed"):
                 self.episode.evaluator("evaluate")
 
     def test_action_requires_driver_delivery_run_and_byte_verified_png(self):
-        cluster.write_json(self.directory / "paired-device.json", {"guest_auv_sha256": adapter.GUEST_AUV_SHA256,
-                                                                 "device_id": "observed-device"})
+        cluster.write_json(
+            self.directory / "paired-device.json",
+            {"guest_auv_sha256": adapter.GUEST_AUV_SHA256, "device_id": "observed-device"},
+        )
         (self.directory / "paired-profiles.json").write_text("{}")
         png = b"\x89PNG\r\n\x1a\nfixture"
 
         def child(*_args, **_kwargs):
             (self.directory / "final-screenshot.png").write_bytes(png)
-            cluster.write_json(self.directory / "action_evidence.json", {"run_ids": ["run-1"],
-                "final_artifact": {"path": "final-screenshot.png", "sha256": cluster.sha256(self.directory / "final-screenshot.png")}})
-            (self.directory / "input-action-results.json").write_text(json.dumps([
-                [{"selected_path": "foreground_system_events", "attempts": [{"succeeded": True}], "verified": False}], []]))
+            cluster.write_json(
+                self.directory / "action_evidence.json",
+                {
+                    "run_ids": ["run-1"],
+                    "final_artifact": {
+                        "path": "final-screenshot.png",
+                        "sha256": cluster.sha256(self.directory / "final-screenshot.png"),
+                    },
+                },
+            )
+            (self.directory / "input-action-results.json").write_text(
+                json.dumps(
+                    [
+                        [
+                            {
+                                "selected_path": "foreground_system_events",
+                                "attempts": [{"succeeded": True}],
+                                "verified": False,
+                            }
+                        ],
+                        [],
+                    ]
+                )
+            )
             return MagicMock(returncode=0)
 
-        with patch.dict(os.environ, {"AUV_OSWORLD_ACTION_EVIDENCE": str(self.directory / "action_evidence.json")}), \
-             patch.object(self.episode, "assert_identity"), \
-             patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(adapter.subprocess, "run", side_effect=child) as run:
+        with (
+            patch.dict(os.environ, {"AUV_OSWORLD_ACTION_EVIDENCE": str(self.directory / "action_evidence.json")}),
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(adapter.subprocess, "run", side_effect=child) as run,
+        ):
             self.episode.action()
         plan = json.loads((self.directory / "fixed-action-plan.json").read_text())
         self.assertEqual(plan["actions"], adapter.FIXED_ACTIONS)
         self.assertEqual(plan["context"]["device_id"], "observed-device")
-        run.assert_called_once_with([self.config["action_binary"], "--plan", str(self.directory / "fixed-action-plan.json")], check=False)
-        with patch.dict(os.environ, {"AUV_OSWORLD_ACTION_EVIDENCE": str(self.directory / "action_evidence.json")}), \
-             patch.object(self.episode, "assert_identity"), patch.object(self.episode, "forward", return_value=nullcontext()):
+        run.assert_called_once_with(
+            [self.config["action_binary"], "--plan", str(self.directory / "fixed-action-plan.json")], check=False
+        )
+        with (
+            patch.dict(os.environ, {"AUV_OSWORLD_ACTION_EVIDENCE": str(self.directory / "action_evidence.json")}),
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+        ):
             with self.assertRaisesRegex(FileExistsError, "stale action evidence"):
                 self.episode.action()
 
     def test_action_rejects_success_without_input_delivery(self):
-        cluster.write_json(self.directory / "paired-device.json", {"guest_auv_sha256": adapter.GUEST_AUV_SHA256,
-                                                                 "device_id": "observed-device"})
+        cluster.write_json(
+            self.directory / "paired-device.json",
+            {"guest_auv_sha256": adapter.GUEST_AUV_SHA256, "device_id": "observed-device"},
+        )
         (self.directory / "paired-profiles.json").write_text("{}")
 
         def child(*_args, **_kwargs):
             (self.directory / "input-action-results.json").write_text("[]")
-            (self.directory / "action_evidence.json").write_text('{}')
+            (self.directory / "action_evidence.json").write_text("{}")
             return MagicMock(returncode=0)
 
-        with patch.dict(os.environ, {"AUV_OSWORLD_ACTION_EVIDENCE": str(self.directory / "action_evidence.json")}), \
-             patch.object(self.episode, "assert_identity"), patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(adapter.subprocess, "run", side_effect=child):
+        with (
+            patch.dict(os.environ, {"AUV_OSWORLD_ACTION_EVIDENCE": str(self.directory / "action_evidence.json")}),
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(adapter.subprocess, "run", side_effect=child),
+        ):
             with self.assertRaisesRegex(ValueError, "driver delivery"):
                 self.episode.action()
 
@@ -357,9 +438,13 @@ class Task099AdapterTest(unittest.TestCase):
             self.assertEqual(adapter.load_config(self.config_path, reset=True), self.config)
         task.assert_not_called()
         cluster.write_json(self.episode.owned_path, [{"kind": "pod", "name": self.config["runtime_pod"], "uid": "old"}])
-        with patch.object(self.episode, "api_proxy", return_value=nullcontext("http://127.0.0.1:1")), \
-             patch.object(self.episode, "get", return_value={"metadata": {"uid": "new", "labels": self.episode._labels("qemu")}}), \
-             patch.object(self.episode, "request_deletion") as delete:
+        with (
+            patch.object(self.episode, "_discover_owned", return_value=[]),
+            patch.object(
+                self.episode, "get", return_value={"metadata": {"uid": "new", "labels": self.episode._labels("qemu")}}
+            ),
+            patch.object(self.episode, "request_deletion") as delete,
+        ):
             with self.assertRaisesRegex(ValueError, "replaced"):
                 self.episode.reset()
         delete.assert_not_called()

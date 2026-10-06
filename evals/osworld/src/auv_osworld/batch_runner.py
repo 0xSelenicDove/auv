@@ -8,24 +8,34 @@ GUI input, or that a remote Kubernetes guest has stopped changing state.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import hashlib
 import json
 import math
 import os
-from pathlib import Path
 import re
 import signal
 import subprocess
 import tempfile
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 
+from .integrity import sha256
 
 PHASES = ("boot", "install", "setup", "action", "evaluate", "reset")
 ACTION_TERM_GRACE_SECONDS = 8.0
 IDENTITY_FIELDS = (
-    "benchmark", "benchmark_revision", "task_id", "task_sha256", "topology",
-    "runtime_image", "qcow2", "auv_source", "auv_binary_sha256", "auv_target", "runner_identity",
+    "benchmark",
+    "benchmark_revision",
+    "task_id",
+    "task_sha256",
+    "topology",
+    "runtime_image",
+    "qcow2",
+    "auv_source",
+    "auv_binary_sha256",
+    "auv_target",
+    "runner_identity",
 )
 
 
@@ -36,20 +46,14 @@ class PhaseInterrupted(KeyboardInterrupt):
 
 
 def _utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return datetime.now(UTC).isoformat()
 
 
 def _write_ledger(path: Path, ledger: dict) -> None:
     """Replace and fsync a complete snapshot after each state transition."""
-    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, prefix=".ledger-", delete=False) as output:
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=path.parent, prefix=".ledger-", delete=False
+    ) as output:
         temporary = Path(output.name)
         try:
             json.dump(ledger, output, indent=2, sort_keys=True)
@@ -80,11 +84,17 @@ def _validate_manifest(manifest: dict) -> None:
         if not isinstance(episode, dict):
             raise ValueError("each episode must be an object")
         episode_id = episode.get("episode_id")
-        if not isinstance(episode_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", episode_id) or episode_id in seen:
+        if (
+            not isinstance(episode_id, str)
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", episode_id)
+            or episode_id in seen
+        ):
             raise ValueError(f"invalid or duplicate episode_id: {episode_id!r}")
         seen.add(episode_id)
         identity = episode.get("identity")
-        if not isinstance(identity, dict) or any(not isinstance(identity.get(field), str) or not identity[field].strip() for field in IDENTITY_FIELDS):
+        if not isinstance(identity, dict) or any(
+            not isinstance(identity.get(field), str) or not identity[field].strip() for field in IDENTITY_FIELDS
+        ):
             raise ValueError(f"{episode_id}: missing required identity field")
         if not isinstance(episode.get("phases"), dict) or set(episode["phases"]) != set(PHASES):
             raise ValueError(f"{episode_id}: all six phases are required")
@@ -95,7 +105,12 @@ def _validate_manifest(manifest: dict) -> None:
             budget = phase.get("timeout_seconds")
             if not isinstance(argv, list) or not argv or any(not isinstance(arg, str) or not arg for arg in argv):
                 raise ValueError(f"{episode_id}/{name}: argv must be a nonempty string list")
-            if isinstance(budget, bool) or not isinstance(budget, (int, float)) or not math.isfinite(budget) or budget <= 0:
+            if (
+                isinstance(budget, bool)
+                or not isinstance(budget, (int, float))
+                or not math.isfinite(budget)
+                or budget <= 0
+            ):
                 raise ValueError(f"{episode_id}/{name}: timeout_seconds must be positive and finite")
 
 
@@ -161,8 +176,13 @@ def _run_phase(name: str, spec: dict, directory: Path, environment: dict[str, st
     with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
         try:
             process = subprocess.Popen(
-                spec["argv"], stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr,
-                cwd=directory, env=environment, start_new_session=True,
+                spec["argv"],
+                stdin=subprocess.DEVNULL,
+                stdout=stdout,
+                stderr=stderr,
+                cwd=directory,
+                env=environment,
+                start_new_session=True,
             )
         except OSError as error:
             result.update(status="spawn_failed", error=str(error), exit_code=None, group_terminated=True)
@@ -171,12 +191,20 @@ def _run_phase(name: str, spec: dict, directory: Path, environment: dict[str, st
                 process.wait(timeout=spec["timeout_seconds"])
             except subprocess.TimeoutExpired:
                 stopped, graceful = _stop_group(process, ACTION_TERM_GRACE_SECONDS if name == "action" else 0.2)
-                result.update(status="timeout" if stopped else "termination_failed", exit_code=process.poll(),
-                              group_terminated=stopped, termination_graceful=graceful)
+                result.update(
+                    status="timeout" if stopped else "termination_failed",
+                    exit_code=process.poll(),
+                    group_terminated=stopped,
+                    termination_graceful=graceful,
+                )
             except KeyboardInterrupt:
                 stopped, graceful = _stop_group(process, ACTION_TERM_GRACE_SECONDS if name == "action" else 0.2)
-                result.update(status="interrupted", exit_code=process.poll(),
-                              group_terminated=stopped, termination_graceful=graceful)
+                result.update(
+                    status="interrupted",
+                    exit_code=process.poll(),
+                    group_terminated=stopped,
+                    termination_graceful=graceful,
+                )
                 interrupted = True
             except BaseException:
                 _stop_group(process, ACTION_TERM_GRACE_SECONDS if name == "action" else 0.2)
@@ -185,13 +213,19 @@ def _run_phase(name: str, spec: dict, directory: Path, environment: dict[str, st
                 # An action command must not leave same-group children running.
                 stopped, graceful = _stop_group(process, ACTION_TERM_GRACE_SECONDS if name == "action" else 0.2)
                 result.update(
-                    status="ok" if process.returncode == 0 and stopped else "exit_failed" if stopped else "termination_failed",
-                    exit_code=process.returncode, group_terminated=stopped, termination_graceful=graceful,
+                    status="ok"
+                    if process.returncode == 0 and stopped
+                    else "exit_failed"
+                    if stopped
+                    else "termination_failed",
+                    exit_code=process.returncode,
+                    group_terminated=stopped,
+                    termination_graceful=graceful,
                 )
     result["ended_utc"] = _utc()
     result["elapsed_monotonic_ns"] = time.monotonic_ns() - start_ns
-    result["stdout_sha256"] = _sha256(stdout_path)
-    result["stderr_sha256"] = _sha256(stderr_path)
+    result["stdout_sha256"] = sha256(stdout_path)
+    result["stderr_sha256"] = sha256(stderr_path)
     if interrupted:
         raise PhaseInterrupted(result)
     return result
@@ -215,7 +249,11 @@ def _controller_evidence(directory: Path, phase: dict, policy_sha256: str, run_i
             raise ValueError("successful scripted action has no controller decision trace")
         return {"status": "absent"}
     decisions = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(decisions, dict) or decisions.get("schema_version") != 1 or decisions.get("policy_sha256") != policy_sha256:
+    if (
+        not isinstance(decisions, dict)
+        or decisions.get("schema_version") != 1
+        or decisions.get("policy_sha256") != policy_sha256
+    ):
         raise ValueError("controller decision schema or policy SHA256 differs")
     if decisions.get("run_id") is not None and [decisions["run_id"]] != run_ids:
         raise ValueError("controller Run ID differs from AUV sidecar")
@@ -224,14 +262,18 @@ def _controller_evidence(directory: Path, phase: dict, policy_sha256: str, run_i
         raise ValueError("controller decision checks are invalid")
     for check in checks:
         artifact = check.get("artifact")
-        if not isinstance(artifact, dict) or not re.fullmatch(r"checkpoint-[0-9]{4}\.png", str(artifact.get("path"))) or not re.fullmatch(r"[0-9a-f]{64}", str(artifact.get("sha256"))):
+        if (
+            not isinstance(artifact, dict)
+            or not re.fullmatch(r"checkpoint-[0-9]{4}\.png", str(artifact.get("path")))
+            or not re.fullmatch(r"[0-9a-f]{64}", str(artifact.get("sha256")))
+        ):
             raise ValueError("controller checkpoint has invalid identity")
         image = (directory / artifact["path"]).resolve(strict=True)
-        if not image.is_relative_to(directory.resolve()) or _sha256(image) != artifact["sha256"]:
+        if not image.is_relative_to(directory.resolve()) or sha256(image) != artifact["sha256"]:
             raise ValueError("controller checkpoint SHA256 differs")
     if phase["status"] == "ok" and (decisions.get("status") != "finished" or not checks):
         raise ValueError("successful scripted action has no finished controller trace")
-    return {"status": decisions.get("status"), "path": path.name, "sha256": _sha256(path), "checks": len(checks)}
+    return {"status": decisions.get("status"), "path": path.name, "sha256": sha256(path), "checks": len(checks)}
 
 
 def _action_evidence(directory: Path, phase: dict, identity: dict | None = None) -> dict:
@@ -260,12 +302,16 @@ def _action_evidence(directory: Path, phase: dict, identity: dict | None = None)
         raise ValueError("action sidecar repeats an AUV Run ID")
     artifact = evidence.get("final_artifact")
     if artifact is not None:
-        if not isinstance(artifact, dict) or not isinstance(artifact.get("path"), str) or not isinstance(artifact.get("sha256"), str):
+        if (
+            not isinstance(artifact, dict)
+            or not isinstance(artifact.get("path"), str)
+            or not isinstance(artifact.get("sha256"), str)
+        ):
             raise ValueError("action sidecar has invalid final artifact")
         artifact_path = (directory / artifact["path"]).resolve(strict=True)
         if not artifact_path.is_relative_to(directory.resolve()):
             raise ValueError("final artifact must be inside the episode directory")
-        if _sha256(artifact_path) != artifact["sha256"]:
+        if sha256(artifact_path) != artifact["sha256"]:
             raise ValueError("final artifact SHA256 mismatch")
     if phase["status"] == "ok":
         terminal = _last_json_line(Path(phase["stdout"]))
@@ -280,7 +326,12 @@ def _action_evidence(directory: Path, phase: dict, identity: dict | None = None)
             terminal = None  # A killed process can leave a truncated line.
         if terminal is not None and (terminal.get("run_ids") != run_ids or terminal.get("final_artifact") != artifact):
             raise ValueError("action stdout and sidecar AUV Run IDs/artifact disagree")
-    result = {"run_ids": run_ids, "final_artifact": artifact, "evidence_status": "verified", "sidecar_sha256": _sha256(path)}
+    result = {
+        "run_ids": run_ids,
+        "final_artifact": artifact,
+        "evidence_status": "verified",
+        "sidecar_sha256": sha256(path),
+    }
     if identity is not None and "controller_policy_sha256" in identity:
         result["controller"] = _controller_evidence(directory, phase, identity["controller_policy_sha256"], run_ids)
     return result
@@ -307,15 +358,22 @@ def run_batch(manifest: dict, output_dir: Path) -> dict:
     output_dir.mkdir(parents=True, exist_ok=False)
     path = output_dir / "ledger.json"
     ledger = {
-        "schema_version": 1, "batch_id": manifest["batch_id"],
+        "schema_version": 1,
+        "batch_id": manifest["batch_id"],
         "manifest_sha256": hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest(),
         "trust": "operator-audited; runner does not verify AUV-only GUI delivery",
-        "denominator": len(manifest["episodes"]), "started_utc": _utc(),
+        "denominator": len(manifest["episodes"]),
+        "started_utc": _utc(),
         "episodes": [
-            {"episode_id": spec["episode_id"], "identity": spec["identity"], "status": "scheduled",
-             "phases": {}, "failure_layers": [],
-             "auv": {"run_ids": [], "final_artifact": None, "evidence_status": "not_run"},
-             "cleanup": {"status": "not_run"}}
+            {
+                "episode_id": spec["episode_id"],
+                "identity": spec["identity"],
+                "status": "scheduled",
+                "phases": {},
+                "failure_layers": [],
+                "auv": {"run_ids": [], "final_artifact": None, "evidence_status": "not_run"},
+                "cleanup": {"status": "not_run"},
+            }
             for spec in manifest["episodes"]
         ],
     }
@@ -326,8 +384,11 @@ def run_batch(manifest: dict, output_dir: Path) -> dict:
         episode["status"] = "running"
         episode["started_utc"] = _utc()
         _write_ledger(path, ledger)
-        environment = {**os.environ, "AUV_OSWORLD_EPISODE_DIR": str(directory),
-                       "AUV_OSWORLD_ACTION_EVIDENCE": str(directory / "action_evidence.json")}
+        environment = {
+            **os.environ,
+            "AUV_OSWORLD_EPISODE_DIR": str(directory),
+            "AUV_OSWORLD_ACTION_EVIDENCE": str(directory / "action_evidence.json"),
+        }
         interrupted = False
         try:
             setup_complete = True
@@ -341,7 +402,9 @@ def run_batch(manifest: dict, output_dir: Path) -> dict:
                     except (OSError, ValueError, json.JSONDecodeError) as error:
                         episode["failure_layers"].append({"layer": "action_evidence", "detail": str(error)})
                     if phase.get("termination_graceful") is False:
-                        episode["failure_layers"].append({"layer": "action_release", "reason": "forced_kill_unverified"})
+                        episode["failure_layers"].append(
+                            {"layer": "action_release", "reason": "forced_kill_unverified"}
+                        )
                     _write_ledger(path, ledger)
                 if phase["status"] != "ok":
                     episode["failure_layers"].append({"layer": name, "reason": phase["status"]})
@@ -363,7 +426,9 @@ def run_batch(manifest: dict, output_dir: Path) -> dict:
                         episode["evaluator_output"] = raw
                         episode["score"] = score
                     except (OSError, ValueError, json.JSONDecodeError) as error:
-                        episode["failure_layers"].append({"layer": "evaluate", "reason": "invalid_output", "detail": str(error)})
+                        episode["failure_layers"].append(
+                            {"layer": "evaluate", "reason": "invalid_output", "detail": str(error)}
+                        )
                 else:
                     episode["failure_layers"].append({"layer": "evaluate", "reason": phase["status"]})
                 _write_ledger(path, ledger)
@@ -396,7 +461,9 @@ def run_batch(manifest: dict, output_dir: Path) -> dict:
                 if cleanup["status"] == "ok":
                     try:
                         report = _last_json_line(Path(cleanup["stdout"]))
-                        if not isinstance(report.get("removed_resources"), list) or not isinstance(report.get("retained_pvcs_verified"), list):
+                        if not isinstance(report.get("removed_resources"), list) or not isinstance(
+                            report.get("retained_pvcs_verified"), list
+                        ):
                             raise ValueError("reset output must list removed_resources and retained_pvcs_verified")
                         episode["cleanup"]["report"] = report
                     except (OSError, ValueError, json.JSONDecodeError) as error:
@@ -433,8 +500,16 @@ def main() -> None:
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     ledger = run_batch(manifest, args.output_dir.resolve())
-    print(json.dumps({"batch_id": ledger["batch_id"], "ledger": str(args.output_dir.resolve() / "ledger.json"),
-                      "denominator": ledger["denominator"], "completed": sum(e["status"] == "completed" for e in ledger["episodes"])}))
+    print(
+        json.dumps(
+            {
+                "batch_id": ledger["batch_id"],
+                "ledger": str(args.output_dir.resolve() / "ledger.json"),
+                "denominator": ledger["denominator"],
+                "completed": sum(e["status"] == "completed" for e in ledger["episodes"]),
+            }
+        )
+    )
     if any(episode["status"] != "completed" for episode in ledger["episodes"]):
         raise SystemExit(1)
 

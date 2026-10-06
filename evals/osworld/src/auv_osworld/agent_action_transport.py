@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import select
 import subprocess
 import time
-
+from pathlib import Path
 
 MAX_LINE_BYTES = 64 * 1024
 MAX_SESSION_BYTES = 1024 * 1024
@@ -24,7 +23,9 @@ REAP_TIMEOUT_SECONDS = 5
 class ForegroundActionTransport:
     """A single, non-restarting child in the runner's own process group."""
 
-    def __init__(self, binary: Path, context: Path, directory: Path, *, response_timeout: float = RESPONSE_TIMEOUT_SECONDS):
+    def __init__(
+        self, binary: Path, context: Path, directory: Path, *, response_timeout: float = RESPONSE_TIMEOUT_SECONDS
+    ):
         self.binary = binary.resolve(strict=True)
         self.context = context.resolve(strict=True)
         self.directory = directory.resolve(strict=True)
@@ -50,8 +51,12 @@ class ForegroundActionTransport:
         # process group, so runner cancellation can reach it as well.
         self.process = subprocess.Popen(
             [str(self.binary), "--interactive", "--context", str(self.context)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None,
-            cwd=self.directory, env=environment, bufsize=0,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=None,
+            cwd=self.directory,
+            env=environment,
+            bufsize=0,
         )
         try:
             # A pipe can report writable with less room than the next chunk.
@@ -110,7 +115,7 @@ class ForegroundActionTransport:
                 raise TimeoutError("interactive AUV request deadline reached")
             # A small write after select is bounded even on a narrow pipe.
             try:
-                count = os.write(self.process.stdin.fileno(), encoded[sent:sent + 4096])
+                count = os.write(self.process.stdin.fileno(), encoded[sent : sent + 4096])
             except BlockingIOError:
                 continue
             if not count:

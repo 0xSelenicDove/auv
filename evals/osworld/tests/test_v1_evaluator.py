@@ -1,25 +1,20 @@
 """Boundary tests; no guest or GUI input is used."""
 
 import ast
-from contextlib import redirect_stdout
-import importlib.util
 import io
 import json
 import logging
 import os
-from pathlib import Path
 import sys
 import tempfile
 import types
 import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
-
-BRIDGE_PATH = Path(__file__).resolve().parents[1] / "v1_evaluator.py"
-spec = importlib.util.spec_from_file_location("v1_evaluator", BRIDGE_PATH)
-bridge = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(bridge)
+from auv_osworld import v1_evaluator as bridge
 
 
 class FakeController:
@@ -60,7 +55,9 @@ class FakeDesktopEnv:
 
 
 class BoundaryTest(unittest.TestCase):
-    @unittest.skipUnless(os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract")
+    @unittest.skipUnless(
+        os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract"
+    )
     def test_vlc_rejects_mutated_task_before_binding_guest_commands(self):
         upstream = Path(os.environ["OSWORLD_V1_CHECKOUT"])
         task, _ = bridge.load_task(upstream, "5ac2891a-eacd-4954-b339-98abba077adb")
@@ -70,11 +67,16 @@ class BoundaryTest(unittest.TestCase):
             post=lambda *_args, **_kwargs: self.fail("no guest request expected"),
             exceptions=types.SimpleNamespace(ReadTimeout=TimeoutError, RequestException=OSError),
         )
-        with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules, {"requests": fake_requests}), \
-                self.assertRaisesRegex(ValueError, "pinned VLC task"):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(sys.modules, {"requests": fake_requests}),
+            self.assertRaisesRegex(ValueError, "pinned VLC task"),
+        ):
             bridge.external_env(task, Path(directory), "127.0.0.1", 5000, 9222, upstream)
 
-    @unittest.skipUnless(os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract")
+    @unittest.skipUnless(
+        os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract"
+    )
     def test_vlc_rejects_unpinned_revision_and_task_bytes(self):
         upstream = Path(os.environ["OSWORLD_V1_CHECKOUT"])
         task_id = "5ac2891a-eacd-4954-b339-98abba077adb"
@@ -85,7 +87,9 @@ class BoundaryTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "task JSON SHA256"):
                 bridge.load_task(upstream, task_id)
 
-    @unittest.skipUnless(os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract")
+    @unittest.skipUnless(
+        os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract"
+    )
     def test_vlc_prepare_rejects_http_200_with_failed_guest_command(self):
         upstream = Path(os.environ["OSWORLD_V1_CHECKOUT"])
         task, _ = bridge.load_task(upstream, "5ac2891a-eacd-4954-b339-98abba077adb")
@@ -103,18 +107,23 @@ class BoundaryTest(unittest.TestCase):
             return Response()
 
         fake_requests = types.SimpleNamespace(
-            get=lambda *_args, **_kwargs: Response(), post=post,
+            get=lambda *_args, **_kwargs: Response(),
+            post=post,
             exceptions=types.SimpleNamespace(ReadTimeout=TimeoutError, RequestException=OSError),
         )
         with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules, {"requests": fake_requests}):
             env = bridge.external_env(task, Path(directory), "127.0.0.1", 5000, 9222, upstream)
-            with self.assertLogs("desktopenv.evaluator-only", level="ERROR") as logs, \
-                    self.assertRaisesRegex(Exception, "VLC guest command did not complete successfully") as caught:
+            with (
+                self.assertLogs("desktopenv.evaluator-only", level="ERROR") as logs,
+                self.assertRaisesRegex(Exception, "VLC guest command did not complete successfully") as caught,
+            ):
                 bridge.prepare(env)
             self.assertNotIn(secret, str(caught.exception))
             self.assertNotIn(secret, "\n".join(logs.output))
 
-    @unittest.skipUnless(os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract")
+    @unittest.skipUnless(
+        os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract"
+    )
     def test_vlc_prepare_rejects_missing_guest_file_postcondition(self):
         upstream = Path(os.environ["OSWORLD_V1_CHECKOUT"])
         task, _ = bridge.load_task(upstream, "5ac2891a-eacd-4954-b339-98abba077adb")
@@ -133,12 +142,16 @@ class BoundaryTest(unittest.TestCase):
         def post(url, **kwargs):
             if urlsplit(url).path == "/execute":
                 command = json.loads(kwargs["data"])["command"][-1]
-                return Response("Linux\n" if command.endswith("import platform; print(platform.system())")
-                                else "/home/user/.config/vlc/vlcrc\n")
+                return Response(
+                    "Linux\n"
+                    if command.endswith("import platform; print(platform.system())")
+                    else "/home/user/.config/vlc/vlcrc\n"
+                )
             return Response()
 
         fake_requests = types.SimpleNamespace(
-            get=lambda *_args, **_kwargs: Response(), post=post,
+            get=lambda *_args, **_kwargs: Response(),
+            post=post,
             exceptions=types.SimpleNamespace(ReadTimeout=TimeoutError, RequestException=OSError),
         )
         with patch.dict(sys.modules, {"requests": fake_requests}):
@@ -149,7 +162,9 @@ class BoundaryTest(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, "did not establish play-and-exit=1"):
                         bridge.prepare(env)
 
-    @unittest.skipUnless(os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract")
+    @unittest.skipUnless(
+        os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract"
+    )
     def test_vlc_setup_does_not_echo_malformed_guest_json(self):
         upstream = Path(os.environ["OSWORLD_V1_CHECKOUT"])
         task, _ = bridge.load_task(upstream, "5ac2891a-eacd-4954-b339-98abba077adb")
@@ -163,18 +178,23 @@ class BoundaryTest(unittest.TestCase):
                 raise ValueError(secret)
 
         fake_requests = types.SimpleNamespace(
-            get=lambda *_args, **_kwargs: Response(), post=lambda *_args, **_kwargs: Response(),
+            get=lambda *_args, **_kwargs: Response(),
+            post=lambda *_args, **_kwargs: Response(),
             exceptions=types.SimpleNamespace(ReadTimeout=TimeoutError, RequestException=OSError),
         )
         with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules, {"requests": fake_requests}):
             env = bridge.external_env(task, Path(directory), "127.0.0.1", 5000, 9222, upstream)
-            with self.assertLogs("desktopenv.evaluator-only", level="ERROR") as logs, \
-                    self.assertRaisesRegex(Exception, "invalid JSON") as caught:
+            with (
+                self.assertLogs("desktopenv.evaluator-only", level="ERROR") as logs,
+                self.assertRaisesRegex(Exception, "invalid JSON") as caught,
+            ):
                 bridge.prepare(env)
             self.assertNotIn(secret, str(caught.exception))
             self.assertNotIn(secret, "\n".join(logs.output))
 
-    @unittest.skipUnless(os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract")
+    @unittest.skipUnless(
+        os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract"
+    )
     def test_vlc_prepare_rejects_wrong_guest_file_even_if_it_contains_expected_setting(self):
         upstream = Path(os.environ["OSWORLD_V1_CHECKOUT"])
         task, _ = bridge.load_task(upstream, "5ac2891a-eacd-4954-b339-98abba077adb")
@@ -196,45 +216,69 @@ class BoundaryTest(unittest.TestCase):
             posts.append(url)
             if urlsplit(url).path == "/execute":
                 command = json.loads(kwargs["data"])["command"][-1]
-                return Response("Linux\n" if command.endswith("import platform; print(platform.system())")
-                                else "/tmp/alternate/vlcrc\n")
+                return Response(
+                    "Linux\n"
+                    if command.endswith("import platform; print(platform.system())")
+                    else "/tmp/alternate/vlcrc\n"
+                )
             return Response()
 
         fake_requests = types.SimpleNamespace(
-            get=lambda *_args, **_kwargs: Response(), post=post,
+            get=lambda *_args, **_kwargs: Response(),
+            post=post,
             exceptions=types.SimpleNamespace(ReadTimeout=TimeoutError, RequestException=OSError),
         )
         with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules, {"requests": fake_requests}):
             env = bridge.external_env(task, Path(directory), "127.0.0.1", 5000, 9222, upstream)
             env.controller.retry_times = 1
             env.controller.retry_interval = 0
-            with self.assertLogs("desktopenv.evaluator-only", level="ERROR"), \
-                    self.assertRaisesRegex(RuntimeError, "VLC setup file verification failed"):
+            with (
+                self.assertLogs("desktopenv.evaluator-only", level="ERROR"),
+                self.assertRaisesRegex(RuntimeError, "VLC setup file verification failed"),
+            ):
                 bridge.prepare(env)
             self.assertFalse(any(url.endswith("/file") for url in posts), "wrong path must not reach file transport")
 
-    @unittest.skipUnless(os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract")
+    @unittest.skipUnless(
+        os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract"
+    )
     def test_vlc_evaluate_requires_matching_prepare_marker_and_endpoint(self):
         upstream = Path(os.environ["OSWORLD_V1_CHECKOUT"])
         task_id = "5ac2891a-eacd-4954-b339-98abba077adb"
         _, task_hash = bridge.load_task(upstream, task_id)
         with tempfile.TemporaryDirectory() as directory:
             marker = Path(directory) / "prepared.json"
-            marker.write_text(json.dumps({
-                "boundary": "evaluator-only; GUI actions must use AUV",
-                "upstream_revision": bridge.UPSTREAM_REV,
-                "task_id": task_id,
-                "task_sha256": task_hash,
-                "endpoint": "http://127.0.0.1:5000",
-                "chromium_port": 9222,
-            }))
-            argv = ["v1_evaluator.py", "evaluate", "--upstream", str(upstream), "--task-id", task_id,
-                    "--episode-dir", directory, "--endpoint", "http://127.0.0.1:5001"]
+            marker.write_text(
+                json.dumps(
+                    {
+                        "boundary": "evaluator-only; GUI actions must use AUV",
+                        "upstream_revision": bridge.UPSTREAM_REV,
+                        "task_id": task_id,
+                        "task_sha256": task_hash,
+                        "endpoint": "http://127.0.0.1:5000",
+                        "chromium_port": 9222,
+                    }
+                )
+            )
+            argv = [
+                "v1_evaluator.py",
+                "evaluate",
+                "--upstream",
+                str(upstream),
+                "--task-id",
+                task_id,
+                "--episode-dir",
+                directory,
+                "--endpoint",
+                "http://127.0.0.1:5001",
+            ]
             with patch.object(sys, "argv", argv), self.assertRaisesRegex(ValueError, "matching prepare marker"):
                 bridge.main()
             self.assertEqual(json.loads(marker.read_text())["endpoint"], "http://127.0.0.1:5000")
 
-    @unittest.skipUnless(os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract")
+    @unittest.skipUnless(
+        os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract"
+    )
     def test_pinned_vlc_prepare_sets_negative_control_and_evaluates_without_gui_relay(self):
         upstream = Path(os.environ["OSWORLD_V1_CHECKOUT"])
         task, task_hash = bridge.load_task(upstream, "5ac2891a-eacd-4954-b339-98abba077adb")
@@ -278,14 +322,17 @@ class BoundaryTest(unittest.TestCase):
                 if command.endswith("import platform; print(platform.system())"):
                     return Response({"status": "success", "output": "Linux\n", "error": "", "returncode": 0})
                 self.assertIn("expanduser('~/.config/vlc/vlcrc')", command)
-                return Response({"status": "success", "output": "/home/user/.config/vlc/vlcrc\n", "error": "", "returncode": 0})
+                return Response(
+                    {"status": "success", "output": "/home/user/.config/vlc/vlcrc\n", "error": "", "returncode": 0}
+                )
             if url.endswith("/file"):
                 self.assertEqual(kwargs["data"]["file_path"], "/home/user/.config/vlc/vlcrc")
                 return Response(content=guest["vlcrc"])
             self.fail(f"unreviewed route: {url}")
 
         fake_requests = types.SimpleNamespace(
-            get=get, post=post,
+            get=get,
+            post=post,
             exceptions=types.SimpleNamespace(ReadTimeout=TimeoutError, RequestException=RuntimeError),
         )
         with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules, {"requests": fake_requests}):
@@ -302,9 +349,23 @@ class BoundaryTest(unittest.TestCase):
             self.assertEqual(calls, before, "unreviewed GUI command must not reach the guest")
         self.assertEqual(calls.count("launch"), 1)
         self.assertEqual(calls.count("execute"), 5)
-        with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules, {"requests": fake_requests}), redirect_stdout(io.StringIO()) as output:
-            argv = ["v1_evaluator.py", "prepare", "--upstream", str(upstream), "--task-id", task["id"],
-                    "--episode-dir", directory, "--endpoint", "http://127.0.0.1:5000"]
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(sys.modules, {"requests": fake_requests}),
+            redirect_stdout(io.StringIO()) as output,
+        ):
+            argv = [
+                "v1_evaluator.py",
+                "prepare",
+                "--upstream",
+                str(upstream),
+                "--task-id",
+                task["id"],
+                "--episode-dir",
+                directory,
+                "--endpoint",
+                "http://127.0.0.1:5000",
+            ]
             with patch.object(sys, "argv", argv):
                 bridge.main()
             marker = json.loads((Path(directory) / "prepared.json").read_text())
@@ -315,7 +376,9 @@ class BoundaryTest(unittest.TestCase):
                 bridge.main()
             self.assertEqual(json.loads(output.getvalue().splitlines()[-1])["score"], 0.0)
 
-    @unittest.skipUnless(os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract")
+    @unittest.skipUnless(
+        os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract"
+    )
     def test_pinned_chrome_method_chain_scores_negative_control_without_gui_input(self):
         upstream = Path(os.environ["OSWORLD_V1_CHECKOUT"])
         task, _ = bridge.load_task(upstream, "2ad9387a-65d8-4e33-ad5b-7580065a27ca")
@@ -351,7 +414,8 @@ class BoundaryTest(unittest.TestCase):
             return Response()
 
         fake_requests = types.SimpleNamespace(
-            get=get, post=post,
+            get=get,
+            post=post,
             exceptions=types.SimpleNamespace(ReadTimeout=TimeoutError, RequestException=RuntimeError),
         )
         with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules, {"requests": fake_requests}):
@@ -362,12 +426,16 @@ class BoundaryTest(unittest.TestCase):
         self.assertEqual(sum(url.endswith("/setup/launch") for _, url in calls), 4)
         self.assertEqual(sum(url.endswith("/file") for _, url in calls), 1)
 
-    @unittest.skipUnless(os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract")
+    @unittest.skipUnless(
+        os.getenv("OSWORLD_V1_CHECKOUT"), "set OSWORLD_V1_CHECKOUT for pinned upstream source contract"
+    )
     def test_exact_pinned_evaluate_method_handles_postconfig_getter_and_metric(self):
         upstream = Path(os.environ["OSWORLD_V1_CHECKOUT"])
         tree = ast.parse((upstream / "desktop_env" / "desktop_env.py").read_text())
         desktop_class = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "DesktopEnv")
-        method = next(node for node in desktop_class.body if isinstance(node, ast.FunctionDef) and node.name == "evaluate")
+        method = next(
+            node for node in desktop_class.body if isinstance(node, ast.FunctionDef) and node.name == "evaluate"
+        )
         module = ast.fix_missing_locations(ast.Module(body=[method], type_ignores=[]))
         namespace = {"logger": logging.getLogger("v1-evaluator-contract")}
         exec(compile(module, str(upstream / "desktop_env" / "desktop_env.py"), "exec"), namespace)
@@ -386,7 +454,9 @@ class BoundaryTest(unittest.TestCase):
             }
             env.result_getter = lambda _env, _config: {"bookmark_bar": {"children": [{"name": "Favorites"}]}}
             env.expected_getter = lambda _env, _config: {"names": ["Favorites"]}
-            env.metric = lambda result, rule, **_options: float(result["bookmark_bar"]["children"][0]["name"] == rule["names"][0])
+            env.metric = lambda result, rule, **_options: float(
+                result["bookmark_bar"]["children"][0]["name"] == rule["names"][0]
+            )
             env.metric_options = {}
             env.cache_dir = directory
             self.assertEqual(namespace["evaluate"](env), 1.0)

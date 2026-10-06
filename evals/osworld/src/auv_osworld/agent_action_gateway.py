@@ -8,14 +8,14 @@ entry remains the authority for OSWorld action parameters and delivery.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import tempfile
-from typing import Callable
+from collections.abc import Callable
+from pathlib import Path
 
+from .integrity import sha256
 
 CHECKPOINT = re.compile(r"checkpoint-[0-9]{4}\.png\Z")
 DIGEST = re.compile(r"[0-9a-f]{64}\Z")
@@ -30,7 +30,9 @@ class AgentActionGateway:
     child. The gate becomes unusable after any ambiguous exchange failure.
     """
 
-    def __init__(self, directory: Path, ready: dict, exchange: Callable[[dict], dict], *, max_actions: int, max_captures: int):
+    def __init__(
+        self, directory: Path, ready: dict, exchange: Callable[[dict], dict], *, max_actions: int, max_captures: int
+    ):
         self.directory = directory.resolve(strict=True)
         if not self.directory.is_dir():
             raise ValueError("episode directory is not a directory")
@@ -55,9 +57,13 @@ class AgentActionGateway:
         self.trace_path = self.directory / "agent_decisions.json"
         if self.trace_path.exists():
             raise FileExistsError("refusing to reuse agent decision trace")
-        self.trace = {"version": 1, "run_id": self.run_id,
-                      "limits": {"actions": max_actions, "captures": max_captures},
-                      "receipts": [], "pending": None}
+        self.trace = {
+            "version": 1,
+            "run_id": self.run_id,
+            "limits": {"actions": max_actions, "captures": max_captures},
+            "receipts": [],
+            "pending": None,
+        }
         self._persist()
 
     def _persist(self) -> None:
@@ -75,10 +81,15 @@ class AgentActionGateway:
         if not isinstance(artifact, dict) or set(artifact) != {"path", "sha256"}:
             raise ValueError("AUV checkpoint receipt has invalid artifact schema")
         name, digest = artifact["path"], artifact["sha256"]
-        if not isinstance(name, str) or not CHECKPOINT.fullmatch(name) or not isinstance(digest, str) or not DIGEST.fullmatch(digest):
+        if (
+            not isinstance(name, str)
+            or not CHECKPOINT.fullmatch(name)
+            or not isinstance(digest, str)
+            or not DIGEST.fullmatch(digest)
+        ):
             raise ValueError("AUV checkpoint receipt has invalid identity")
         image = (self.directory / name).resolve(strict=True)
-        if not image.is_relative_to(self.directory) or hashlib.sha256(image.read_bytes()).hexdigest() != digest:
+        if not image.is_relative_to(self.directory) or sha256(image) != digest:
             raise ValueError("AUV checkpoint bytes differ from receipt")
         index = json.loads((self.directory / "checkpoints.json").read_text(encoding="utf-8"))
         if not isinstance(index, list) or len(index) != self.captures or index[-1] != artifact:
@@ -90,13 +101,17 @@ class AgentActionGateway:
             raise ValueError("interactive AUV terminal receipt has a different Run or schema")
         artifact = response["final_artifact"]
         if op == "finish":
-            if not isinstance(artifact, dict) or set(artifact) != {"path", "sha256"} or artifact["path"] != "final-screenshot.png":
+            if (
+                not isinstance(artifact, dict)
+                or set(artifact) != {"path", "sha256"}
+                or artifact["path"] != "final-screenshot.png"
+            ):
                 raise ValueError("interactive AUV finish receipt lacks its final screenshot")
             digest = artifact["sha256"]
             if not isinstance(digest, str) or not DIGEST.fullmatch(digest):
                 raise ValueError("interactive AUV final screenshot digest is invalid")
             image = (self.directory / "final-screenshot.png").resolve(strict=True)
-            if not image.is_relative_to(self.directory) or hashlib.sha256(image.read_bytes()).hexdigest() != digest:
+            if not image.is_relative_to(self.directory) or sha256(image) != digest:
                 raise ValueError("interactive AUV final screenshot bytes differ from receipt")
         elif artifact is not None:
             raise ValueError("interactive AUV abort receipt unexpectedly has a final screenshot")
@@ -120,7 +135,12 @@ class AgentActionGateway:
             if self.actions >= self.max_actions:
                 raise ValueError("agent action budget exhausted")
             action = proposal["action"]
-            if not isinstance(action, dict) or not isinstance(action.get("action_type"), str) or not action["action_type"] or action["action_type"] in GUI_CONTROL_ACTIONS:
+            if (
+                not isinstance(action, dict)
+                or not isinstance(action.get("action_type"), str)
+                or not action["action_type"]
+                or action["action_type"] in GUI_CONTROL_ACTIONS
+            ):
                 raise ValueError("agent action is not a typed GUI action")
             # NOTICE: Parameter semantics remain in Rust parse_action; the
             # gateway only rejects an absent/forbidden action shape here.
@@ -128,8 +148,10 @@ class AgentActionGateway:
                 raise ValueError("agent action lacks the latest verified AUV screenshot provenance")
             # Recheck at decision time so a checkpoint changed after capture
             # cannot authorize input using an earlier valid digest.
-            if self._checkpoint({"path": self.latest_checkpoint["path"],
-                                 "sha256": self.latest_checkpoint["sha256"]}) != self.latest_checkpoint:
+            if (
+                self._checkpoint({"path": self.latest_checkpoint["path"], "sha256": self.latest_checkpoint["sha256"]})
+                != self.latest_checkpoint
+            ):
                 raise ValueError("agent screenshot provenance changed before action")
         request = {"op": op, "seq": self.next_seq}
         if op == "action":
@@ -152,7 +174,11 @@ class AgentActionGateway:
                     deliveries = json.loads((self.directory / "input-action-results.json").read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError) as error:
                     raise ValueError("interactive AUV durable action results are missing or invalid") from error
-                if not isinstance(deliveries, list) or len(deliveries) != self.actions + 1 or deliveries[-1] != response["delivery"]:
+                if (
+                    not isinstance(deliveries, list)
+                    or len(deliveries) != self.actions + 1
+                    or deliveries[-1] != response["delivery"]
+                ):
                     raise ValueError("interactive AUV action delivery differs from durable results")
                 self.actions += 1
                 self.latest_checkpoint = None

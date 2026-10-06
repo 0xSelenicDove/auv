@@ -1,27 +1,18 @@
 """Kubernetes adapter contract tests. Every cluster/process boundary is mocked."""
 
-import importlib.util
-from contextlib import nullcontext, redirect_stdout
 import hashlib
 import io
 import json
 import os
-from pathlib import Path
 import socket
 import tempfile
 import unittest
+from contextlib import nullcontext, redirect_stdout
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-
-ADAPTER_PATH = Path(__file__).resolve().parents[1] / "k8s_phase_adapter.py"
-spec = importlib.util.spec_from_file_location("k8s_phase_adapter", ADAPTER_PATH)
-adapter = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(adapter)
-EVALUATOR_PATH = ADAPTER_PATH.with_name("v1_evaluator.py")
-evaluator_spec = importlib.util.spec_from_file_location("v1_evaluator", EVALUATOR_PATH)
-evaluator = importlib.util.module_from_spec(evaluator_spec)
-evaluator_spec.loader.exec_module(evaluator)
-
+from auv_osworld import k8s_phase_adapter as adapter
+from auv_osworld import v1_evaluator as evaluator
 
 # Frozen from the 2026-10-06 V1 live boot that the old -snapshot assertion rejected.
 LIVE_V1_QEMU_ARGV = (
@@ -43,13 +34,23 @@ LIVE_V1_QEMU_ARGV = (
 
 def config(task_id: str | None = None) -> dict:
     value = {
-        "batch_id": "control-1", "episode_id": "chrome-1", "namespace": "bench",
-        "kubeconfig": "/fake/kubeconfig", "context": "test-context", "node": "liet-gpu-1",
-        "runtime_pod": "chrome-vm", "runtime_service": "chrome-svc", "proxy_pod": "chrome-proxy",
+        "batch_id": "control-1",
+        "episode_id": "chrome-1",
+        "namespace": "bench",
+        "kubeconfig": "/fake/kubeconfig",
+        "context": "test-context",
+        "node": "liet-gpu-1",
+        "runtime_pod": "chrome-vm",
+        "runtime_service": "chrome-svc",
+        "proxy_pod": "chrome-proxy",
         "proxy_image": "registry.example/proxy@sha256:" + "a" * 64,
-        "base_pvc": "osworld-v1-hot", "base_qcow_sha256": "b" * 64,
-        "guest_auv_binary": "/fake/guest-auv", "host_auv_binary": "/fake/host-auv",
-        "upstream_checkout": "/fake/osworld", "setup_local_port": 25000, "auv_local_port": 28080,
+        "base_pvc": "osworld-v1-hot",
+        "base_qcow_sha256": "b" * 64,
+        "guest_auv_binary": "/fake/guest-auv",
+        "host_auv_binary": "/fake/host-auv",
+        "upstream_checkout": "/fake/osworld",
+        "setup_local_port": 25000,
+        "auv_local_port": 28080,
     }
     if task_id is not None:
         value["task_id"] = task_id
@@ -69,14 +70,16 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(adapter.TASKS, evaluator.TASKS)
 
     def test_manifest_has_no_configurable_action_argv_and_is_capture_only(self):
-        with patch.object(adapter, "load_config", return_value=config()), \
-                patch.object(adapter.subprocess, "run", return_value=MagicMock(returncode=0)) as run, \
-                patch.object(Path, "resolve", return_value=Path("/fake/config.json")):
+        with (
+            patch.object(adapter, "load_config", return_value=config()),
+            patch.object(adapter.subprocess, "run", return_value=MagicMock(returncode=0)) as run,
+            patch.object(Path, "resolve", return_value=Path("/fake/config.json")),
+        ):
             built = adapter.manifest(Path("/fake/config.json"))
         episode = built["episodes"][0]
         self.assertEqual(episode["identity"]["topology"], "paired-remote-capture-only-negative-control")
         self.assertEqual(set(episode["phases"]), set(adapter.PHASES))
-        self.assertEqual(episode["phases"]["action"]["argv"][2:4], ["phase", "action"])
+        self.assertEqual(episode["phases"]["action"]["argv"][3:5], ["phase", "action"])
         self.assertEqual(episode["phases"]["action"]["timeout_seconds"], 600)
         self.assertNotIn("action_argv", config())
         self.assertTrue(all(phase["argv"][0] == run.call_args.args[0][0] for phase in episode["phases"].values()))
@@ -87,27 +90,34 @@ class AdapterTest(unittest.TestCase):
         # verify that this exact interpreter could import requests. A live
         # episode then booted and installed before setup failed.
         output = io.StringIO()
-        with patch.object(adapter, "load_config", return_value=config()), \
-                patch.object(Path, "resolve", return_value=Path("/fake/config.json")), \
-                patch.object(adapter.subprocess, "run", return_value=MagicMock(returncode=1)) as run, \
-                patch.object(adapter.sys, "argv", ["k8s_phase_adapter.py", "manifest", "--config", "/fake/config.json"]), \
-                redirect_stdout(output):
+        with (
+            patch.object(adapter, "load_config", return_value=config()),
+            patch.object(Path, "resolve", return_value=Path("/fake/config.json")),
+            patch.object(adapter.subprocess, "run", return_value=MagicMock(returncode=1)) as run,
+            patch.object(adapter.sys, "argv", ["k8s_phase_adapter.py", "manifest", "--config", "/fake/config.json"]),
+            redirect_stdout(output),
+        ):
             with self.assertRaisesRegex(RuntimeError, "requests"):
                 adapter.main()
         self.assertEqual(output.getvalue(), "")
-        run.assert_called_once_with([adapter.sys.executable, "-c", "import requests"],
-                                    capture_output=True, text=True, check=False)
+        run.assert_called_once_with(
+            [adapter.sys.executable, "-c", "import requests"], capture_output=True, text=True, check=False
+        )
 
     def test_manifest_selects_pinned_vlc_identity_without_exposing_action_argv(self):
         selected = config("5ac2891a-eacd-4954-b339-98abba077adb")
-        with patch.object(adapter, "load_config", return_value=selected), \
-                patch.object(adapter.subprocess, "run", return_value=MagicMock(returncode=0)), \
-                patch.object(Path, "resolve", return_value=Path("/fake/config.json")):
+        with (
+            patch.object(adapter, "load_config", return_value=selected),
+            patch.object(adapter.subprocess, "run", return_value=MagicMock(returncode=0)),
+            patch.object(Path, "resolve", return_value=Path("/fake/config.json")),
+        ):
             episode = adapter.manifest(Path("/fake/config.json"))["episodes"][0]
         self.assertEqual(episode["identity"]["task_id"], selected["task_id"])
-        self.assertEqual(episode["identity"]["task_sha256"], "4e038a7bb4c3770186209d68402e678ff723238cb31684fe452f0b0c6f4665da")
+        self.assertEqual(
+            episode["identity"]["task_sha256"], "4e038a7bb4c3770186209d68402e678ff723238cb31684fe452f0b0c6f4665da"
+        )
         self.assertEqual(episode["identity"]["topology"], "paired-remote-capture-only-negative-control")
-        self.assertEqual(episode["phases"]["action"]["argv"][2:4], ["phase", "action"])
+        self.assertEqual(episode["phases"]["action"]["argv"][3:5], ["phase", "action"])
         self.assertNotIn("action_argv", selected)
 
     def test_config_rejects_unlisted_task_without_reaching_guest_or_cluster(self):
@@ -124,13 +134,18 @@ class AdapterTest(unittest.TestCase):
         selected = config("5ac2891a-eacd-4954-b339-98abba077adb")
         episode = adapter.Episode(selected, self.directory)
         adapter.write_json(self.directory / "paired-device.json", {"device_id": "device"})
-        with patch.object(episode, "assert_identity"), patch.object(episode, "forward", return_value=nullcontext()), \
-                patch.object(adapter, "_run", return_value='{"score": 0.0}') as run:
+        with (
+            patch.object(episode, "assert_identity"),
+            patch.object(episode, "forward", return_value=nullcontext()),
+            patch.object(adapter, "_run", return_value='{"score": 0.0}') as run,
+        ):
             episode.evaluator("setup")
             episode.evaluator("evaluate")
-        self.assertEqual([call.args[0][2] for call in run.call_args_list], ["prepare", "evaluate"])
-        self.assertEqual([call.args[0][call.args[0].index("--task-id") + 1] for call in run.call_args_list],
-                         [selected["task_id"], selected["task_id"]])
+        self.assertEqual([call.args[0][3] for call in run.call_args_list], ["prepare", "evaluate"])
+        self.assertEqual(
+            [call.args[0][call.args[0].index("--task-id") + 1] for call in run.call_args_list],
+            [selected["task_id"], selected["task_id"]],
+        )
 
     def test_config_rejects_missing_measured_qcow_and_any_action_argv(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -156,11 +171,18 @@ class AdapterTest(unittest.TestCase):
             value["upstream_checkout"] = str(upstream)
             path = root / "config.json"
             path.write_text(json.dumps(value))
-            with patch.object(adapter, "sha256", side_effect=lambda candidate: {
-                value["guest_auv_binary"]: adapter.GUEST_AUV_SHA256,
-                value["host_auv_binary"]: adapter.HOST_AUV_SHA256,
-                str(task): adapter.CHROME_SHA256,
-            }[str(candidate)]), patch.object(adapter.subprocess, "run") as run:
+            with (
+                patch.object(
+                    adapter,
+                    "sha256",
+                    side_effect=lambda candidate: {
+                        value["guest_auv_binary"]: adapter.GUEST_AUV_SHA256,
+                        value["host_auv_binary"]: adapter.HOST_AUV_SHA256,
+                        str(task): adapter.CHROME_SHA256,
+                    }[str(candidate)],
+                ),
+                patch.object(adapter.subprocess, "run") as run,
+            ):
                 run.side_effect = [MagicMock(stdout=adapter.V1_REVISION), MagicMock(stdout="")]
                 self.assertEqual(adapter.load_config(path), value)
             value["base_qcow_sha256"] = "unknown"
@@ -193,8 +215,10 @@ class AdapterTest(unittest.TestCase):
                 value["host_auv_binary"]: adapter.HOST_AUV_SHA256,
                 str(task): adapter.VLC_SHA256,
             }
-            with patch.object(adapter, "sha256", side_effect=lambda candidate: hashes[str(candidate)]), \
-                    patch.object(adapter.subprocess, "run") as run:
+            with (
+                patch.object(adapter, "sha256", side_effect=lambda candidate: hashes[str(candidate)]),
+                patch.object(adapter.subprocess, "run") as run,
+            ):
                 run.side_effect = [MagicMock(stdout=adapter.V1_REVISION), MagicMock(stdout="")]
                 self.assertEqual(adapter.load_config(path), value)
                 hashes[str(task)] = "0" * 64
@@ -203,9 +227,16 @@ class AdapterTest(unittest.TestCase):
                     adapter.load_config(path)
 
     def test_guest_control_rejects_osworld_relay_of_auv_gui_input(self):
-        with patch.object(self.episode, "_post", return_value={
-            "status": "success", "output": "known", "error": "", "returncode": 0,
-        }) as post:
+        with patch.object(
+            self.episode,
+            "_post",
+            return_value={
+                "status": "success",
+                "output": "known",
+                "error": "",
+                "returncode": 0,
+            },
+        ) as post:
             with self.assertRaisesRegex(ValueError, "forbidden"):
                 self.episode.guest_control(["/home/user/auv", "invoke", "input.clickPoint", "10", "20"])
             post.assert_not_called()
@@ -221,7 +252,16 @@ class AdapterTest(unittest.TestCase):
         response = {"status": "success", "output": "", "error": secret, "returncode": 1}
         with patch.object(self.episode, "_post", return_value=response):
             with self.assertRaisesRegex(RuntimeError, "returncode=1") as caught:
-                self.episode.guest_control(["env", "AUV_ENDPOINT=unix:///home/user/auv.sock", "/home/user/auv", "devices", "pair", "create-token"])
+                self.episode.guest_control(
+                    [
+                        "env",
+                        "AUV_ENDPOINT=unix:///home/user/auv.sock",
+                        "/home/user/auv",
+                        "devices",
+                        "pair",
+                        "create-token",
+                    ]
+                )
         self.assertNotIn(secret, str(caught.exception))
         self.assertIn("stderr_sha256=", str(caught.exception))
 
@@ -239,15 +279,30 @@ class AdapterTest(unittest.TestCase):
     def test_pair_token_shape_failure_reports_metadata_not_bearer(self):
         secret = "do-not-log-this-pairing-value"
         reply = {"status": "success", "output": f"warning\n{secret}\n", "error": "", "returncode": 0}
-        good = lambda output: {"status": "success", "output": output, "error": "", "returncode": 0}
-        with patch.object(self.episode, "assert_identity"), \
-             patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(adapter, "_run", return_value=""), \
-             patch.object(self.episode, "guest_control", side_effect=[
-                 {"returncode": 1}, good(adapter.GUEST_AUV_SHA256 + "  /home/user/auv"), good(""),
-                 good(""), good(""), good("auv 0.0.28"), reply,
-             ]), \
-             patch.object(self.episode, "_post", return_value="launched successfully"):
+
+        def good(output):
+            return {"status": "success", "output": output, "error": "", "returncode": 0}
+
+        with (
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(adapter, "_run", return_value=""),
+            patch.object(self.episode, "_upload_guest_binary"),
+            patch.object(
+                self.episode,
+                "guest_control",
+                side_effect=[
+                    {"returncode": 1},
+                    good(adapter.GUEST_AUV_SHA256 + "  /home/user/auv"),
+                    good(""),
+                    good(""),
+                    good(""),
+                    good("auv 0.0.28"),
+                    reply,
+                ],
+            ),
+            patch.object(self.episode, "_post", return_value="launched successfully"),
+        ):
             with self.assertRaisesRegex(ValueError, "stdout_lines=2") as caught:
                 self.episode.install()
         self.assertNotIn(secret, str(caught.exception))
@@ -255,6 +310,7 @@ class AdapterTest(unittest.TestCase):
 
     def test_install_prepares_guest_libraries_before_auv_version(self):
         calls = []
+
         def control(command):
             calls.append(command)
             if command == ["test", "-e", "/home/user/auv"]:
@@ -264,20 +320,27 @@ class AdapterTest(unittest.TestCase):
             if command == ["/home/user/auv", "--version"]:
                 raise RuntimeError("stop after library preparation")
             return {"output": ""}
-        with patch.object(self.episode, "assert_identity"), \
-             patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(adapter, "_run", return_value=""), \
-             patch.object(self.episode, "guest_control", side_effect=control):
+
+        with (
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(adapter, "_run", return_value=""),
+            patch.object(self.episode, "_upload_guest_binary"),
+            patch.object(self.episode, "guest_control", side_effect=control),
+        ):
             with self.assertRaisesRegex(RuntimeError, "stop after library preparation"):
                 self.episode.install()
-        self.assertEqual(calls, [
-            ["test", "-e", "/home/user/auv"],
-            ["sha256sum", "/home/user/auv"],
-            ["chmod", "0700", "/home/user/auv"],
-            adapter.GUEST_APT_UPDATE,
-            adapter.GUEST_APT_INSTALL,
-            ["/home/user/auv", "--version"],
-        ])
+        self.assertEqual(
+            calls,
+            [
+                ["test", "-e", "/home/user/auv"],
+                ["sha256sum", "/home/user/auv"],
+                ["chmod", "0700", "/home/user/auv"],
+                adapter.GUEST_APT_UPDATE,
+                adapter.GUEST_APT_INSTALL,
+                ["/home/user/auv", "--version"],
+            ],
+        )
 
     def test_launch_accepts_pinned_upstream_plain_text_success(self):
         # ROOT CAUSE:
@@ -286,81 +349,103 @@ class AdapterTest(unittest.TestCase):
         # pairing, so this response has a distinct explicit contract.
         response = MagicMock()
         response.status = 200
-        response.read.return_value = b"/home/user/auv serve launched successfully"
-        with patch.object(adapter.request, "urlopen") as urlopen:
-            urlopen.return_value.__enter__.return_value = response
+        response.text = "/home/user/auv serve launched successfully"
+        with patch.object(adapter.requests, "post", return_value=response):
             result = self.episode._post("/setup/launch", {"command": ["/home/user/auv", "serve"], "shell": False})
         self.assertEqual(result, "/home/user/auv serve launched successfully")
 
     def test_launch_rejects_unconfirmed_text_while_execute_keeps_json_contract(self):
         response = MagicMock()
         response.status = 200
-        with patch.object(adapter.request, "urlopen") as urlopen:
-            urlopen.return_value.__enter__.return_value = response
-            response.read.return_value = b"unexpected launch response"
+        with patch.object(adapter.requests, "post", return_value=response):
+            response.text = "unexpected launch response"
             with self.assertRaisesRegex(ValueError, "no success confirmation"):
                 self.episode._post("/setup/launch", {"command": ["/home/user/auv", "serve"], "shell": False})
-            response.read.return_value = b'{"output":"known control response"}'
+            response.json.return_value = {"output": "known control response"}
             result = self.episode._post("/setup/execute", {"command": ["sha256sum", "/home/user/auv"], "shell": False})
         self.assertEqual(result, {"output": "known control response"})
 
     def test_service_selects_runtime_not_proxy(self):
         created = []
-        with patch.object(self.episode, "_retained_pvc", return_value={"name": "osworld-v1-hot"}), \
-             patch.object(self.episode, "_create", side_effect=created.append), \
-             patch.object(self.episode, "kubectl"), \
-             patch.object(self.episode, "_pod_snapshot", side_effect=[{"uid": "vm"}, {"uid": "proxy"}]), \
-             patch.object(self.episode, "get", return_value={"metadata": {"uid": "svc"}}), \
-             patch.object(self.episode, "_overlay", return_value={"overlay": "qcow2 backing-file", "runtime": {"uid": "vm"}}), \
-             patch.object(self.episode, "_stable_guest_control"), \
-             patch.object(self.episode, "assert_identity"), \
-             patch.object(adapter.time, "sleep"):
+        with (
+            patch.object(self.episode, "_retained_pvc", return_value={"name": "osworld-v1-hot"}),
+            patch.object(self.episode, "_create", side_effect=created.append),
+            patch.object(self.episode, "kubectl"),
+            patch.object(self.episode, "_pod_snapshot", side_effect=[{"uid": "vm"}, {"uid": "proxy"}]),
+            patch.object(self.episode, "get", return_value={"metadata": {"uid": "svc"}}),
+            patch.object(
+                self.episode, "_overlay", return_value={"overlay": "qcow2 backing-file", "runtime": {"uid": "vm"}}
+            ),
+            patch.object(self.episode, "_stable_guest_control"),
+            patch.object(self.episode, "assert_identity"),
+            patch.object(adapter.time, "sleep"),
+        ):
             self.episode.boot()
         pod, service, proxy = created
         self.assertEqual(service["spec"]["selector"], pod["metadata"]["labels"])
         self.assertNotEqual(service["spec"]["selector"], proxy["metadata"]["labels"])
         self.assertEqual(pod["spec"]["containers"][0]["startupProbe"]["tcpSocket"], {"port": 5000})
-        self.assertEqual(pod["spec"]["volumes"][0]["persistentVolumeClaim"],
-                         {"claimName": "osworld-v1-hot", "readOnly": True})
+        self.assertEqual(
+            pod["spec"]["volumes"][0]["persistentVolumeClaim"], {"claimName": "osworld-v1-hot", "readOnly": True}
+        )
         self.assertNotIn("/screenshot", json.dumps(created))
         self.assertEqual(json.loads(self.episode.identity_path.read_text())["runtime"]["uid"], "vm")
 
     def test_stable_guest_control_checks_terminal_not_pixels(self):
         response = MagicMock()
         response.status = 200
-        with patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(adapter.request, "urlopen") as urlopen, \
-             patch.object(adapter.time, "sleep") as sleep:
-            urlopen.return_value.__enter__.return_value = response
+        with (
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(adapter.requests, "get", return_value=response) as get,
+            patch.object(adapter.time, "sleep") as sleep,
+        ):
             self.episode._stable_guest_control()
-        self.assertEqual(urlopen.call_count, 4)
-        self.assertTrue(all(call.args[0].endswith("/terminal") for call in urlopen.call_args_list))
+        self.assertEqual(get.call_count, 4)
+        self.assertTrue(all(call.args[0].endswith("/terminal") for call in get.call_args_list))
         self.assertEqual(sleep.call_count, 3)
 
     def test_overlay_rejects_unprotected_base_and_persistent_boot_path_before_exec(self):
-        pod = {"spec": {"containers": [{"name": "qemu", "volumeMounts": [
-            {"name": "image", "mountPath": "/System.qcow2", "subPath": "System.qcow2", "readOnly": True}]}],
-            "volumes": [{"name": "image", "persistentVolumeClaim": {"claimName": "osworld-v1-hot", "readOnly": True}}]}}
+        pod = {
+            "spec": {
+                "containers": [
+                    {
+                        "name": "qemu",
+                        "volumeMounts": [
+                            {"name": "image", "mountPath": "/System.qcow2", "subPath": "System.qcow2", "readOnly": True}
+                        ],
+                    }
+                ],
+                "volumes": [
+                    {"name": "image", "persistentVolumeClaim": {"claimName": "osworld-v1-hot", "readOnly": True}}
+                ],
+            }
+        }
         pod["spec"]["containers"][0]["volumeMounts"][0]["readOnly"] = False
-        with patch.object(self.episode, "_pod_snapshot", return_value={"uid": "vm"}), \
-             patch.object(self.episode, "get", return_value=pod), \
-             patch.object(self.episode, "kubectl") as kubectl:
+        with (
+            patch.object(self.episode, "_pod_snapshot", return_value={"uid": "vm"}),
+            patch.object(self.episode, "get", return_value=pod),
+            patch.object(self.episode, "kubectl") as kubectl,
+        ):
             with self.assertRaisesRegex(ValueError, "read-only"):
                 self.episode._overlay()
             kubectl.assert_not_called()
         pod["spec"]["containers"][0]["volumeMounts"][0]["readOnly"] = True
         pod["spec"]["volumes"][0]["persistentVolumeClaim"]["readOnly"] = False
-        with patch.object(self.episode, "_pod_snapshot", return_value={"uid": "vm"}), \
-             patch.object(self.episode, "get", return_value=pod), \
-             patch.object(self.episode, "kubectl") as kubectl:
+        with (
+            patch.object(self.episode, "_pod_snapshot", return_value={"uid": "vm"}),
+            patch.object(self.episode, "get", return_value=pod),
+            patch.object(self.episode, "kubectl") as kubectl,
+        ):
             with self.assertRaisesRegex(ValueError, "PVC source is not read-only"):
                 self.episode._overlay()
             kubectl.assert_not_called()
         pod["spec"]["volumes"][0]["persistentVolumeClaim"]["readOnly"] = True
         pod["spec"]["containers"][0]["volumeMounts"].append({"name": "other", "mountPath": "/boot.qcow2"})
-        with patch.object(self.episode, "_pod_snapshot", return_value={"uid": "vm"}), \
-             patch.object(self.episode, "get", return_value=pod), \
-             patch.object(self.episode, "kubectl") as kubectl:
+        with (
+            patch.object(self.episode, "_pod_snapshot", return_value={"uid": "vm"}),
+            patch.object(self.episode, "get", return_value=pod),
+            patch.object(self.episode, "kubectl") as kubectl,
+        ):
             with self.assertRaisesRegex(ValueError, "covered by a Pod volume mount"):
                 self.episode._overlay()
             kubectl.assert_not_called()
@@ -372,15 +457,32 @@ class AdapterTest(unittest.TestCase):
         # the real fresh overlay before the episode could install AUV.
         pod = {
             "metadata": {"uid": "runtime-uid", "labels": self.episode._labels("qemu")},
-            "spec": {"nodeName": "liet-gpu-1", "containers": [{
-                "name": "qemu", "image": adapter.RUNTIME_IMAGE,
-                "volumeMounts": [{"name": "image", "mountPath": "/System.qcow2",
-                                  "subPath": "System.qcow2", "readOnly": True}],
-            }], "volumes": [{"name": "image", "persistentVolumeClaim": {
-                "claimName": "osworld-v1-hot", "readOnly": True}}]},
-            "status": {"containerStatuses": [{"name": "qemu", "ready": True,
-                "restartCount": 0, "containerID": "containerd://live-container",
-                "imageID": "docker.io/" + adapter.RUNTIME_IMAGE}]},
+            "spec": {
+                "nodeName": "liet-gpu-1",
+                "containers": [
+                    {
+                        "name": "qemu",
+                        "image": adapter.RUNTIME_IMAGE,
+                        "volumeMounts": [
+                            {"name": "image", "mountPath": "/System.qcow2", "subPath": "System.qcow2", "readOnly": True}
+                        ],
+                    }
+                ],
+                "volumes": [
+                    {"name": "image", "persistentVolumeClaim": {"claimName": "osworld-v1-hot", "readOnly": True}}
+                ],
+            },
+            "status": {
+                "containerStatuses": [
+                    {
+                        "name": "qemu",
+                        "ready": True,
+                        "restartCount": 0,
+                        "containerID": "containerd://live-container",
+                        "imageID": "docker.io/" + adapter.RUNTIME_IMAGE,
+                    }
+                ]
+            },
         }
         overrides = {}
 
@@ -392,10 +494,15 @@ class AdapterTest(unittest.TestCase):
             if "ps" in args:
                 return "42 " + LIVE_V1_QEMU_ARGV + "\n"
             if "qemu-img" in args:
-                return json.dumps({"filename": "/boot.qcow2", "format": "qcow2",
-                                   "backing-filename": "/System.qcow2",
-                                   "full-backing-filename": "/System.qcow2",
-                                   "backing-filename-format": "qcow2"})
+                return json.dumps(
+                    {
+                        "filename": "/boot.qcow2",
+                        "format": "qcow2",
+                        "backing-filename": "/System.qcow2",
+                        "full-backing-filename": "/System.qcow2",
+                        "backing-filename-format": "qcow2",
+                    }
+                )
             if "findmnt" in args:
                 return json.dumps({"filesystems": [{"target": "/", "fstype": "overlay", "source": "overlay"}]})
             if "sha256sum" in args:
@@ -404,50 +511,100 @@ class AdapterTest(unittest.TestCase):
                 return "/boot.qcow2\n/System.qcow2\n"
             self.fail(f"unexpected cluster command: {args}")
 
-        with patch.object(self.episode, "get", return_value=pod), \
-             patch.object(self.episode, "kubectl", side_effect=observed_command):
+        with (
+            patch.object(self.episode, "get", return_value=pod),
+            patch.object(self.episode, "kubectl", side_effect=observed_command),
+        ):
             evidence = self.episode._overlay()
         self.assertEqual(evidence["base_qcow_sha256"], "b" * 64)
         self.assertEqual(evidence["backing_file"], "/System.qcow2")
         self.assertEqual(evidence["boot_file"], "/boot.qcow2")
         self.assertEqual(evidence["runtime"]["uid"], "runtime-uid")
 
-        overrides["qemu-img"] = json.dumps({"filename": "/boot.qcow2", "format": "qcow2",
-            "backing-filename": "/different.qcow2", "full-backing-filename": "/different.qcow2",
-            "backing-filename-format": "qcow2"})
-        with patch.object(self.episode, "get", return_value=pod), \
-             patch.object(self.episode, "kubectl", side_effect=observed_command):
+        overrides["qemu-img"] = json.dumps(
+            {
+                "filename": "/boot.qcow2",
+                "format": "qcow2",
+                "backing-filename": "/different.qcow2",
+                "full-backing-filename": "/different.qcow2",
+                "backing-filename-format": "qcow2",
+            }
+        )
+        with (
+            patch.object(self.episode, "get", return_value=pod),
+            patch.object(self.episode, "kubectl", side_effect=observed_command),
+        ):
             with self.assertRaisesRegex(ValueError, "backing file"):
                 self.episode._overlay()
         del overrides["qemu-img"]
         overrides["/bin/sh"] = "/System.qcow2\n"
-        with patch.object(self.episode, "get", return_value=pod), \
-             patch.object(self.episode, "kubectl", side_effect=observed_command):
+        with (
+            patch.object(self.episode, "get", return_value=pod),
+            patch.object(self.episode, "kubectl", side_effect=observed_command),
+        ):
             with self.assertRaisesRegex(ValueError, "has not opened"):
                 self.episode._overlay()
 
     def test_vlc_keeps_uid_and_read_only_overlay_checks(self):
         episode = adapter.Episode(config(adapter.VLC_TASK), self.directory)
-        adapter.write_json(episode.identity_path, {"runtime": {"uid": "same", "container_id": "old", "restart_count": 0},
-                                                  "proxy": {"uid": "proxy"}, "service_uid": "svc"})
-        with patch.object(episode, "_pod_snapshot", side_effect=[
-            {"uid": "same", "container_id": "new", "restart_count": 1}, {"uid": "proxy"}]):
+        adapter.write_json(
+            episode.identity_path,
+            {
+                "runtime": {"uid": "same", "container_id": "old", "restart_count": 0},
+                "proxy": {"uid": "proxy"},
+                "service_uid": "svc",
+            },
+        )
+        with patch.object(
+            episode,
+            "_pod_snapshot",
+            side_effect=[{"uid": "same", "container_id": "new", "restart_count": 1}, {"uid": "proxy"}],
+        ):
             with self.assertRaisesRegex(ValueError, "identity changed"):
                 episode.assert_identity()
-        pod = {"spec": {"containers": [{"name": "qemu", "volumeMounts": [
-            {"name": "image", "mountPath": "/System.qcow2", "subPath": "System.qcow2", "readOnly": False}]}],
-            "volumes": [{"name": "image", "persistentVolumeClaim": {"claimName": "osworld-v1-hot", "readOnly": True}}]}}
-        with patch.object(episode, "_pod_snapshot", return_value={"uid": "same"}), \
-                patch.object(episode, "get", return_value=pod), patch.object(episode, "kubectl") as kubectl:
+        pod = {
+            "spec": {
+                "containers": [
+                    {
+                        "name": "qemu",
+                        "volumeMounts": [
+                            {
+                                "name": "image",
+                                "mountPath": "/System.qcow2",
+                                "subPath": "System.qcow2",
+                                "readOnly": False,
+                            }
+                        ],
+                    }
+                ],
+                "volumes": [
+                    {"name": "image", "persistentVolumeClaim": {"claimName": "osworld-v1-hot", "readOnly": True}}
+                ],
+            }
+        }
+        with (
+            patch.object(episode, "_pod_snapshot", return_value={"uid": "same"}),
+            patch.object(episode, "get", return_value=pod),
+            patch.object(episode, "kubectl") as kubectl,
+        ):
             with self.assertRaisesRegex(ValueError, "read-only"):
                 episode._overlay()
             kubectl.assert_not_called()
 
     def test_identity_fails_if_container_restarted_under_same_pod_uid(self):
-        adapter.write_json(self.episode.identity_path, {"runtime": {"uid": "same", "container_id": "old", "restart_count": 0},
-                                                        "proxy": {"uid": "proxy"}, "service_uid": "svc"})
-        with patch.object(self.episode, "_pod_snapshot", side_effect=[
-            {"uid": "same", "container_id": "new", "restart_count": 1}, {"uid": "proxy"}]):
+        adapter.write_json(
+            self.episode.identity_path,
+            {
+                "runtime": {"uid": "same", "container_id": "old", "restart_count": 0},
+                "proxy": {"uid": "proxy"},
+                "service_uid": "svc",
+            },
+        )
+        with patch.object(
+            self.episode,
+            "_pod_snapshot",
+            side_effect=[{"uid": "same", "container_id": "new", "restart_count": 1}, {"uid": "proxy"}],
+        ):
             with self.assertRaisesRegex(ValueError, "identity changed"):
                 self.episode.assert_identity()
 
@@ -455,14 +612,22 @@ class AdapterTest(unittest.TestCase):
         process = MagicMock()
         process.poll.return_value = None
         process.pid = 1234
+
         def spawn(_argv, **kwargs):
-            kwargs["stdout"].write(f"Forwarding from 127.0.0.1:{self.episode.config['setup_local_port']} -> 5000\n".encode())
-            kwargs["stdout"].write(f"Forwarding from 127.0.0.1:{self.episode.config['auv_local_port']} -> 8080\n".encode())
+            kwargs["stdout"].write(
+                f"Forwarding from 127.0.0.1:{self.episode.config['setup_local_port']} -> 5000\n".encode()
+            )
+            kwargs["stdout"].write(
+                f"Forwarding from 127.0.0.1:{self.episode.config['auv_local_port']} -> 8080\n".encode()
+            )
             kwargs["stdout"].flush()
             return process
-        with patch.object(self.episode, "assert_identity"), \
-             patch.object(adapter.subprocess, "Popen", side_effect=spawn) as popen, \
-             patch.object(adapter.socket, "create_connection") as connect:
+
+        with (
+            patch.object(self.episode, "assert_identity"),
+            patch.object(adapter.subprocess, "Popen", side_effect=spawn) as popen,
+            patch.object(adapter.socket, "create_connection") as connect,
+        ):
             connect.return_value.__enter__.return_value = None
             with self.assertRaisesRegex(RuntimeError, "phase failed"):
                 with self.episode.forward(setup=True, auv=True):
@@ -470,8 +635,10 @@ class AdapterTest(unittest.TestCase):
         self.assertFalse(popen.call_args.kwargs["start_new_session"])
         self.assertNotEqual(popen.call_args.kwargs["stderr"], adapter.subprocess.PIPE)
         self.assertTrue((self.directory / "port-forward-setup-auv.stderr").exists())
-        self.assertEqual([call.args[0][1] for call in connect.call_args_list],
-                         [self.episode.config["setup_local_port"], self.episode.config["auv_local_port"]])
+        self.assertEqual(
+            [call.args[0][1] for call in connect.call_args_list],
+            [self.episode.config["setup_local_port"], self.episode.config["auv_local_port"]],
+        )
         process.terminate.assert_called_once()
         process.wait.assert_called_once()
 
@@ -494,7 +661,10 @@ class AdapterTest(unittest.TestCase):
             kwargs["stderr"].flush()
             return process
 
-        with patch.object(self.episode, "assert_identity"), patch.object(adapter.subprocess, "Popen", side_effect=spawn):
+        with (
+            patch.object(self.episode, "assert_identity"),
+            patch.object(adapter.subprocess, "Popen", side_effect=spawn),
+        ):
             with self.assertRaisesRegex(RuntimeError, "forward-failed"):
                 with self.episode.forward(setup=True):
                     self.fail("failed forward must not yield")
@@ -506,11 +676,16 @@ class AdapterTest(unittest.TestCase):
         (self.directory / "paired-profiles.json").write_text("paired-secret")
         adapter.write_json(self.directory / "paired-device.json", {"device_id": "canonical-device"})
         sidecar = self.directory / "action_evidence.json"
-        capture = {"run_id": "run-123", "artifacts": [{"purpose": "auv.driver.display_capture", "file_path": str(image)}]}
-        with patch.dict(os.environ, {"AUV_OSWORLD_ACTION_EVIDENCE": str(sidecar)}), \
-             patch.object(self.episode, "assert_identity"), \
-             patch.object(self.episode, "forward", return_value=nullcontext()), \
-             patch.object(adapter, "_run", return_value=json.dumps(capture)) as run:
+        capture = {
+            "run_id": "run-123",
+            "artifacts": [{"purpose": "auv.driver.display_capture", "file_path": str(image)}],
+        }
+        with (
+            patch.dict(os.environ, {"AUV_OSWORLD_ACTION_EVIDENCE": str(sidecar)}),
+            patch.object(self.episode, "assert_identity"),
+            patch.object(self.episode, "forward", return_value=nullcontext()),
+            patch.object(adapter, "_run", return_value=json.dumps(capture)) as run,
+        ):
             self.episode.action()
         argv = run.call_args.args[0]
         # ROOT CAUSE:
@@ -529,12 +704,17 @@ class AdapterTest(unittest.TestCase):
         (self.directory / "paired-profiles.json").write_text("paired-secret")
         adapter.write_json(self.directory / "paired-device.json", {"device_id": "canonical-device"})
         sidecar = self.directory / "action_evidence.json"
-        capture = {"run_id": "vlc-control", "artifacts": [{"purpose": "auv.driver.display_capture", "file_path": str(image)}]}
-        with patch.dict(os.environ, {"AUV_OSWORLD_ACTION_EVIDENCE": str(sidecar)}), \
-             patch.object(episode, "assert_identity"), \
-             patch.object(episode, "forward", return_value=nullcontext()), \
-             patch.object(episode, "_post") as post, \
-             patch.object(adapter, "_run", return_value=json.dumps(capture)) as run:
+        capture = {
+            "run_id": "vlc-control",
+            "artifacts": [{"purpose": "auv.driver.display_capture", "file_path": str(image)}],
+        }
+        with (
+            patch.dict(os.environ, {"AUV_OSWORLD_ACTION_EVIDENCE": str(sidecar)}),
+            patch.object(episode, "assert_identity"),
+            patch.object(episode, "forward", return_value=nullcontext()),
+            patch.object(episode, "_post") as post,
+            patch.object(adapter, "_run", return_value=json.dumps(capture)) as run,
+        ):
             episode.action()
         argv = run.call_args.args[0]
         self.assertEqual(argv[1:6], ["--device-id", "canonical-device", "invoke", "display.capture", "--json"])
@@ -546,9 +726,13 @@ class AdapterTest(unittest.TestCase):
         adapter.write_json(self.episode.owned_path, [{"kind": "pod", "name": "chrome-vm", "uid": "old"}])
         secret = self.directory / "paired-profiles.json"
         secret.write_text("task-owned bearer")
-        with patch.object(self.episode, "api_proxy", return_value=nullcontext("http://127.0.0.1:12345")), \
-             patch.object(self.episode, "get", return_value={"metadata": {"uid": "new", "labels": self.episode._labels("qemu")}}), \
-             patch.object(self.episode, "kubectl") as kubectl:
+        with (
+            patch.object(self.episode, "_discover_owned", return_value=[]),
+            patch.object(
+                self.episode, "get", return_value={"metadata": {"uid": "new", "labels": self.episode._labels("qemu")}}
+            ),
+            patch.object(self.episode, "kubectl") as kubectl,
+        ):
             with self.assertRaisesRegex(ValueError, "replaced"):
                 self.episode.reset()
         kubectl.assert_not_called()
@@ -559,9 +743,11 @@ class AdapterTest(unittest.TestCase):
         adapter.write_json(episode.owned_path, [{"kind": "pod", "name": "chrome-vm", "uid": "old"}])
         secret = self.directory / "paired-profiles.json"
         secret.write_text("task-owned bearer")
-        with patch.object(episode, "api_proxy", return_value=nullcontext("http://127.0.0.1:12345")), \
-             patch.object(episode, "get", return_value={"metadata": {"uid": "new", "labels": episode._labels("qemu")}}), \
-             patch.object(episode, "request_deletion") as deletion:
+        with (
+            patch.object(episode, "_discover_owned", return_value=[]),
+            patch.object(episode, "get", return_value={"metadata": {"uid": "new", "labels": episode._labels("qemu")}}),
+            patch.object(episode, "request_deletion") as deletion,
+        ):
             with self.assertRaisesRegex(ValueError, "replaced"):
                 episode.reset()
         deletion.assert_not_called()
@@ -569,17 +755,13 @@ class AdapterTest(unittest.TestCase):
 
     def test_delete_uses_kubernetes_uid_precondition_in_atomic_delete_body(self):
         item = {"kind": "pod", "name": "chrome-vm", "uid": "exact-uid"}
-        response = MagicMock()
-        response.status = 200
-        with patch.object(adapter.request, "urlopen") as urlopen:
-            urlopen.return_value.__enter__.return_value = response
-            self.episode.request_deletion("http://127.0.0.1:12345", item)
-        outgoing = urlopen.call_args.args[0]
-        self.assertEqual(outgoing.get_method(), "DELETE")
-        self.assertEqual(outgoing.full_url, "http://127.0.0.1:12345/api/v1/namespaces/bench/pods/chrome-vm")
-        self.assertEqual(json.loads(outgoing.data), {
-            "apiVersion": "v1", "kind": "DeleteOptions", "preconditions": {"uid": "exact-uid"},
-        })
+        core = MagicMock()
+        with patch.object(self.episode, "core", return_value=core):
+            self.episode.request_deletion(item)
+        _, namespace = core.delete_namespaced_pod.call_args.args
+        body = core.delete_namespaced_pod.call_args.kwargs["body"]
+        self.assertEqual(namespace, "bench")
+        self.assertEqual(body.preconditions.uid, "exact-uid")
 
     def test_delete_waits_past_pod_grace_period_for_accepted_uid(self):
         # ROOT CAUSE:
@@ -595,9 +777,11 @@ class AdapterTest(unittest.TestCase):
                 raise RuntimeError("NotFound")
             return {"metadata": {"uid": "exact-uid"}}
 
-        with patch.object(self.episode, "get", side_effect=get_after_grace), \
-             patch.object(adapter.time, "monotonic", side_effect=lambda: now[0]), \
-             patch.object(adapter.time, "sleep", side_effect=lambda seconds: now.__setitem__(0, now[0] + seconds)):
+        with (
+            patch.object(self.episode, "get", side_effect=get_after_grace),
+            patch.object(adapter.time, "monotonic", side_effect=lambda: now[0]),
+            patch.object(adapter.time, "sleep", side_effect=lambda seconds: now.__setitem__(0, now[0] + seconds)),
+        ):
             self.episode.wait_deleted([item])
         self.assertGreaterEqual(now[0], 40)
 
@@ -613,9 +797,11 @@ class AdapterTest(unittest.TestCase):
                 raise RuntimeError("NotFound")
             return {"metadata": {"uid": "vm-uid"}}
 
-        with patch.object(self.episode, "get", side_effect=get_one_stuck), \
-             patch.object(adapter.time, "monotonic", side_effect=lambda: now[0]), \
-             patch.object(adapter.time, "sleep", side_effect=lambda seconds: now.__setitem__(0, now[0] + seconds)):
+        with (
+            patch.object(self.episode, "get", side_effect=get_one_stuck),
+            patch.object(adapter.time, "monotonic", side_effect=lambda: now[0]),
+            patch.object(adapter.time, "sleep", side_effect=lambda seconds: now.__setitem__(0, now[0] + seconds)),
+        ):
             with self.assertRaisesRegex(TimeoutError, "pod/chrome-vm uid=vm-uid"):
                 self.episode.wait_deleted(items, timeout_seconds=1)
 
@@ -633,39 +819,63 @@ class AdapterTest(unittest.TestCase):
             role = "qemu" if name == "chrome-vm" else "proxy" if name == "chrome-proxy" else None
             return {"metadata": {"uid": uid, "labels": self.episode._labels(role)}}
 
-        with patch.object(self.episode, "api_proxy", return_value=nullcontext("http://127.0.0.1:12345")), \
-             patch.object(self.episode, "get", side_effect=observed), \
-             patch.object(self.episode, "request_deletion", side_effect=lambda _origin, item: events.append(("delete", item["uid"]))), \
-             patch.object(self.episode, "wait_deleted", side_effect=lambda items: events.append(("wait", [item["uid"] for item in items]))), \
-             patch.object(self.episode, "_retained_pvc", return_value={"name": "osworld-v1-hot"}):
+        with (
+            patch.object(self.episode, "_discover_owned", return_value=[]),
+            patch.object(self.episode, "get", side_effect=observed),
+            patch.object(
+                self.episode, "request_deletion", side_effect=lambda item: events.append(("delete", item["uid"]))
+            ),
+            patch.object(
+                self.episode,
+                "wait_deleted",
+                side_effect=lambda items: events.append(("wait", [item["uid"] for item in items])),
+            ),
+            patch.object(self.episode, "_retained_pvc", return_value={"name": "osworld-v1-hot"}),
+        ):
             self.episode.reset()
-        self.assertEqual(events, [
-            ("delete", "proxy-uid"), ("delete", "svc-uid"), ("delete", "vm-uid"),
-            ("wait", ["vm-uid", "svc-uid", "proxy-uid"]),
-        ])
+        self.assertEqual(
+            events,
+            [
+                ("delete", "proxy-uid"),
+                ("delete", "svc-uid"),
+                ("delete", "vm-uid"),
+                ("wait", ["vm-uid", "svc-uid", "proxy-uid"]),
+            ],
+        )
 
-    def test_api_proxy_stays_in_runner_group_and_is_closed(self):
-        process = MagicMock()
-        process.poll.return_value = None
-        process.stdout.readline.return_value = "Starting to serve on 127.0.0.1:45678\n"
-        with patch.object(adapter.subprocess, "Popen", return_value=process) as popen:
-            with self.episode.api_proxy() as origin:
-                self.assertEqual(origin, "http://127.0.0.1:45678")
-        self.assertFalse(popen.call_args.kwargs["start_new_session"])
-        self.assertNotEqual(popen.call_args.kwargs["stderr"], adapter.subprocess.PIPE)
-        self.assertTrue((self.directory / "kube-api-proxy.stderr").exists())
-        process.terminate.assert_called_once()
+    def test_reset_recovers_created_resource_missing_from_journal(self):
+        discovered = [{"kind": "pod", "name": "chrome-vm", "uid": "vm-uid"}]
+        observed = {"metadata": {"uid": "vm-uid", "labels": self.episode._labels("qemu")}}
+        with (
+            patch.object(self.episode, "_discover_owned", return_value=discovered),
+            patch.object(self.episode, "get", return_value=observed),
+            patch.object(self.episode, "request_deletion") as deletion,
+            patch.object(self.episode, "wait_deleted"),
+            patch.object(self.episode, "_retained_pvc", return_value={"name": "osworld-v1-hot"}),
+        ):
+            self.episode.reset()
+        deletion.assert_called_once_with(discovered[0])
 
     def test_reset_requires_bound_pvc_with_original_pv_identity(self):
         adapter.write_json(self.episode.owned_path, [])
-        adapter.write_json(self.episode.identity_path, {"retained_pvc": {"name": "osworld-v1-hot", "uid": "pvc-1", "pv_uid": "pv-1"}})
-        with patch.object(self.episode, "_retained_pvc", return_value={"name": "osworld-v1-hot", "uid": "pvc-2", "pv_uid": "pv-1"}):
+        adapter.write_json(
+            self.episode.identity_path, {"retained_pvc": {"name": "osworld-v1-hot", "uid": "pvc-1", "pv_uid": "pv-1"}}
+        )
+        with (
+            patch.object(self.episode, "_discover_owned", return_value=[]),
+            patch.object(
+                self.episode, "_retained_pvc", return_value={"name": "osworld-v1-hot", "uid": "pvc-2", "pv_uid": "pv-1"}
+            ),
+        ):
             with self.assertRaisesRegex(ValueError, "identity changed"):
                 self.episode.reset()
 
     def test_reset_rejects_journal_entry_outside_task_owned_names(self):
         adapter.write_json(self.episode.owned_path, [{"kind": "pod", "name": "other-workload", "uid": "uid"}])
-        with patch.object(self.episode, "kubectl") as kubectl:
+        with (
+            patch.object(self.episode, "_discover_owned", return_value=[]),
+            patch.object(self.episode, "kubectl") as kubectl,
+        ):
             with self.assertRaisesRegex(ValueError, "unapproved"):
                 self.episode.reset()
         kubectl.assert_not_called()

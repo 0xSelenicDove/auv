@@ -1,0 +1,28 @@
+[workspace]
+name = "auv-osworld-evals"
+version = "0.1.0"
+description = "Reproducible OSWorld evaluation harness for AUV"
+authors = ["AUV contributors"]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+requires-pixi = ">=0.71,<1"
+
+[tasks]
+format = "ruff format ."
+format-check = "ruff format --check ."
+lint = "ruff check ."
+lint-fix = "ruff check --fix ."
+test = "pytest"
+build = "python -m build"
+check = { depends-on = ["format-check", "lint", "test", "build"] }
+
+[dependencies]
+python = "3.12.*"
+hatchling = ">=1.31,<2"
+python-build = ">=1.5,<2"
+pytest = ">=9.1,<10"
+ruff = ">=0.15.22,<0.16"
+tesseract = ">=5.5,<6"
+
+[pypi-dependencies]
+auv-osworld-evals = { path = ".", editable = true }

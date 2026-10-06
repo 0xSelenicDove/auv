@@ -4,19 +4,15 @@ import hashlib
 import io
 import json
 import os
-from pathlib import Path
 import socket
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-import agent_action_guest_local as guest  # noqa: E402
-from test_agent_action_transport import FAKE_CHILD  # noqa: E402
-
+from auv_osworld import agent_action_guest_local as guest
+from test_agent_action_transport import FAKE_CHILD
 
 DEVICE = "a" * 64
 
@@ -37,7 +33,9 @@ class GuestLocalRelayTest(unittest.TestCase):
         self.sock.bind(str(self.socket_path))
         self.endpoint = "unix://" + str(self.socket_path)
         self.auv = self.root / "auv"
-        self.auv.write_text(f"#!{sys.executable}\nimport json\nprint(json.dumps([{{'source':'daemon','local':True,'status':'online','device_id':'{DEVICE}'}}]))\n")
+        self.auv.write_text(
+            f"#!{sys.executable}\nimport json\nprint(json.dumps([{{'source':'daemon','local':True,'status':'online','device_id':'{DEVICE}'}}]))\n"
+        )
         self.auv.chmod(0o700)
         self.auv_hash = hashlib.sha256(self.auv.read_bytes()).hexdigest()
         self.action = self.root / "auv-osworld-action"
@@ -46,15 +44,24 @@ class GuestLocalRelayTest(unittest.TestCase):
         self.action_hash = hashlib.sha256(self.action.read_bytes()).hexdigest()
 
     def prepare(self, *, endpoint=None, device=DEVICE):
-        return guest.prepare(self.directory, self.action, self.action_hash, self.auv, self.auv_hash,
-                             self.endpoint if endpoint is None else endpoint, device)
+        return guest.prepare(
+            self.directory,
+            self.action,
+            self.action_hash,
+            self.auv,
+            self.auv_hash,
+            self.endpoint if endpoint is None else endpoint,
+            device,
+        )
 
     def test_owner_socket_and_online_daemon_bind_context(self):
         directory, action, context = self.prepare()
         self.assertEqual(directory, self.directory)
         self.assertEqual(action, self.action)
-        self.assertEqual(context, {"version": 1, "context": {"kind": "guest-local",
-            "device_id": DEVICE, "daemon_endpoint": self.endpoint}})
+        self.assertEqual(
+            context,
+            {"version": 1, "context": {"kind": "guest-local", "device_id": DEVICE, "daemon_endpoint": self.endpoint}},
+        )
 
     def test_rejects_tcp_symlink_regular_file_and_wrong_owner(self):
         with self.assertRaisesRegex(ValueError, "Unix absolute"):
@@ -77,8 +84,7 @@ class GuestLocalRelayTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unique online local Device"):
             self.prepare(device="b" * 64)
         with self.assertRaisesRegex(ValueError, "operator-pinned"):
-            guest.prepare(self.directory, self.action, "0" * 64, self.auv, self.auv_hash,
-                          self.endpoint, DEVICE)
+            guest.prepare(self.directory, self.action, "0" * 64, self.auv, self.auv_hash, self.endpoint, DEVICE)
         for name in ("agent_decisions.json", "action_evidence.json", "checkpoint-0002.png"):
             with self.subTest(name=name):
                 path = self.directory / name
@@ -90,6 +96,7 @@ class GuestLocalRelayTest(unittest.TestCase):
     def test_socket_replacement_during_device_probe_fails_closed(self):
         replacement = None
         try:
+
             def replace(_auv, _endpoint, _device):
                 nonlocal replacement
                 self.socket_path.unlink()
@@ -110,8 +117,9 @@ class GuestLocalRelayTest(unittest.TestCase):
         os.close(write_fd)
         output = io.StringIO()
         try:
-            code = guest.run_session(directory, action, context, max_actions=1, max_captures=1,
-                                     input_fd=read_fd, output=output)
+            code = guest.run_session(
+                directory, action, context, max_actions=1, max_captures=1, input_fd=read_fd, output=output
+            )
         finally:
             os.close(read_fd)
         self.assertEqual(code, 1)
@@ -119,10 +127,25 @@ class GuestLocalRelayTest(unittest.TestCase):
         self.assertEqual(json.loads(output.getvalue().splitlines()[-1])["status"], "incomplete_eof")
 
     def test_main_rejects_excess_budget_before_child(self):
-        argv = ["guest", "--episode-dir", str(self.directory), "--action-binary", str(self.action),
-                "--action-sha256", self.action_hash, "--auv-binary", str(self.auv),
-                "--auv-sha256", self.auv_hash, "--daemon-endpoint", self.endpoint,
-                "--device-id", DEVICE, "--max-actions", "33"]
+        argv = [
+            "guest",
+            "--episode-dir",
+            str(self.directory),
+            "--action-binary",
+            str(self.action),
+            "--action-sha256",
+            self.action_hash,
+            "--auv-binary",
+            str(self.auv),
+            "--auv-sha256",
+            self.auv_hash,
+            "--daemon-endpoint",
+            self.endpoint,
+            "--device-id",
+            DEVICE,
+            "--max-actions",
+            "33",
+        ]
         with patch.object(sys, "argv", argv), patch.object(sys, "stdout", io.StringIO()) as output:
             self.assertEqual(guest.main(), 1)
         self.assertIn("budget", output.getvalue())
@@ -137,8 +160,12 @@ class GuestLocalRelayTest(unittest.TestCase):
         digest = hashlib.sha256(b"\x89PNG\r\n\x1a\n" + name.encode()).hexdigest()
         proposals = [
             {"op": "capture", "seq": 1},
-            {"op": "action", "seq": 2, "action": {"action_type": "CLICK", "x": 2, "y": 3},
-             "based_on": {"run_id": "one-run", "path": name, "sha256": digest}},
+            {
+                "op": "action",
+                "seq": 2,
+                "action": {"action_type": "CLICK", "x": 2, "y": 3},
+                "based_on": {"run_id": "one-run", "path": name, "sha256": digest},
+            },
             {"op": "finish", "seq": 3},
         ]
         read_fd, write_fd = os.pipe()
@@ -146,15 +173,17 @@ class GuestLocalRelayTest(unittest.TestCase):
         os.close(write_fd)
         output = io.StringIO()
         try:
-            code = guest.run_session(directory, action, context, max_actions=2, max_captures=2,
-                                     input_fd=read_fd, output=output)
+            code = guest.run_session(
+                directory, action, context, max_actions=2, max_captures=2, input_fd=read_fd, output=output
+            )
         finally:
             os.close(read_fd)
         replies = [json.loads(line) for line in output.getvalue().splitlines()]
         self.assertEqual(code, 0)
         self.assertEqual([value["op"] for value in replies], ["ready", "receipt", "receipt", "receipt"])
-        self.assertEqual(replies[0]["limits"], {"actions": 2, "captures": 2,
-            "proposal_idle_seconds": 180, "session_seconds": 540})
+        self.assertEqual(
+            replies[0]["limits"], {"actions": 2, "captures": 2, "proposal_idle_seconds": 180, "session_seconds": 540}
+        )
         self.assertEqual(replies[0]["rules"], {"action_checkpoint": "latest_verified_single_use"})
         self.assertEqual(replies[1]["checkpoint_sha256"], digest)
         self.assertEqual(replies[-1]["status"], "finished")

@@ -1,28 +1,16 @@
 """Offline foreground-child protocol checks; no GUI or cluster is contacted."""
 
-import importlib.util
 import json
 import os
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
+from auv_osworld.agent_action_gateway import AgentActionGateway
+from auv_osworld.agent_action_transport import ForegroundActionTransport
 
-ROOT = Path(__file__).resolve().parents[1]
-
-
-def load(name):
-    spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-AgentActionGateway = load("agent_action_gateway").AgentActionGateway
-ForegroundActionTransport = load("agent_action_transport").ForegroundActionTransport
-
-FAKE_CHILD = r'''
+FAKE_CHILD = r"""
 import hashlib
 import json
 import os
@@ -105,7 +93,7 @@ if not terminal:
     (episode / "action_evidence.json").write_text(json.dumps(response))
     print(json.dumps(response), flush=True)
     sys.exit(1)
-'''
+"""
 
 
 class ForegroundActionTransportTest(unittest.TestCase):
@@ -132,8 +120,12 @@ class ForegroundActionTransportTest(unittest.TestCase):
             first = gateway.submit({"op": "capture", "seq": 1})["artifact"]
             provenance = {"run_id": "one-run", **first}
             with self.assertRaisesRegex(ValueError, "provenance"):
-                gateway.submit({"op": "action", "seq": 2, "action": {"action_type": "CLICK", "x": 5, "y": 6}, "based_on": None})
-            gateway.submit({"op": "action", "seq": 2, "action": {"action_type": "CLICK", "x": 5, "y": 6}, "based_on": provenance})
+                gateway.submit(
+                    {"op": "action", "seq": 2, "action": {"action_type": "CLICK", "x": 5, "y": 6}, "based_on": None}
+                )
+            gateway.submit(
+                {"op": "action", "seq": 2, "action": {"action_type": "CLICK", "x": 5, "y": 6}, "based_on": provenance}
+            )
             second = gateway.submit({"op": "capture", "seq": 3})["artifact"]
             self.assertNotEqual(first, second)
             terminal = gateway.submit({"op": "finish", "seq": 4})
@@ -142,13 +134,17 @@ class ForegroundActionTransportTest(unittest.TestCase):
         self.assertEqual(json.loads((self.directory / "action_evidence.json").read_text()), terminal)
         self.assertEqual(len(json.loads((self.directory / "checkpoints.json").read_text())), 2)
         self.assertEqual(len(json.loads((self.directory / "input-action-results.json").read_text())), 1)
-        self.assertEqual([request["op"] for request in json.loads((self.directory / "action-requests.json").read_text())],
-                         ["capture", "action", "capture", "finish"])
+        self.assertEqual(
+            [request["op"] for request in json.loads((self.directory / "action-requests.json").read_text())],
+            ["capture", "action", "capture", "finish"],
+        )
         trace = json.loads((self.directory / "agent_decisions.json").read_text())
         self.assertEqual(trace["status"], "finished")
         self.assertEqual(len(trace["receipts"]), 4)
         self.assertEqual(trace["receipts"][1]["proposal"]["based_on"], provenance)
-        self.assertEqual({receipt["response"].get("run_ids", ["one-run"])[0] for receipt in trace["receipts"]}, {"one-run"})
+        self.assertEqual(
+            {receipt["response"].get("run_ids", ["one-run"])[0] for receipt in trace["receipts"]}, {"one-run"}
+        )
 
     def test_abort_is_terminal_and_reaped(self):
         with self.transport() as child:
@@ -168,10 +164,15 @@ class ForegroundActionTransportTest(unittest.TestCase):
                 self.context = self.directory / "context.json"
                 self.mode(mode)
                 with self.transport() as child:
-                    gateway = AgentActionGateway(self.directory, child.ready, child.exchange, max_actions=1, max_captures=1)
+                    gateway = AgentActionGateway(
+                        self.directory, child.ready, child.exchange, max_actions=1, max_captures=1
+                    )
                     with self.assertRaises(error):
                         gateway.submit({"op": "abort", "seq": 1})
-                    self.assertEqual(json.loads((self.directory / "agent_decisions.json").read_text())["status"], "failed-after-forward")
+                    self.assertEqual(
+                        json.loads((self.directory / "agent_decisions.json").read_text())["status"],
+                        "failed-after-forward",
+                    )
                     self.assertIsNotNone(child.process.returncode)
 
     def test_cancellation_closes_stdin_and_reaps_without_terminal_request(self):
@@ -181,8 +182,10 @@ class ForegroundActionTransportTest(unittest.TestCase):
                 raise KeyboardInterrupt("cancel")
         self.assertIsNotNone(child.process.returncode)
         self.assertEqual(child.process.returncode, 1)
-        self.assertEqual(json.loads((self.directory / "action_evidence.json").read_text()),
-                         {"run_ids": ["one-run"], "final_artifact": None})
+        self.assertEqual(
+            json.loads((self.directory / "action_evidence.json").read_text()),
+            {"run_ids": ["one-run"], "final_artifact": None},
+        )
         with self.assertRaises(ProcessLookupError):
             os.kill(pid, 0)
 
@@ -197,12 +200,18 @@ class ForegroundActionTransportTest(unittest.TestCase):
             with self.assertRaises((EOFError, BrokenPipeError, TimeoutError)):
                 gateway.submit({"op": "capture", "seq": 1})
             self.assertTrue(gateway.closed)
-            self.assertEqual(json.loads((self.directory / "agent_decisions.json").read_text())["status"], "failed-after-forward")
+            self.assertEqual(
+                json.loads((self.directory / "agent_decisions.json").read_text())["status"], "failed-after-forward"
+            )
             self.assertEqual(child.process.returncode, 1)
 
     def test_timeout_and_malformed_response_close_and_reap(self):
-        for mode, error in [("hang-before-ready", TimeoutError), ("hang-after-request", TimeoutError),
-                            ("malformed-response", json.JSONDecodeError), ("oversized-response", ValueError)]:
+        for mode, error in [
+            ("hang-before-ready", TimeoutError),
+            ("hang-after-request", TimeoutError),
+            ("malformed-response", json.JSONDecodeError),
+            ("oversized-response", ValueError),
+        ]:
             with self.subTest(mode=mode):
                 with tempfile.TemporaryDirectory() as temporary:
                     self.directory = Path(temporary)

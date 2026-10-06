@@ -1,22 +1,16 @@
 """Local process and ledger tests; no guest, Kubernetes, or GUI input."""
 
-import importlib.util
 import json
-from pathlib import Path
 import signal
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-
-RUNNER_PATH = Path(__file__).resolve().parents[1] / "batch_runner.py"
-spec = importlib.util.spec_from_file_location("batch_runner", RUNNER_PATH)
-runner = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(runner)
-
+from auv_osworld import batch_runner as runner
 
 SUCCESS_ACTION = """
 import hashlib, json, os
@@ -70,22 +64,30 @@ def command(source: str, seconds: float = 2) -> dict:
     return {"argv": [sys.executable, "-u", "-c", source], "timeout_seconds": seconds}
 
 
-def manifest(action: str = SUCCESS_ACTION, evaluator: str = 'print("{\\"score\\": 0.75}")', reset: str | None = None) -> dict:
-    reset = reset or 'print("{\\"removed_resources\\": [\\"test-pod\\"], \\"retained_pvcs_verified\\": [\\"base-pvc\\"]}")'
+def manifest(
+    action: str = SUCCESS_ACTION, evaluator: str = 'print("{\\"score\\": 0.75}")', reset: str | None = None
+) -> dict:
+    reset = (
+        reset or 'print("{\\"removed_resources\\": [\\"test-pod\\"], \\"retained_pvcs_verified\\": [\\"base-pvc\\"]}")'
+    )
     identity = {field: f"pinned-{field}" for field in runner.IDENTITY_FIELDS}
     return {
-        "trust": "operator-audited", "batch_id": "local-fixture",
-        "episodes": [{
-            "episode_id": "episode-1", "identity": identity,
-            "phases": {
-                "boot": command("print('boot')"),
-                "install": command("print('install')"),
-                "setup": command("print('setup')"),
-                "action": command(action, 0.6 if action == TIMEOUT_ACTION else 2),
-                "evaluate": command(evaluator),
-                "reset": command(reset),
-            },
-        }],
+        "trust": "operator-audited",
+        "batch_id": "local-fixture",
+        "episodes": [
+            {
+                "episode_id": "episode-1",
+                "identity": identity,
+                "phases": {
+                    "boot": command("print('boot')"),
+                    "install": command("print('install')"),
+                    "setup": command("print('setup')"),
+                    "action": command(action, 0.6 if action == TIMEOUT_ACTION else 2),
+                    "evaluate": command(evaluator),
+                    "reset": command(reset),
+                },
+            }
+        ],
     }
 
 
@@ -132,7 +134,9 @@ class BatchRunnerTest(unittest.TestCase):
         self.assertEqual(episode["cleanup"]["status"], "ok")
         child_pid = int((directory / "episode-1" / "child.pid").read_text())
         for _ in range(20):
-            observed = subprocess.run(["ps", "-o", "stat=", "-p", str(child_pid)], capture_output=True, text=True, check=False)
+            observed = subprocess.run(
+                ["ps", "-o", "stat=", "-p", str(child_pid)], capture_output=True, text=True, check=False
+            )
             if observed.returncode != 0 or observed.stdout.strip().startswith("Z"):
                 break
             time.sleep(0.05)
@@ -160,8 +164,9 @@ class BatchRunnerTest(unittest.TestCase):
         self.assertTrue(action["group_terminated"])
         self.assertFalse(action["termination_graceful"])
         self.assertEqual(result["episodes"][0]["score"], 0.75)
-        self.assertIn({"layer": "action_release", "reason": "forced_kill_unverified"},
-                      result["episodes"][0]["failure_layers"])
+        self.assertIn(
+            {"layer": "action_release", "reason": "forced_kill_unverified"}, result["episodes"][0]["failure_layers"]
+        )
 
     def test_evaluator_failure_keeps_score_absent(self):
         result, _ = self.run_fixture(manifest(evaluator="raise RuntimeError('evaluation unavailable')"))
@@ -196,14 +201,20 @@ class BatchRunnerTest(unittest.TestCase):
         result, _ = self.run_fixture(manifest(action=TIMEOUT_ACTION, reset="raise RuntimeError('cleanup unavailable')"))
         episode = result["episodes"][0]
         self.assertEqual(episode["score"], 0.75)
-        self.assertEqual(episode["failure_layers"], [
-            {"layer": "action", "reason": "timeout"},
-            {"layer": "reset", "reason": "exit_failed"},
-        ])
+        self.assertEqual(
+            episode["failure_layers"],
+            [
+                {"layer": "action", "reason": "timeout"},
+                {"layer": "reset", "reason": "exit_failed"},
+            ],
+        )
         self.assertEqual(episode["cleanup"]["status"], "exit_failed")
 
     def test_stdout_sidecar_disagreement_is_evidence_failure(self):
-        action = SUCCESS_ACTION + "print(json.dumps({'run_ids': ['other'], 'final_artifact': evidence['final_artifact']}), flush=True)\n"
+        action = (
+            SUCCESS_ACTION
+            + "print(json.dumps({'run_ids': ['other'], 'final_artifact': evidence['final_artifact']}), flush=True)\n"
+        )
         result, _ = self.run_fixture(manifest(action=action))
         episode = result["episodes"][0]
         self.assertIsNone(episode["auv"]["final_artifact"])
@@ -215,14 +226,19 @@ class BatchRunnerTest(unittest.TestCase):
             directory = Path(temporary)
             image = directory / "checkpoint-0001.png"
             image.write_bytes(b"AUV checkpoint")
-            artifact = {"path": image.name, "sha256": runner._sha256(image)}
-            trace = {"schema_version": 1, "policy_sha256": "pinned-policy", "run_id": "run-1",
-                     "status": "finished", "checks": [{"artifact": artifact, "matched": True}]}
+            artifact = {"path": image.name, "sha256": runner.sha256(image)}
+            trace = {
+                "schema_version": 1,
+                "policy_sha256": "pinned-policy",
+                "run_id": "run-1",
+                "status": "finished",
+                "checks": [{"artifact": artifact, "matched": True}],
+            }
             (directory / "controller_decisions.json").write_text(json.dumps(trace))
             phase = {"status": "ok"}
             bound = runner._controller_evidence(directory, phase, "pinned-policy", ["run-1"])
             self.assertEqual(bound["checks"], 1)
-            self.assertEqual(bound["sha256"], runner._sha256(directory / "controller_decisions.json"))
+            self.assertEqual(bound["sha256"], runner.sha256(directory / "controller_decisions.json"))
             with self.assertRaisesRegex(ValueError, "policy SHA256 differs"):
                 runner._controller_evidence(directory, phase, "different", ["run-1"])
             with self.assertRaisesRegex(ValueError, "Run ID differs"):
@@ -266,14 +282,18 @@ class BatchRunnerTest(unittest.TestCase):
 
     def test_guest_local_and_paired_target_identity_are_preserved(self):
         config = manifest()
-        config["episodes"][0]["identity"].update(topology="guest-local-shared-socket", auv_target="unix:///home/user/auv.sock")
+        config["episodes"][0]["identity"].update(
+            topology="guest-local-shared-socket", auv_target="unix:///home/user/auv.sock"
+        )
         paired = json.loads(json.dumps(config["episodes"][0]))
         paired["episode_id"] = "paired"
         paired["identity"].update(topology="paired-remote", auv_target="device:0123456789abcdef")
         config["episodes"].append(paired)
         result, _ = self.run_fixture(config)
-        self.assertEqual([episode["identity"]["auv_target"] for episode in result["episodes"]],
-                         ["unix:///home/user/auv.sock", "device:0123456789abcdef"])
+        self.assertEqual(
+            [episode["identity"]["auv_target"] for episode in result["episodes"]],
+            ["unix:///home/user/auv.sock", "device:0123456789abcdef"],
+        )
 
     def test_action_spawn_failure_is_not_scored(self):
         config = manifest()
@@ -309,8 +329,18 @@ class BatchRunnerTest(unittest.TestCase):
             manifest_path.write_text(json.dumps(config))
             directory = root / "batch"
             process = subprocess.Popen(
-                [sys.executable, str(RUNNER_PATH), "--manifest", str(manifest_path), "--output-dir", str(directory)],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                [
+                    sys.executable,
+                    "-m",
+                    "auv_osworld.batch_runner",
+                    "--manifest",
+                    str(manifest_path),
+                    "--output-dir",
+                    str(directory),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
             )
             try:
                 evidence = directory / "episode-1" / "action_evidence.json"

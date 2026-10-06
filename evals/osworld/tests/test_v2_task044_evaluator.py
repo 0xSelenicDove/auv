@@ -3,20 +3,13 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
-from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs
 
-
-BRIDGE_PATH = Path(__file__).resolve().parents[1] / "v2_task044_evaluator.py"
-spec = importlib.util.spec_from_file_location("v2_task044_evaluator", BRIDGE_PATH)
-bridge = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(bridge)
+from auv_osworld import v2_task044_evaluator as bridge
 
 PILOT = Path("/tmp/auv-osworld-batch-20261005")
 UPSTREAM = PILOT / "v2"
@@ -26,20 +19,14 @@ HAS_PINNED_SOURCES = UPSTREAM.exists() and TASK_SOURCE.exists() and ASSET.exists
 
 
 class Response:
-    status = 200
-
     def __init__(self, content: bytes, status: int = 200):
         self.content = content
-        self.status = status
+        self.text = content.decode()
+        self.status_code = status
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_args):
-        return False
-
-    def read(self):
-        return self.content
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise bridge.requests.HTTPError(f"HTTP {self.status_code}")
 
 
 class FakeCv2:
@@ -73,10 +60,15 @@ def pinned_task(cv2=None):
 
 
 def crop_xml(top: int, *, center: str = "0", service: str = "crop") -> bytes:
-    position = f"<property name='top'>{top}</property>" if service == "crop" else \
-        f"<property name='rect'>0 {top} 834 1112</property>"
-    return (f"<mlt><filter><property name='mlt_service'>{service}</property>{position}"
-            f"<property name='center'>{center}</property></filter></mlt>").encode()
+    position = (
+        f"<property name='top'>{top}</property>"
+        if service == "crop"
+        else f"<property name='rect'>0 {top} 834 1112</property>"
+    )
+    return (
+        f"<mlt><filter><property name='mlt_service'>{service}</property>{position}"
+        f"<property name='center'>{center}</property></filter></mlt>"
+    ).encode()
 
 
 class Task044BridgeTest(unittest.TestCase):
@@ -139,8 +131,7 @@ class Task044BridgeTest(unittest.TestCase):
                 return "4.12.0.88"
             raise bridge.metadata.PackageNotFoundError(name)
 
-        with patch.object(bridge.metadata, "version", side_effect=version), \
-                patch.dict(sys.modules, {"cv2": FakeCv2()}):
+        with patch.object(bridge.metadata, "version", side_effect=version), patch.dict(sys.modules, {"cv2": FakeCv2()}):
             with self.assertRaisesRegex(RuntimeError, "OpenCV mismatch"):
                 bridge._pinned_cv2()
 
@@ -158,42 +149,67 @@ class Task044BridgeTest(unittest.TestCase):
     def test_upload_and_launch_require_exact_receipts(self):
         transport = bridge.FileTransport("http://127.0.0.1:5000")
         video = b"test-video"
-        with patch.object(bridge, "ASSET_SHA256", hashlib.sha256(video).hexdigest()), \
-                patch.object(bridge, "ASSET_BYTES", len(video)), \
-                patch.object(bridge, "urlopen", side_effect=[
+        with (
+            patch.object(bridge, "ASSET_SHA256", hashlib.sha256(video).hexdigest()),
+            patch.object(bridge, "ASSET_BYTES", len(video)),
+            patch.object(
+                bridge.requests,
+                "post",
+                side_effect=[
                     Response(f"File Uploaded: {len(video)} bytes".encode()),
-                    Response(video), Response(b"shotcut launched successfully"),
-                ]) as urlopen:
-            transport.download([{"url": "/local/promo_video.mp4", "path": bridge.SOURCE_VM_PATH}],
-                               video, Path("/local/promo_video.mp4"))
+                    Response(video),
+                    Response(b"shotcut launched successfully"),
+                ],
+            ) as post,
+        ):
+            transport.download(
+                [{"url": "/local/promo_video.mp4", "path": bridge.SOURCE_VM_PATH}],
+                video,
+                Path("/local/promo_video.mp4"),
+            )
             transport.launch(["shotcut"])
-        self.assertEqual([call.args[0].full_url for call in urlopen.call_args_list], [
-            "http://127.0.0.1:5000/setup/upload", "http://127.0.0.1:5000/file",
-            "http://127.0.0.1:5000/setup/launch",
-        ])
-        self.assertIn(video, urlopen.call_args_list[0].args[0].data)
+        self.assertEqual(
+            [call.args[0] for call in post.call_args_list],
+            [
+                "http://127.0.0.1:5000/setup/upload",
+                "http://127.0.0.1:5000/file",
+                "http://127.0.0.1:5000/setup/launch",
+            ],
+        )
+        self.assertEqual(post.call_args_list[0].kwargs["files"]["file_data"][1], video)
         with self.assertRaisesRegex(ValueError, "unreviewed download"):
-            transport.download([{"url": "/local/promo_video.mp4", "path": "/tmp/wrong"}],
-                               video, Path("/local/promo_video.mp4"))
-        with patch.object(bridge, "urlopen", return_value=Response(b"not launched")):
+            transport.download(
+                [{"url": "/local/promo_video.mp4", "path": "/tmp/wrong"}], video, Path("/local/promo_video.mp4")
+            )
+        with patch.object(bridge.requests, "post", return_value=Response(b"not launched")):
             with self.assertRaisesRegex(RuntimeError, "not confirmed"):
                 transport.launch(["shotcut"])
-        with patch.object(bridge, "urlopen", return_value=Response(b"shotcut launched successfully", status=500)):
+        with patch.object(bridge.requests, "post", return_value=Response(b"shotcut launched successfully", status=500)):
             with self.assertRaisesRegex(RuntimeError, "not confirmed"):
                 transport.launch(["shotcut"])
-        with patch.object(bridge, "urlopen", return_value=Response(b"short upload")):
+        with patch.object(bridge.requests, "post", return_value=Response(b"short upload")):
             with self.assertRaisesRegex(RuntimeError, "not confirmed"):
-                transport.download([{"url": "/local/promo_video.mp4", "path": bridge.SOURCE_VM_PATH}],
-                                   video, Path("/local/promo_video.mp4"))
+                transport.download(
+                    [{"url": "/local/promo_video.mp4", "path": bridge.SOURCE_VM_PATH}],
+                    video,
+                    Path("/local/promo_video.mp4"),
+                )
 
     @unittest.skipUnless(HAS_PINNED_SOURCES, "pinned V2.1 Task044 sources and gated video unavailable")
     def test_original_score_boundaries_and_legitimate_missing_outputs(self):
         task = pinned_task()
         source = b"source"
 
-        def score(top, *, center="0", service="crop", size=100, source_dimensions=(834, 1112),
-                  export_dimensions=(834, 1112),
-                  missing=frozenset()):
+        def score(
+            top,
+            *,
+            center="0",
+            service="crop",
+            size=100,
+            source_dimensions=(834, 1112),
+            export_dimensions=(834, 1112),
+            missing=frozenset(),
+        ):
             current_task = pinned_task(FakeCv2(source=source_dimensions, export=export_dimensions))
             files = {
                 bridge.EXPORT_VM_PATH: b"x" * size,
@@ -202,15 +218,17 @@ class Task044BridgeTest(unittest.TestCase):
             }
             transport = bridge.FileTransport("http://127.0.0.1:5000")
 
-            def response(request, timeout):
-                path = parse_qs(request.data.decode())["file_path"][0]
+            def response(_url, *, data, timeout):
+                path = data["file_path"]
                 if path in missing:
-                    raise HTTPError(request.full_url, 404, "Not Found", {}, None)
+                    return Response(b"", status=404)
                 return Response(files[path])
 
-            with tempfile.TemporaryDirectory() as directory, \
-                    patch.object(bridge, "ASSET_SHA256", hashlib.sha256(source).hexdigest()), \
-                    patch.object(bridge, "urlopen", side_effect=response):
+            with (
+                tempfile.TemporaryDirectory() as directory,
+                patch.object(bridge, "ASSET_SHA256", hashlib.sha256(source).hexdigest()),
+                patch.object(bridge.requests, "post", side_effect=response),
+            ):
                 return bridge.evaluate(current_task, transport, Path(directory))
 
         self.assertEqual(task.id, "044")
@@ -233,8 +251,10 @@ class Task044BridgeTest(unittest.TestCase):
     def test_getter_broad_catches_do_not_convert_transport_or_cache_errors_to_scores(self):
         task = pinned_task()
         transport = bridge.FileTransport("http://127.0.0.1:5000")
-        with tempfile.TemporaryDirectory() as directory, \
-                patch.object(bridge, "urlopen", side_effect=URLError("connection refused")):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(bridge.requests, "post", side_effect=bridge.requests.ConnectionError("connection refused")),
+        ):
             with self.assertRaisesRegex(RuntimeError, "no score"):
                 bridge.evaluate(task, transport, Path(directory))
 
@@ -242,7 +262,7 @@ class Task044BridgeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             blocked_cache = Path(directory) / "cache-is-a-file"
             blocked_cache.write_text("not a directory")
-            with patch.object(bridge, "urlopen", return_value=Response(b"exported")):
+            with patch.object(bridge.requests, "post", return_value=Response(b"exported")):
                 with self.assertRaisesRegex(RuntimeError, "persist.*no score"):
                     bridge.evaluate(task, transport, blocked_cache)
 

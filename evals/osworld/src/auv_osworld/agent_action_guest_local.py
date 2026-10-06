@@ -11,15 +11,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import stat
 import subprocess
 import sys
+from pathlib import Path
 
-from agent_action_gateway import DIGEST
-from agent_action_relay import PRIOR_OUTPUTS, absolute_file, emit, run_session, sha256
-
+from .agent_action_gateway import DIGEST
+from .agent_action_relay import PRIOR_OUTPUTS, absolute_file, emit, run_session
+from .integrity import sha256
 
 DEVICE_ID = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -31,7 +31,7 @@ def owner_socket(endpoint: str, uid: int) -> Path:
     # exposes an authenticated local-daemon identity for this socket.
     if not endpoint.startswith("unix:///") or endpoint.count("?") or endpoint.count("#"):
         raise ValueError("guest daemon endpoint must be a Unix absolute pathname")
-    raw = Path(endpoint[len("unix://"):])
+    raw = Path(endpoint[len("unix://") :])
     if not raw.is_absolute() or str(raw) == "/" or ".." in raw.parts:
         raise ValueError("guest daemon socket path must be absolute and normalized")
     if raw.is_symlink() or raw.parent.is_symlink() or raw.resolve(strict=True) != raw:
@@ -54,19 +54,38 @@ def online_device(auv_binary: Path, endpoint: str, expected: str) -> None:
     # not silently select a different target during this read-only probe.
     for name in ("AUV_ENDPOINT", "AUV_DEVICE_ID", "AUV_DEVICE", "AUV_CONFIG_PROFILE"):
         env.pop(name, None)
-    result = subprocess.run([str(auv_binary), "devices", "list", "--endpoint", endpoint, "--json"],
-                            check=True, capture_output=True, text=True, timeout=15, env=env)
+    result = subprocess.run(
+        [str(auv_binary), "devices", "list", "--endpoint", endpoint, "--json"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        env=env,
+    )
     values = json.loads(result.stdout)
     if not isinstance(values, list):
         raise ValueError("AUV Device list is not a JSON array")
-    local = [value for value in values if isinstance(value, dict) and value.get("source") == "daemon"
-             and value.get("local") is True and value.get("status") == "online"]
+    local = [
+        value
+        for value in values
+        if isinstance(value, dict)
+        and value.get("source") == "daemon"
+        and value.get("local") is True
+        and value.get("status") == "online"
+    ]
     if len(local) != 1 or local[0].get("device_id") != expected:
         raise ValueError("owner socket did not report the expected unique online local Device ID")
 
 
-def prepare(directory_path: Path, action_path: Path, action_digest: str,
-            auv_path: Path, auv_digest: str, endpoint: str, expected_device: str) -> tuple[Path, Path, dict]:
+def prepare(
+    directory_path: Path,
+    action_path: Path,
+    action_digest: str,
+    auv_path: Path,
+    auv_digest: str,
+    endpoint: str,
+    expected_device: str,
+) -> tuple[Path, Path, dict]:
     if sys.platform != "linux" or os.geteuid() == 0:
         raise ValueError("guest-local relay requires an unprivileged Linux owner")
     if not directory_path.is_absolute():
@@ -92,8 +111,11 @@ def prepare(directory_path: Path, action_path: Path, action_digest: str,
     socket = owner_socket(endpoint, os.geteuid())
     if (socket.lstat().st_dev, socket.lstat().st_ino) != identity:
         raise ValueError("guest daemon socket changed during Device probe")
-    return directory, action, {"version": 1, "context": {"kind": "guest-local",
-            "device_id": expected_device, "daemon_endpoint": endpoint}}
+    return (
+        directory,
+        action,
+        {"version": 1, "context": {"kind": "guest-local", "device_id": expected_device, "daemon_endpoint": endpoint}},
+    )
 
 
 def main() -> int:
@@ -111,11 +133,24 @@ def main() -> int:
     try:
         if not 1 <= args.max_actions <= 32 or not 1 <= args.max_captures <= 32:
             raise ValueError("relay action and capture budgets must each be 1..32")
-        directory, action, context = prepare(args.episode_dir, args.action_binary, args.action_sha256,
-                                             args.auv_binary, args.auv_sha256, args.daemon_endpoint,
-                                             args.device_id)
-        return run_session(directory, action, context, max_actions=args.max_actions,
-                           max_captures=args.max_captures, input_fd=sys.stdin.fileno(), output=sys.stdout)
+        directory, action, context = prepare(
+            args.episode_dir,
+            args.action_binary,
+            args.action_sha256,
+            args.auv_binary,
+            args.auv_sha256,
+            args.daemon_endpoint,
+            args.device_id,
+        )
+        return run_session(
+            directory,
+            action,
+            context,
+            max_actions=args.max_actions,
+            max_captures=args.max_captures,
+            input_fd=sys.stdin.fileno(),
+            output=sys.stdout,
+        )
     except BaseException as error:
         emit({"op": "session_end", "status": "error", "error": f"{type(error).__name__}: {error}"}, sys.stdout)
         return 1

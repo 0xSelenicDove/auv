@@ -8,19 +8,20 @@ GUI relay. The separate evaluator still owns the task score.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import select
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import NamedTuple
 
-import k8s_phase_adapter as capture
+import pytesseract
+from PIL import Image
 
+from . import k8s_phase_adapter as capture
 
 ACTION_ENTRY_SOURCE = "bf5c6c048ddabdf9592bce06ef641ae0adc4b41a"
 # NOTICE: This is the measured local build used by the fixed two-task replay;
@@ -55,8 +56,10 @@ def _normalized(text: str) -> str:
 
 def _word(words: list[Word], text: str, bounds: tuple[int, int, int, int]) -> bool:
     left, top, right, bottom = bounds
-    return any(_normalized(word.text) == text and word.confidence >= 60
-               and left <= word.x <= right and top <= word.y <= bottom for word in words)
+    return any(
+        _normalized(word.text) == text and word.confidence >= 60 and left <= word.x <= right and top <= word.y <= bottom
+        for word in words
+    )
 
 
 def matches_gate(gate: str, words: list[Word]) -> bool:
@@ -77,7 +80,12 @@ def matches_gate(gate: str, words: list[Word]) -> bool:
 def verify_ocr_pins(binary: Path, eng_data: Path) -> None:
     if not binary.is_absolute() or not binary.is_file() or capture.sha256(binary) != OCR_SHA256:
         raise ValueError("Tesseract executable differs from the pinned build")
-    if not eng_data.is_absolute() or eng_data.name != "eng.traineddata" or not eng_data.is_file() or capture.sha256(eng_data) != ENG_SHA256:
+    if (
+        not eng_data.is_absolute()
+        or eng_data.name != "eng.traineddata"
+        or not eng_data.is_file()
+        or capture.sha256(eng_data) != ENG_SHA256
+    ):
         raise ValueError("Tesseract English model differs from the pinned data")
     version = subprocess.run([str(binary), "--version"], capture_output=True, text=True, timeout=5, check=False)
     if version.returncode or version.stdout.splitlines()[0] != OCR_VERSION:
@@ -86,27 +94,29 @@ def verify_ocr_pins(binary: Path, eng_data: Path) -> None:
 
 def ocr_words(image: Path, binary: Path, eng_data: Path | None = None) -> list[Word]:
     # The fixed coordinates are meaningful only on the audited V1 display.
-    with image.open("rb") as source:
-        header = source.read(24)
-    if len(header) != 24 or header[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" or (int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")) != (1920, 1080):
-        raise ValueError("visual policy requires a 1920x1080 AUV PNG")
-    environment = dict(os.environ)
-    if eng_data is not None:
-        environment["TESSDATA_PREFIX"] = str(eng_data.parent)
-    result = subprocess.run([str(binary), str(image), "stdout", "-l", "eng", "tsv"],
-                            capture_output=True, text=True, timeout=10, env=environment, check=False)
-    if result.returncode or not result.stdout.startswith("level\tpage_num\t"):
-        raise ValueError(f"Tesseract TSV failed: {result.stderr[-300:]}")
-    words = []
-    for line in result.stdout.splitlines()[1:]:
-        fields = line.split("\t", 11)
-        if len(fields) != 12 or fields[0] != "5":
-            continue
-        try:
-            words.append(Word(fields[11], int(fields[6]), int(fields[7]), float(fields[10])))
-        except ValueError as error:
-            raise ValueError("Tesseract TSV contains an invalid word row") from error
-    return words
+    previous = pytesseract.pytesseract.tesseract_cmd
+    pytesseract.pytesseract.tesseract_cmd = str(binary)
+    try:
+        with Image.open(image) as frame:
+            if frame.format != "PNG" or frame.size != (1920, 1080):
+                raise ValueError("visual policy requires a 1920x1080 AUV PNG")
+            config = f'--tessdata-dir "{eng_data.parent}"' if eng_data is not None else ""
+            data = pytesseract.image_to_data(
+                frame,
+                lang="eng",
+                config=config,
+                output_type=pytesseract.Output.DICT,
+                timeout=10,
+            )
+    finally:
+        pytesseract.pytesseract.tesseract_cmd = previous
+    return [
+        Word(text, int(left), int(top), float(confidence))
+        for level, text, left, top, confidence in zip(
+            data["level"], data["text"], data["left"], data["top"], data["conf"], strict=True
+        )
+        if level == 5
+    ]
 
 
 def policy() -> dict:
@@ -114,20 +124,36 @@ def policy() -> dict:
     if capture.sha256(path) != POLICY_SHA256:
         raise ValueError("Chrome visual policy differs from pinned SHA256")
     value = json.loads(path.read_text())
-    if not isinstance(value, dict) or set(value) != {"version", "task_id", "name", "steps"} or value["version"] != 1 or value["task_id"] != capture.CHROME_TASK:
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"version", "task_id", "name", "steps"}
+        or value["version"] != 1
+        or value["task_id"] != capture.CHROME_TASK
+    ):
         raise ValueError("Chrome visual policy schema or task differs")
     steps = value["steps"]
     if not isinstance(steps, list) or len(steps) != len(GATES):
         raise ValueError("Chrome visual policy has wrong step count")
     for step, gate in zip(steps, GATES):
-        if not isinstance(step, dict) or set(step) != {"action", "gate"} or not isinstance(step["action"], dict) or step["gate"] != gate:
+        if (
+            not isinstance(step, dict)
+            or set(step) != {"action", "gate"}
+            or not isinstance(step["action"], dict)
+            or step["gate"] != gate
+        ):
             raise ValueError("Chrome visual policy has an invalid typed step or gate")
     return value
 
 
 def _batch(path: Path) -> tuple[Path, Path, Path, Path]:
     value = json.loads(path.read_text())
-    if not isinstance(value, dict) or set(value) != {"batch_id", "episode", "action_binary", "tesseract_binary", "eng_traineddata"}:
+    if not isinstance(value, dict) or set(value) != {
+        "batch_id",
+        "episode",
+        "action_binary",
+        "tesseract_binary",
+        "eng_traineddata",
+    }:
         raise ValueError("Chrome controller batch requires exactly five fixed fields")
     if not isinstance(value["batch_id"], str) or not value["batch_id"]:
         raise ValueError("batch_id is required")
@@ -154,16 +180,37 @@ def manifest(batch_path: Path) -> dict:
     config = capture.load_config(config_path)
     config_sha = capture.sha256(config_path)
     identity = built["episodes"][0]["identity"]
-    identity.update({"topology": TOPOLOGY, "runner_identity": "k8s_task_controller.py scripted visual policy",
-                     "action_entry_source": ACTION_ENTRY_SOURCE, "action_binary_sha256": ACTION_SHA256,
-                     "controller_policy_sha256": POLICY_SHA256, "ocr_binary_sha256": OCR_SHA256,
-                     "ocr_eng_sha256": ENG_SHA256, "episode_config_sha256": config_sha})
+    identity.update(
+        {
+            "topology": TOPOLOGY,
+            "runner_identity": "k8s_task_controller.py scripted visual policy",
+            "action_entry_source": ACTION_ENTRY_SOURCE,
+            "action_binary_sha256": ACTION_SHA256,
+            "controller_policy_sha256": POLICY_SHA256,
+            "ocr_binary_sha256": OCR_SHA256,
+            "ocr_eng_sha256": ENG_SHA256,
+            "episode_config_sha256": config_sha,
+        }
+    )
     for name in capture.PHASES:
         built["episodes"][0]["phases"][name] = {
-            "argv": [sys.executable, str(Path(__file__).resolve()), "phase", name,
-                     "--config", str(config_path), "--config-sha256", config_sha,
-                     "--action-binary", str(binary), "--tesseract-binary", str(tesseract),
-                     "--eng-traineddata", str(eng_data)],
+            "argv": [
+                sys.executable,
+                "-m",
+                "auv_osworld.k8s_task_controller",
+                "phase",
+                name,
+                "--config",
+                str(config_path),
+                "--config-sha256",
+                config_sha,
+                "--action-binary",
+                str(binary),
+                "--tesseract-binary",
+                str(tesseract),
+                "--eng-traineddata",
+                str(eng_data),
+            ],
             "timeout_seconds": capture.TIMEOUTS[name],
         }
     if built["episodes"][0]["identity"]["task_id"] != config["task_id"]:
@@ -222,7 +269,13 @@ class InteractivePipe:
 
 def _artifact(directory: Path, response: dict) -> Path:
     value = response.get("artifact")
-    if not isinstance(value, dict) or set(value) != {"path", "sha256"} or not isinstance(value["path"], str) or not re.fullmatch(r"checkpoint-[0-9]{4}\.png", value["path"]) or not re.fullmatch("[0-9a-f]{64}", str(value["sha256"])):
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"path", "sha256"}
+        or not isinstance(value["path"], str)
+        or not re.fullmatch(r"checkpoint-[0-9]{4}\.png", value["path"])
+        or not re.fullmatch("[0-9a-f]{64}", str(value["sha256"]))
+    ):
         raise ValueError("interactive capture response has invalid artifact")
     image = (directory / value["path"]).resolve(strict=True)
     if not image.is_relative_to(directory.resolve()) or capture.sha256(image) != value["sha256"]:
@@ -249,19 +302,37 @@ def action(config: dict, directory: Path, binary: Path, tesseract: Path, eng_dat
     profiles = directory / "paired-profiles.json"
     if not isinstance(device_id, str) or not device_id or not profiles.is_file():
         raise ValueError("install did not record the observed paired Device ID and profiles")
-    context = {"version": 1, "context": {"kind": "paired", "device_id": device_id,
-                                         "config_profile": config["episode_id"], "profiles_file": str(profiles)}}
+    context = {
+        "version": 1,
+        "context": {
+            "kind": "paired",
+            "device_id": device_id,
+            "config_profile": config["episode_id"],
+            "profiles_file": str(profiles),
+        },
+    }
     context_path = directory / "controller-context.json"
     if context_path.exists() or (directory / "controller_decisions.json").exists():
         raise FileExistsError("refusing to reuse controller evidence")
     capture.write_json(context_path, context)
-    decisions = {"schema_version": 1, "policy_sha256": POLICY_SHA256, "task_id": capture.CHROME_TASK,
-                 "run_id": None, "checks": [], "status": "starting"}
+    decisions = {
+        "schema_version": 1,
+        "policy_sha256": POLICY_SHA256,
+        "task_id": capture.CHROME_TASK,
+        "run_id": None,
+        "checks": [],
+        "status": "starting",
+    }
     _save_decisions(directory, decisions)
     with episode.forward(auv=True):
-        process = subprocess.Popen([str(binary), "--interactive", "--context", str(context_path)],
-                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None,
-                                   cwd=directory, env=os.environ.copy())
+        process = subprocess.Popen(
+            [str(binary), "--interactive", "--context", str(context_path)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=None,
+            cwd=directory,
+            env=os.environ.copy(),
+        )
         pipe = InteractivePipe(process)
         try:
             ready = pipe.read()
@@ -277,9 +348,15 @@ def action(config: dict, directory: Path, binary: Path, tesseract: Path, eng_dat
             for number, step in enumerate(audited["steps"], 1):
                 response = pipe.request("action", step["action"])
                 delivery = response.get("delivery")
-                if not isinstance(delivery, list) or not delivery or not all(
-                    isinstance(item, dict) and any(attempt.get("succeeded") is True for attempt in item.get("attempts", []))
-                    for item in delivery):
+                if (
+                    not isinstance(delivery, list)
+                    or not delivery
+                    or not all(
+                        isinstance(item, dict)
+                        and any(attempt.get("succeeded") is True for attempt in item.get("attempts", []))
+                        for item in delivery
+                    )
+                ):
                     raise ValueError(f"step {number} has no successful typed AUV delivery")
                 gate = step["gate"]
                 if gate is None:
@@ -292,11 +369,23 @@ def action(config: dict, directory: Path, binary: Path, tesseract: Path, eng_dat
                     image = _artifact(directory, frame)
                     words = ocr_words(image, tesseract, eng_data)
                     matched = matches_gate(gate, words)
-                    decisions["checks"].append({"step": number, "gate": gate, "attempt": attempt,
-                                                "seq": pipe.sequence, "artifact": frame["artifact"],
-                                                "matched": matched,
-                                                "ocr_words": [word._asdict() for word in words if word.confidence >= 60
-                                                              and _normalized(word.text) in ("add", "folder", "new", "favorites", "bookmarks", "bar", "save")]})
+                    decisions["checks"].append(
+                        {
+                            "step": number,
+                            "gate": gate,
+                            "attempt": attempt,
+                            "seq": pipe.sequence,
+                            "artifact": frame["artifact"],
+                            "matched": matched,
+                            "ocr_words": [
+                                word._asdict()
+                                for word in words
+                                if word.confidence >= 60
+                                and _normalized(word.text)
+                                in ("add", "folder", "new", "favorites", "bookmarks", "bar", "save")
+                            ],
+                        }
+                    )
                     _save_decisions(directory, decisions)
                     if matched:
                         passed = True
@@ -307,7 +396,13 @@ def action(config: dict, directory: Path, binary: Path, tesseract: Path, eng_dat
             if terminal != json.loads(sidecar_path.read_text()) or terminal.get("run_ids") != [run_id]:
                 raise ValueError("interactive final stdout differs from atomic Run sidecar")
             artifact = terminal.get("final_artifact")
-            if not isinstance(artifact, dict) or set(artifact) != {"path", "sha256"} or artifact["path"] != "final-screenshot.png" or not re.fullmatch("[0-9a-f]{64}", str(artifact["sha256"])) or capture.sha256((directory / artifact["path"]).resolve(strict=True)) != artifact["sha256"]:
+            if (
+                not isinstance(artifact, dict)
+                or set(artifact) != {"path", "sha256"}
+                or artifact["path"] != "final-screenshot.png"
+                or not re.fullmatch("[0-9a-f]{64}", str(artifact["sha256"]))
+                or capture.sha256((directory / artifact["path"]).resolve(strict=True)) != artifact["sha256"]
+            ):
                 raise ValueError("interactive final artifact SHA differs")
             process.wait(timeout=5)
             if process.returncode != 0:

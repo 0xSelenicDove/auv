@@ -14,15 +14,14 @@ import json
 import logging
 import math
 import os
-from pathlib import Path
 import re
 import shlex
 import subprocess
 import time
 import traceback
 import types
+from pathlib import Path
 from urllib.parse import urlsplit
-
 
 UPSTREAM_REV = "b138d348256078fa634fc3b73567a7337c793e6b"
 VLC_TASK = "5ac2891a-eacd-4954-b339-98abba077adb"
@@ -31,11 +30,10 @@ VLC_TASK = "5ac2891a-eacd-4954-b339-98abba077adb"
 VLC_CONFIG_PATH = "/home/user/.config/vlc/vlcrc"
 TASKS = {
     "2ad9387a-65d8-4e33-ad5b-7580065a27ca": (
-        "chrome", "4ddb526e5f3b9efa72a01e3ccae86ee4d698f480e4a526f9dfde85fd9499559c"
+        "chrome",
+        "4ddb526e5f3b9efa72a01e3ccae86ee4d698f480e4a526f9dfde85fd9499559c",
     ),
-    VLC_TASK: (
-        "vlc", "4e038a7bb4c3770186209d68402e678ff723238cb31684fe452f0b0c6f4665da"
-    ),
+    VLC_TASK: ("vlc", "4e038a7bb4c3770186209d68402e678ff723238cb31684fe452f0b0c6f4665da"),
     # TODO: Other V1 task chains remain unreviewed. Add each only after its
     # pinned setup/getter/metric path and a live negative control are audited.
 }
@@ -71,7 +69,9 @@ def _pinned_members(source: Path, class_name: str | None, names: tuple[str, ...]
     body = tree.body
     if class_name:
         body = next(node.body for node in body if isinstance(node, ast.ClassDef) and node.name == class_name)
-    selected = [node for node in body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names]
+    selected = [
+        node for node in body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names
+    ]
     if {node.name for node in selected} != set(names):
         raise ValueError(f"missing reviewed members in {source}: {set(names) - {node.name for node in selected}}")
     if class_name:
@@ -118,7 +118,8 @@ def _pinned_runtime(upstream: Path, task: dict):
             elif url.endswith("/execute"):
                 command = json.loads(kwargs["data"])["command"]
                 allowed = [
-                    ["python", "-c", ns["PYAUTOGUI_PKGS_PREFIX"].format(command=query)] for query in (
+                    ["python", "-c", ns["PYAUTOGUI_PKGS_PREFIX"].format(command=query)]
+                    for query in (
                         "import platform; print(platform.system())",
                         "import os; print(os.path.expanduser('~/.config/vlc/vlcrc'))",
                     )
@@ -143,10 +144,15 @@ def _pinned_runtime(upstream: Path, task: dict):
                     result = response.json() if response.status_code == 200 else None
                 except Exception:
                     raise RuntimeError("VLC guest command returned invalid JSON") from None
-                if not isinstance(result, dict) or set(result) != {"status", "output", "error", "returncode"} \
-                        or result.get("returncode") != 0 or isinstance(result.get("returncode"), bool) \
-                        or not isinstance(result.get("output"), str) or not isinstance(result.get("error"), str) \
-                        or result.get("status") != "success":
+                if (
+                    not isinstance(result, dict)
+                    or set(result) != {"status", "output", "error", "returncode"}
+                    or result.get("returncode") != 0
+                    or isinstance(result.get("returncode"), bool)
+                    or not isinstance(result.get("output"), str)
+                    or not isinstance(result.get("error"), str)
+                    or result.get("status") != "success"
+                ):
                     raise RuntimeError("VLC guest command did not complete successfully")
                 if urlsplit(url).path == "/execute":
                     path_query = command[2].endswith("expanduser('~/.config/vlc/vlcrc'))")
@@ -161,21 +167,38 @@ def _pinned_runtime(upstream: Path, task: dict):
 
     root = upstream / "desktop_env"
     ns = {
-        "__builtins__": __builtins__, "requests": requests, "json": json,
-        "logging": logging, "os": os, "re": re, "shlex": shlex, "time": time,
-        "traceback": traceback, "MAX_RETRIES": 20,
+        "__builtins__": __builtins__,
+        "requests": requests,
+        "json": json,
+        "logging": logging,
+        "os": os,
+        "re": re,
+        "shlex": shlex,
+        "time": time,
+        "traceback": traceback,
+        "MAX_RETRIES": 20,
         "CHROME_STDERR_LOG": "/tmp/osworld_chrome_stderr.log",
         "logger": logging.getLogger("desktopenv.evaluator-only"),
     }
     # PythonController's prefix is copied from its pinned source assignment.
     controller_source = root / "controllers" / "python.py"
     controller_ast = ast.parse(controller_source.read_text())
-    prefix = next(node for node in controller_ast.body if isinstance(node, ast.Assign)
-                  and any(isinstance(target, ast.Name) and target.id == "PYAUTOGUI_PKGS_PREFIX" for target in node.targets))
-    exec(compile(ast.fix_missing_locations(ast.Module(body=[prefix], type_ignores=[])), str(controller_source), "exec"), ns)
-    controller = _pinned_members(controller_source, "PythonController", (
-        "__init__", "get_file", "execute_python_command", "get_vm_platform", "get_vm_machine"
-    ), ns)
+    prefix = next(
+        node
+        for node in controller_ast.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "PYAUTOGUI_PKGS_PREFIX" for target in node.targets)
+    )
+    exec(
+        compile(ast.fix_missing_locations(ast.Module(body=[prefix], type_ignores=[])), str(controller_source), "exec"),
+        ns,
+    )
+    controller = _pinned_members(
+        controller_source,
+        "PythonController",
+        ("__init__", "get_file", "execute_python_command", "get_vm_platform", "get_vm_machine"),
+        ns,
+    )
     setup_source = root / "controllers" / "setup.py"
     _pinned_members(setup_source, None, ("_wrap_chrome_launch_for_stderr_capture",), ns)
     setup_methods = ("__init__", "reset_cache_dir", "setup", "_launch_setup", "_sleep_setup")
@@ -205,9 +228,12 @@ def _pinned_runtime(upstream: Path, task: dict):
         metric_chrome = root / "evaluators" / "metrics" / "chrome.py"
         _pinned_members(metric_chrome, None, ("is_expected_bookmarks",), ns)
         metrics.is_expected_bookmarks = ns["is_expected_bookmarks"]
-    desktop = _pinned_members(root / "desktop_env.py", "DesktopEnv", (
-        "_set_task_info", "_set_evaluator_info", "evaluate", "vm_platform", "vm_machine"
-    ), ns)
+    desktop = _pinned_members(
+        root / "desktop_env.py",
+        "DesktopEnv",
+        ("_set_task_info", "_set_evaluator_info", "evaluate", "vm_platform", "vm_machine"),
+        ns,
+    )
     return desktop, controller, setup
 
 
@@ -260,8 +286,10 @@ def prepare(env) -> None:
         except Exception:
             raise RuntimeError("VLC setup file verification failed") from None
         contents = Path(config_path).read_text()
-        if not any(line.strip() == "play-and-exit=1" for line in contents.splitlines()) \
-                or env.metric(config_path, {"expected_play_and_exit": 1}) != 1:
+        if (
+            not any(line.strip() == "play-and-exit=1" for line in contents.splitlines())
+            or env.metric(config_path, {"expected_play_and_exit": 1}) != 1
+        ):
             raise RuntimeError("VLC setup did not establish play-and-exit=1")
         # NOTICE: /setup/launch confirms process spawn, not that VLC rendered
         # or is ready for GUI input; live acceptance must check that separately.

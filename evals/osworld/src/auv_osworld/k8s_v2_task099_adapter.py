@@ -9,14 +9,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
+from pathlib import Path
 
-import k8s_phase_adapter as cluster
-import v2_task099_evaluator as task099
-
+from . import k8s_phase_adapter as cluster
+from . import v2_task099_evaluator as task099
 
 TASK_ID = "099"
 GUEST_AUV_SOURCE = "1148f382ab441605dc42c722073c8e186147fd24"
@@ -25,9 +24,24 @@ V2_BASE_QCOW_SHA256 = "28b617987f3edf14edd835069cdde6a6e4708be8e4ae4eb957200d5da
 V2_HOT_PVC = "osworld-v2-hot"
 # NOTICE: This public V2.1 guest uses a different sudo password from V1.
 # Remove these commands when the pinned image or AUV build ships the libraries.
-APT_UPDATE = ["bash", "-lc", "printf '%s\\n' osworld-public-evaluation | sudo -S -p '' env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=30 update"]
-APT_INSTALL = ["bash", "-lc", "printf '%s\\n' osworld-public-evaluation | sudo -S -p '' env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=30 install -y --no-install-recommends libtesseract4 liblept5 tesseract-ocr-eng"]
-EXTRA_FIELDS = ("task_source", "asset", "host_auv_sha256", "action_binary", "action_binary_sha256", "action_source_commit")
+APT_UPDATE = [
+    "bash",
+    "-lc",
+    "printf '%s\\n' osworld-public-evaluation | sudo -S -p '' env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=30 update",
+]
+APT_INSTALL = [
+    "bash",
+    "-lc",
+    "printf '%s\\n' osworld-public-evaluation | sudo -S -p '' env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=30 install -y --no-install-recommends libtesseract4 liblept5 tesseract-ocr-eng",
+]
+EXTRA_FIELDS = (
+    "task_source",
+    "asset",
+    "host_auv_sha256",
+    "action_binary",
+    "action_binary_sha256",
+    "action_source_commit",
+)
 HEX_SHA256 = re.compile(r"[0-9a-f]{64}")
 GIT_COMMIT = re.compile(r"[0-9a-f]{40}")
 # Frozen from the fresh V2.1 1920x1080 desktop capture: the supplied image
@@ -48,8 +62,11 @@ def load_config(path: Path, *, reset: bool = False) -> dict:
     if not isinstance(config["action_source_commit"], str) or not GIT_COMMIT.fullmatch(config["action_source_commit"]):
         raise ValueError("action_source_commit must identify an audited source commit")
     for name in ("task_source", "asset", "action_binary"):
-        if not isinstance(config[name], str) or not Path(config[name]).is_absolute() or \
-                (not reset and not Path(config[name]).is_file()):
+        if (
+            not isinstance(config[name], str)
+            or not Path(config[name]).is_absolute()
+            or (not reset and not Path(config[name]).is_file())
+        ):
             raise ValueError(f"{name} must be an absolute file path")
     if reset:
         # Reset needs only the sealed config and ownership journal. A missing
@@ -75,11 +92,15 @@ def manifest(config_path: Path) -> dict:
         raise RuntimeError(f"phase Python {sys.executable} cannot import requests")
     config_hash = cluster.sha256(config_path)
     identity = {
-        "benchmark": "OSWorld-V2.1", "benchmark_revision": task099.UPSTREAM_REV,
-        "task_id": TASK_ID, "task_sha256": task099.TASK_SHA256,
+        "benchmark": "OSWorld-V2.1",
+        "benchmark_revision": task099.UPSTREAM_REV,
+        "task_id": TASK_ID,
+        "task_sha256": task099.TASK_SHA256,
         "topology": "paired-remote-fixed-action-infrastructure-trial",
-        "runtime_image": cluster.RUNTIME_IMAGE, "qcow2": f"sha256:{V2_BASE_QCOW_SHA256}",
-        "auv_source": GUEST_AUV_SOURCE, "auv_binary_sha256": GUEST_AUV_SHA256,
+        "runtime_image": cluster.RUNTIME_IMAGE,
+        "qcow2": f"sha256:{V2_BASE_QCOW_SHA256}",
+        "auv_source": GUEST_AUV_SOURCE,
+        "auv_binary_sha256": GUEST_AUV_SHA256,
         "auv_target": "paired Device ID acquired at install",
         "runner_identity": "k8s_v2_task099_adapter.py fixed image-opening action",
         "asset_sha256": task099.ASSET_SHA256,
@@ -91,12 +112,28 @@ def manifest(config_path: Path) -> dict:
         "action_source_commit_operator_declared": config["action_source_commit"],
         "episode_config_sha256": config_hash,
     }
-    script = Path(__file__).resolve()
-    phases = {name: {"argv": [sys.executable, str(script), "phase", name, "--config", str(config_path),
-                              "--config-sha256", config_hash],
-                     "timeout_seconds": cluster.TIMEOUTS[name]} for name in cluster.PHASES}
-    return {"trust": "operator-audited", "batch_id": config["batch_id"],
-            "episodes": [{"episode_id": config["episode_id"], "identity": identity, "phases": phases}]}
+    phases = {
+        name: {
+            "argv": [
+                sys.executable,
+                "-m",
+                "auv_osworld.k8s_v2_task099_adapter",
+                "phase",
+                name,
+                "--config",
+                str(config_path),
+                "--config-sha256",
+                config_hash,
+            ],
+            "timeout_seconds": cluster.TIMEOUTS[name],
+        }
+        for name in cluster.PHASES
+    }
+    return {
+        "trust": "operator-audited",
+        "batch_id": config["batch_id"],
+        "episodes": [{"episode_id": config["episode_id"], "identity": identity, "phases": phases}],
+    }
 
 
 class Episode(cluster.Episode):
@@ -111,18 +148,30 @@ class Episode(cluster.Episode):
         paired = json.loads((self.directory / "paired-device.json").read_text())
         if paired.get("guest_auv_sha256") != GUEST_AUV_SHA256:
             raise ValueError("installed guest AUV evidence differs from V2 pin")
-        command = [sys.executable, str(Path(__file__).with_name("v2_task099_evaluator.py")),
-                   "prepare" if phase == "setup" else "evaluate",
-                   "--upstream", self.config["upstream_checkout"],
-                   "--task-source", self.config["task_source"], "--asset", self.config["asset"],
-                   "--episode-dir", str(self.directory),
-                   "--endpoint", f"http://127.0.0.1:{self.config['setup_local_port']}"]
+        command = [
+            sys.executable,
+            "-m",
+            "auv_osworld.v2_task099_evaluator",
+            "prepare" if phase == "setup" else "evaluate",
+            "--upstream",
+            self.config["upstream_checkout"],
+            "--task-source",
+            self.config["task_source"],
+            "--asset",
+            self.config["asset"],
+            "--episode-dir",
+            str(self.directory),
+            "--endpoint",
+            f"http://127.0.0.1:{self.config['setup_local_port']}",
+        ]
         with self.forward(setup=True):
             output = cluster._run(command, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
         self.assert_identity()
         result = json.loads(output.splitlines()[-1])
-        if result.get("phase") != ("prepare" if phase == "setup" else "evaluate") or \
-                result.get("task_sha256") != task099.TASK_SHA256:
+        if (
+            result.get("phase") != ("prepare" if phase == "setup" else "evaluate")
+            or result.get("task_sha256") != task099.TASK_SHA256
+        ):
             raise ValueError("pinned V2 Task099 bridge returned a mismatched phase or task")
         if phase == "evaluate":
             raw = result.get("result")
@@ -139,17 +188,34 @@ class Episode(cluster.Episode):
         if Path(os.environ["AUV_OSWORLD_ACTION_EVIDENCE"]) != self.directory / "action_evidence.json":
             raise ValueError("action evidence path must be the runner episode sidecar")
         paired = json.loads((self.directory / "paired-device.json").read_text())
-        if paired.get("guest_auv_sha256") != GUEST_AUV_SHA256 or not isinstance(paired.get("device_id"), str) or not paired["device_id"]:
+        if (
+            paired.get("guest_auv_sha256") != GUEST_AUV_SHA256
+            or not isinstance(paired.get("device_id"), str)
+            or not paired["device_id"]
+        ):
             raise ValueError("paired Device or installed guest AUV evidence differs from V2 pin")
         profiles = self.directory / "paired-profiles.json"
         if not profiles.is_file():
             raise ValueError("paired profile evidence is missing")
-        for name in ("fixed-action-plan.json", "action_evidence.json", "input-action-results.json", "final-screenshot.png"):
+        for name in (
+            "fixed-action-plan.json",
+            "action_evidence.json",
+            "input-action-results.json",
+            "final-screenshot.png",
+        ):
             if (self.directory / name).exists():
                 raise FileExistsError(f"refusing stale action evidence: {name}")
-        plan = {"version": 1, "context": {"kind": "paired", "device_id": paired["device_id"],
-                                           "config_profile": self.config["episode_id"], "profiles_file": str(profiles)},
-                "actions": FIXED_ACTIONS, "final_settle_ms": 1000}
+        plan = {
+            "version": 1,
+            "context": {
+                "kind": "paired",
+                "device_id": paired["device_id"],
+                "config_profile": self.config["episode_id"],
+                "profiles_file": str(profiles),
+            },
+            "actions": FIXED_ACTIONS,
+            "final_settle_ms": 1000,
+        }
         plan_path = self.directory / "fixed-action-plan.json"
         cluster.write_json(plan_path, plan)
         if json.loads(plan_path.read_text()) != plan:
@@ -161,18 +227,33 @@ class Episode(cluster.Episode):
             raise RuntimeError(f"pinned foreground AUV action exited {child.returncode}")
         evidence = json.loads((self.directory / "action_evidence.json").read_text())
         deliveries = json.loads((self.directory / "input-action-results.json").read_text())
-        if not isinstance(deliveries, list) or len(deliveries) != 2 or not isinstance(deliveries[0], list) or \
-                len(deliveries[0]) != 1 or deliveries[1] != [] or not isinstance(deliveries[0][0], dict) or \
-                not deliveries[0][0].get("selected_path") or not any(
-                    attempt.get("succeeded") is True for attempt in deliveries[0][0].get("attempts", [])
-                    if isinstance(attempt, dict)):
+        if (
+            not isinstance(deliveries, list)
+            or len(deliveries) != 2
+            or not isinstance(deliveries[0], list)
+            or len(deliveries[0]) != 1
+            or deliveries[1] != []
+            or not isinstance(deliveries[0][0], dict)
+            or not deliveries[0][0].get("selected_path")
+            or not any(
+                attempt.get("succeeded") is True
+                for attempt in deliveries[0][0].get("attempts", [])
+                if isinstance(attempt, dict)
+            )
+        ):
             raise ValueError("fixed image-opening AUV input lacks successful driver delivery")
         artifact = evidence.get("final_artifact")
         png = self.directory / "final-screenshot.png"
-        if not isinstance(evidence.get("run_ids"), list) or len(evidence["run_ids"]) != 1 or \
-                not isinstance(evidence["run_ids"][0], str) or not evidence["run_ids"][0] or \
-                not isinstance(artifact, dict) or artifact.get("path") != png.name or \
-                artifact.get("sha256") != cluster.sha256(png) or png.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+        if (
+            not isinstance(evidence.get("run_ids"), list)
+            or len(evidence["run_ids"]) != 1
+            or not isinstance(evidence["run_ids"][0], str)
+            or not evidence["run_ids"][0]
+            or not isinstance(artifact, dict)
+            or artifact.get("path") != png.name
+            or artifact.get("sha256") != cluster.sha256(png)
+            or png.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n"
+        ):
             raise ValueError("fixed AUV action has no byte-verified final PNG and Run ID")
         # The child printed the exact sidecar as its final stdout line. Do not
         # print another line: batch_runner compares stdout and sidecar.
