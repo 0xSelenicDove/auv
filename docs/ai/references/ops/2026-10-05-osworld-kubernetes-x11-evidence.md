@@ -1029,6 +1029,37 @@ resources, and independent checks found no remaining batch resources; the
 V1 hot PVC/PV remained Bound with unchanged UIDs. This normal-completion
 trial did not verify hard-timeout cancellation or held-input release.
 
+### Static Chrome Favorites typed-action pilot did not reproduce the positive
+
+A later one-episode Chrome trial froze the exact AUV action sequence recovered
+from the earlier evaluator-positive manual session: Ctrl+Shift+B, right-click
+the bookmark bar, choose `Add folder...`, type `Favorites`, click Save, then
+`DONE`. The frozen action JSON SHA256 was
+`044da62d16d371ef839440f5d4799ebf0e6d85708367afed33c85d37eac054a6`;
+the manifest SHA256 was
+`1fe69eadc8c880aae73679bffb8c60b541a82fd3a9326bd194c1cdc8b1c0ba7e`.
+An AUV-only
+pre-action [capture](/private/tmp/auv-osworld-v1-positive-typed.sSX5kB/output/chrome-positive-static-k/pre-action.png)
+with SHA256 `74fdf4c97d899723b18bba8fd4120004308b459990b04d03c87ca19fb158e857`
+was checked for the expected 1920×1080 Chrome initial state without changing
+the plan. The [ledger](/private/tmp/auv-osworld-v1-positive-typed.sSX5kB/output/ledger.json)
+has SHA256 `0279ab30bf82710bf00c2af122bad7911226077f0c1dd68988b33c03b4ec3c42`:
+all six phases completed, no failure layer, and UID-safe reset preserved the
+hot PVC/PV. AUV Run `e3e36fa0d76ec629b03bf422d7ee6df7` recorded five
+successful `foreground_system_events` delivery attempts, each with
+`verified=false`; `DONE` had no input delivery. Its same-Runner
+[final screenshot](/private/tmp/auv-osworld-v1-positive-typed.sSX5kB/output/chrome-positive-static-k/final-screenshot.png)
+has SHA256 `243bd44472ae566bfa07fc46326a70aa18a9e3c6cee1c953ac865de9316f80ce`.
+It still shows the `New folder` dialog with `Favorites` entered, the bookmark
+bar selected, and Save visible. The original pinned evaluator returned
+`0.0`. Thus the first four actions had visible UI effect, while the last
+click was not semantically confirmed before capture/evaluation. The plan had
+no intermediate observations or post-click delay; whether timing or delivery
+caused the Save failure remains unresolved. This is one failed static-script
+pilot, **not** evidence that AUV lacks a save-click capability or an agent
+completion-rate observation. No coordinates were changed or retried in this
+episode.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

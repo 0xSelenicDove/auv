@@ -383,6 +383,16 @@ entry/cancellation, then evaluate a frozen agent policy on a predeclared
 denominator. Do not divide successful infra phases by task count and call it
 an OSWorld completion rate.
 
+The first frozen task-directed Chrome replay then reproduced the UI through
+the `New folder` dialog and entered `Favorites`, but its final same-Runner
+capture still showed Save unconfirmed; the pinned evaluator returned `0.0`
+despite five successful-but-`verified=false` input delivery records. The
+earlier manual positive path inspected intermediate screenshots, whereas the
+new entry runs actions immediately and captures immediately after the final
+click. A narrowly bounded post-action settle/observation gate is the next
+diagnostic slice; do not label this discrepancy an X11 click failure or
+replay the same episode with changed coordinates.
+
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
 approval.` After the owner approved access, read-only dry-runs at revision
