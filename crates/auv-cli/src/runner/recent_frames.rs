@@ -127,6 +127,9 @@ impl History {
     }
     self.frames.push_back(proto::RecentFrame {
       sequence: self.latest_sequence,
+      // TODO(recent-frames-capture-refs): buffered frames still carry pixels.
+      // Move them into the capture store and return references together with
+      // the planned video stream (capture-references-and-positions design).
       capture: Some(local_driver::capture_to_proto(capture)),
     });
   }

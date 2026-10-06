@@ -144,14 +144,12 @@ export interface PlaygroundState {
  */
 export type Resource = (
   | {
-    /** Display copy at logical resolution; kept for inspection after `released`. */
+    /** Display copy at logical resolution, loaded after the call returns. */
     bitmap?: ImageBitmap
     capturedAt: number
     frame: CapturedFrame
     handle: FrameHandle
     kind: 'frame'
-    /** Raw pixels were dropped to stay within the memory budget; OCR on this frame needs a new capture. */
-    released?: true
   }
   | { handle: DisplayHandle, kind: 'display' }
   | { handle: InputHandle, kind: 'input' }
@@ -323,26 +321,6 @@ export const actions = {
 
   putResource(ref: string, resource: Resource): void {
     set(state => ({ resources: { ...state.resources, [ref]: resource } }))
-  },
-
-  /**
-   * Keeps raw RGBA only for the newest captures within `budgetBytes`; older
-   * frames keep their display bitmap and handle but drop pixels, so memory
-   * no longer grows with every capture across runs.
-   */
-  releaseRawFrames(budgetBytes: number): void {
-    const frames = Object.entries(get().resources)
-      .flatMap(([ref, resource]) => (resource.kind === 'frame' && !resource.released ? [[ref, resource] as const] : []))
-      .sort(([, a], [, b]) => b.capturedAt - a.capturedAt)
-    let kept = 0
-    const released: Record<string, Resource> = {}
-    for (const [ref, resource] of frames) {
-      kept += resource.frame.rgba.byteLength
-      if (kept > budgetBytes)
-        released[ref] = { ...resource, frame: { ...resource.frame, native: undefined, rgba: new Uint8Array(0) }, released: true }
-    }
-    if (Object.keys(released).length > 0)
-      set(state => ({ resources: { ...state.resources, ...released } }))
   },
 
   removePin(id: string): void {

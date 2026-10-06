@@ -3,14 +3,56 @@ import type { UnaryCall } from '../../transport/types'
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf'
 import { describe, expect, it } from 'vitest'
 
-import { CaptureWindowRequestSchema, CaptureWindowResponseSchema } from '../../gen/auv/api/driver/v1/capture_pb'
+import { CaptureWindowRequestSchema, CaptureWindowResponseSchema, GetCaptureImageRequestSchema, GetCaptureImageResponseSchema } from '../../gen/auv/api/driver/v1/capture_pb'
 import { ListDisplaysResponseSchema } from '../../gen/auv/api/driver/v1/display_pb'
 import { ClickScreenPointRequestSchema, ClickScreenPointResponseSchema, ClickWindowPointRequestSchema, ClickWindowPointResponseSchema, CreateMouseResponseSchema, DragMouseRequestSchema, DragMouseResponseSchema, HoldKeysRequestSchema, HoldKeysResponseSchema, InputPolicy, KeyDownRequestSchema, KeyDownResponseSchema, KeyUpRequestSchema, KeyUpResponseSchema, MouseButton, MouseDownRequestSchema, MouseDownResponseSchema, MouseUpRequestSchema, MouseUpResponseSchema, ScrollDeliveryCandidate, ScrollUntilRequestSchema, ScrollUntilResponseSchema, ScrollUntilStopReason, ScrollWindowPointMotionRequestSchema, ScrollWindowPointMotionResponseSchema, ScrollWindowPointRequestSchema, ScrollWindowPointResponseSchema, StandardMotionTimingFunction, StreamScrollRequestSchema, StreamScrollResponseSchema } from '../../gen/auv/api/driver/v1/input_pb'
+import { RecognizeTextRequestSchema, RecognizeTextResponseSchema } from '../../gen/auv/api/driver/v1/text_recognition_pb'
 import { ListWindowsResponseSchema, ResolveWindowRequestSchema, ResolveWindowResponseSchema } from '../../gen/auv/api/driver/v1/window_pb'
+import { ImageEncoding } from '../../gen/auv/api/image/v1/image_pb'
 import { connect } from '../../node/index'
 import { createAuv } from './client'
 
 describe('runner Driver control surface', () => {
+  it('recognizes Runner captures by reference and fetches pixels only on request', async () => {
+    const calls: UnaryCall[] = []
+    const connection = await connect({
+      local: true,
+      transport: {
+        close() {},
+        async connect() {},
+        async duplex() { throw new Error('unexpected duplex call') },
+        async unary(call) {
+          calls.push(call)
+          switch (call.method) {
+            case '/auv.api.driver.v1.CaptureService/GetCaptureImage':
+              return toBinary(GetCaptureImageResponseSchema, create(GetCaptureImageResponseSchema, {
+                image: { case: 'encoded', value: { data: new Uint8Array([1, 2]), encoding: ImageEncoding.JPEG, height: 50, width: 80 } },
+              }))
+            case '/auv.api.driver.v1.TextRecognitionService/RecognizeText':
+              return toBinary(RecognizeTextResponseSchema, create(RecognizeTextResponseSchema, { text: 'ok' }))
+            default: throw new Error(`unexpected method: ${call.method}`)
+          }
+        },
+      },
+    })
+    const runner = createAuv(connection).runner({ runnerClass: 'auv.core.local' })
+    const frame = { ref: { captureId: 'cap-1' } }
+
+    expect((await runner.recognizeText(frame, { region: { height: 0.5, width: 1, x: 0, y: 0 } })).text).toBe('ok')
+    const recognize = fromBinary(RecognizeTextRequestSchema, calls[0]!.body)
+    expect(recognize.source).toEqual({ case: 'captureRef', value: expect.objectContaining({ captureId: 'cap-1' }) })
+    expect(recognize.region?.height).toBe(0.5)
+
+    const image = await runner.captures.image('cap-1', { encoding: ImageEncoding.JPEG, maxSize: { height: 100, width: 100 } })
+    expect(image).toMatchObject({ encoding: ImageEncoding.JPEG, height: 50, width: 80 })
+    const fetch = fromBinary(GetCaptureImageRequestSchema, calls[1]!.body)
+    expect(fetch.capture?.captureId).toBe('cap-1')
+    expect(fetch.maxSize).toMatchObject({ height: 100, width: 100 })
+
+    expect(() => runner.recognizeText({ ref: undefined })).toThrow(TypeError)
+    await connection.close()
+  })
+
   it('preserves a held chord and its opaque release ID across Runner calls', async () => {
     const calls: UnaryCall[] = []
     const connection = await connect({
@@ -286,7 +328,7 @@ describe('runner Driver control surface', () => {
 
     const completed = await window.scrollUntil({ x: 10, y: 20 }, {
       condition: { case: 'textVisible', value: { query: 'Load more' } },
-      observe: { omitCapture: true },
+      observe: { omitText: true },
       step: { case: 'instant', value: { deltaY: 600 } },
     }, { onObservation: observation => void stops.push(observation.stop) })
 
@@ -296,7 +338,7 @@ describe('runner Driver control surface', () => {
     expect(requests.map(event => event.case)).toEqual(['begin'])
     const begin = requests[0]!
     expect(begin.case === 'begin' && begin.value.awaitDecisions).toBe(false)
-    expect(begin.case === 'begin' && begin.value.observe?.omitCapture).toBe(true)
+    expect(begin.case === 'begin' && begin.value.observe?.omitText).toBe(true)
     expect(begin.case === 'begin' && begin.value.condition.case === 'textVisible' && begin.value.condition.value.query).toBe('Load more')
   })
 

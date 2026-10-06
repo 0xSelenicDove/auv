@@ -1509,11 +1509,8 @@ impl ScrollUntilArgs {
       settle: std::time::Duration::from_millis(self.settle_ms),
       no_motion_confirmations: self.confirmations,
       motion_region: self.region.as_deref().map(parse_normalized_region).transpose()?,
-      // The command reports only the result, so observations carry no payload.
-      observe: auv_scan::ScrollUntilObserve {
-        capture: false,
-        text: false,
-      },
+      // The command reports only the result, so observations skip OCR.
+      observe: auv_scan::ScrollUntilObserve { text: false },
     };
     request.validate().map_err(|error| format!("input.scrollUntil: {error}"))?;
     Ok(ScrollUntilPlan {

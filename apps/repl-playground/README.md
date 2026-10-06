@@ -206,10 +206,12 @@ store (zustand) ─▶ canvas, timeline, inspector, editor decorations
 
 These are known and intentionally deferred; each is marked in code.
 
-- **Resource handles live in the browser.** AUV currently returns captured
-  pixels inline (`RgbaFrame`), so a 5K capture moves ~80 MB per call. A
-  daemon-side handle and `GetResource` API in AUV would let the REPL
-  fetch thumbnails or PNGs by ref instead.
+- **Captures are fetched as logical-resolution JPEGs.** Frames are AUV
+  capture references; OCR reads the full-resolution capture in the Runner,
+  but the canvas and magnifiers show only the logical-resolution image. A
+  reference expires in the Runner (memory budget, ten idle minutes); OCR on an
+  expired frame fails with NOT_FOUND and needs a new capture. Replay keeps the
+  images it loaded during the recorded run.
 - **Scroll** exposes `ScrollWindowPoint` and `ScrollUntil`; timed
   (`ScrollWindowPointMotion`) and live (`StreamScroll`) scrolling are not in the
   script API yet, and `scrollUntil` records only its last observation.

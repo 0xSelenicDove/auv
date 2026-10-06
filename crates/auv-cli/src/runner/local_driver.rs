@@ -21,6 +21,8 @@ use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
+use super::capture_store::{CaptureStore, CaptureStoreOptions};
+
 use auv_driver::{Driver as _, WindowInput as _};
 
 struct LocalDisplayService {
@@ -33,14 +35,17 @@ struct LocalWindowService {
 
 struct LocalCaptureService {
   session: auv_driver::LocalDriverSession,
+  captures: CaptureStore,
 }
 
 struct LocalTextRecognitionService {
   session: auv_driver::LocalDriverSession,
+  captures: CaptureStore,
 }
 
 struct LocalInputService {
   session: auv_driver::LocalDriverSession,
+  captures: CaptureStore,
 }
 
 impl Drop for LocalInputService {
@@ -832,9 +837,10 @@ impl InputService for LocalInputService {
     require_point_inside_window(&window, point)?;
     let (sender, receiver) = tokio::sync::mpsc::channel(1);
     let session = self.session.clone();
+    let captures = self.captures.clone();
     tokio::spawn(async move {
       let disconnected = sender.clone();
-      let operation = relay_scroll_until(session, window, point, options, until, await_decisions, requests, sender);
+      let operation = relay_scroll_until(session, window, point, options, until, await_decisions, captures, requests, sender);
       tokio::select! {
         _ = disconnected.closed() => {},
         _ = operation => {},
@@ -1336,6 +1342,7 @@ async fn relay_scroll_until(
   options: auv_driver::ScrollOptions,
   until: auv_scan::ScrollUntilRequest,
   await_decisions: bool,
+  captures: CaptureStore,
   mut requests: tonic::Streaming<proto::ScrollUntilRequest>,
   sender: tokio::sync::mpsc::Sender<Result<proto::ScrollUntilResponse, Status>>,
 ) {
@@ -1366,7 +1373,7 @@ async fn relay_scroll_until(
     let mut surface = auv_scan::WindowScrollUntilSurface::new(&session, window, point, options);
     auv_scan::scroll_until(&mut surface, &until, &mut |observation| {
       let awaiting_decision = await_decisions && observation.stop.is_none();
-      let event = response(Event::Observation(scroll_until_observation_to_proto(observation, awaiting_decision)));
+      let event = response(Event::Observation(scroll_until_observation_to_proto(observation, awaiting_decision, &captures)));
       if observations.blocking_send(Ok(event)).is_err() {
         return Err(auv_driver::DriverError::Backend {
           message: "scroll-until client disconnected".to_string(),
@@ -1413,6 +1420,7 @@ async fn relay_scroll_until(
 fn scroll_until_observation_to_proto(
   observation: auv_scan::ScrollUntilObservation,
   awaiting_decision: bool,
+  captures: &CaptureStore,
 ) -> proto::ScrollUntilObservation {
   proto::ScrollUntilObservation {
     steps: observation.steps,
@@ -1422,7 +1430,7 @@ fn scroll_until_observation_to_proto(
     }),
     motion: observation.motion.map(viewport_pixel_motion_to_proto),
     no_motion_streak: observation.no_motion_streak,
-    capture: observation.capture.map(capture_to_proto),
+    capture: Some(stored_capture_to_proto(captures, observation.capture)),
     text: observation.text.map(recognition_to_proto),
     stop: observation.stop.map_or(proto::ScrollUntilStopReason::Unspecified, scroll_until_stop_reason_to_proto) as i32,
     awaiting_decision,
@@ -1742,7 +1750,6 @@ fn scroll_until_request_from_proto(request: proto::ScrollUntilBegin) -> Result<a
     no_motion_confirmations: request.no_motion_confirmations,
     motion_region,
     observe: auv_scan::ScrollUntilObserve {
-      capture: !request.observe.is_some_and(|observe| observe.omit_capture),
       text: !request.observe.is_some_and(|observe| observe.omit_text),
     },
   })
@@ -1938,7 +1945,11 @@ fn input_action_to_proto(action: auv_driver::InputActionResult) -> Result<proto:
 impl TextRecognitionService for LocalTextRecognitionService {
   async fn recognize_text(&self, request: Request<proto::RecognizeTextRequest>) -> Result<Response<proto::RecognizeTextResponse>, Status> {
     let request = request.into_inner();
-    let capture = capture_from_proto(request.capture.ok_or_else(|| Status::invalid_argument("capture is required"))?)?;
+    let capture = match request.source {
+      Some(proto::recognize_text_request::Source::CaptureRef(reference)) => stored_capture(&self.captures, reference)?,
+      Some(proto::recognize_text_request::Source::Capture(capture)) => std::sync::Arc::new(capture_from_proto(capture)?),
+      None => return Err(Status::invalid_argument("capture_ref or capture is required")),
+    };
     let region = ratio_rect_from_proto(request.region)?;
     let recognition = self
       .session
@@ -1980,7 +1991,7 @@ impl TextRecognitionService for LocalTextRecognitionService {
           confidence: matched.confidence,
         })
         .collect(),
-      capture: Some(capture_to_proto(capture)),
+      capture: Some(stored_capture_to_proto(&self.captures, capture)),
     }))
   }
 
@@ -2023,7 +2034,7 @@ impl TextRecognitionService for LocalTextRecognitionService {
           confidence: matched.confidence,
         })
         .collect(),
-      capture: Some(capture_to_proto(captured.capture)),
+      capture: Some(stored_capture_to_proto(&self.captures, captured.capture)),
     }))
   }
 }
@@ -2048,6 +2059,80 @@ fn recognition_to_proto(recognition: auv_driver::TextRecognition) -> proto::Reco
         confidence: region.confidence,
       })
       .collect(),
+  }
+}
+
+/// The stored capture a reference names, or NOT_FOUND once it left the store.
+fn stored_capture(captures: &CaptureStore, reference: proto::CaptureRef) -> Result<std::sync::Arc<auv_driver::Capture>, Status> {
+  if reference.capture_id.trim().is_empty() {
+    return Err(Status::invalid_argument("capture_id is required"));
+  }
+  captures.get(&reference.capture_id).ok_or_else(|| {
+    Status::not_found(format!(
+      "capture {} was not found: it was evicted, expired, or produced by another Runner; capture again",
+      reference.capture_id
+    ))
+  })
+}
+
+/// Crops, bounds and encodes a stored capture's pixels for `GetCaptureImage`.
+fn capture_image_to_proto(
+  capture: &auv_driver::Capture,
+  region: auv_driver::RatioRect,
+  max_size: Option<auv_api_proto::auv::api::image::v1::PixelSize>,
+  encoding: auv_api_proto::auv::api::image::v1::ImageEncoding,
+) -> Result<proto::GetCaptureImageResponse, Status> {
+  use auv_api_proto::auv::api::image::v1 as image_proto;
+  use image::ImageEncoder as _;
+  let (width, height) = capture.image.dimensions();
+  // Region edges round outward so a crop never loses a partly covered pixel.
+  let left = ((region.x * f64::from(width)).floor() as u32).min(width.saturating_sub(1));
+  let top = ((region.y * f64::from(height)).floor() as u32).min(height.saturating_sub(1));
+  let right = (((region.x + region.width) * f64::from(width)).ceil() as u32).clamp(left + 1, width);
+  let bottom = (((region.y + region.height) * f64::from(height)).ceil() as u32).clamp(top + 1, height);
+  let mut pixels = image::imageops::crop_imm(&capture.image, left, top, right - left, bottom - top).to_image();
+  if let Some(max) = max_size.filter(|max| max.width > 0 && max.height > 0) {
+    let scale = (f64::from(max.width) / f64::from(pixels.width())).min(f64::from(max.height) / f64::from(pixels.height()));
+    if scale < 1.0 {
+      let fitted_width = ((f64::from(pixels.width()) * scale).round() as u32).max(1);
+      let fitted_height = ((f64::from(pixels.height()) * scale).round() as u32).max(1);
+      pixels = image::imageops::resize(&pixels, fitted_width, fitted_height, image::imageops::FilterType::Triangle);
+    }
+  }
+  let (width, height) = pixels.dimensions();
+  let encoded = |encoding: image_proto::ImageEncoding, data: Vec<u8>| proto::GetCaptureImageResponse {
+    image: Some(proto::get_capture_image_response::Image::Encoded(image_proto::EncodedImage {
+      encoding: encoding as i32,
+      width,
+      height,
+      data,
+    })),
+  };
+  match encoding {
+    image_proto::ImageEncoding::Unspecified | image_proto::ImageEncoding::Rgba => Ok(proto::GetCaptureImageResponse {
+      image: Some(proto::get_capture_image_response::Image::Rgba(image_proto::RgbaFrame {
+        width,
+        height,
+        data: pixels.into_raw(),
+      })),
+    }),
+    image_proto::ImageEncoding::Png => {
+      let mut data = Vec::new();
+      image::codecs::png::PngEncoder::new(&mut data)
+        .write_image(pixels.as_raw(), width, height, image::ExtendedColorType::Rgba8)
+        .map_err(|error| Status::internal(format!("PNG encoding failed: {error}")))?;
+      Ok(encoded(image_proto::ImageEncoding::Png, data))
+    }
+    image_proto::ImageEncoding::Jpeg => {
+      // NOTICE(capture-jpeg-quality): quality 85 keeps UI text legible at about
+      // a tenth of the PNG size; a request field can follow if callers need it.
+      let rgb = image::DynamicImage::ImageRgba8(pixels).to_rgb8();
+      let mut data = Vec::new();
+      image::codecs::jpeg::JpegEncoder::new_with_quality(&mut data, 85)
+        .write_image(rgb.as_raw(), width, height, image::ExtendedColorType::Rgb8)
+        .map_err(|error| Status::internal(format!("JPEG encoding failed: {error}")))?;
+      Ok(encoded(image_proto::ImageEncoding::Jpeg, data))
+    }
   }
 }
 
@@ -2112,13 +2197,30 @@ fn rect_to_proto(rect: auv_driver::Rect) -> proto::ScreenRect {
 
 #[tonic::async_trait]
 impl CaptureService for LocalCaptureService {
+  async fn get_capture_image(
+    &self,
+    request: Request<proto::GetCaptureImageRequest>,
+  ) -> Result<Response<proto::GetCaptureImageResponse>, Status> {
+    let request = request.into_inner();
+    let capture = stored_capture(&self.captures, request.capture.ok_or_else(|| Status::invalid_argument("capture is required"))?)?;
+    let region = ratio_rect_from_proto(request.region)?;
+    let encoding = auv_api_proto::auv::api::image::v1::ImageEncoding::try_from(request.encoding)
+      .map_err(|_| Status::invalid_argument("encoding is not a known ImageEncoding"))?;
+    // Encoding a Retina capture takes long enough to stall the current-thread
+    // Runner runtime, so it runs on the blocking pool.
+    let response = tokio::task::spawn_blocking(move || capture_image_to_proto(&capture, region, request.max_size, encoding))
+      .await
+      .map_err(|error| Status::internal(format!("capture image task failed: {error}")))??;
+    Ok(Response::new(response))
+  }
+
   async fn capture_window(&self, request: Request<proto::CaptureWindowRequest>) -> Result<Response<proto::CaptureWindowResponse>, Status> {
     let request = request.into_inner();
     let window = resolve_window_ref(&self.session, request.window.ok_or_else(|| Status::invalid_argument("window is required"))?)?;
     let capture = self.session.window().capture(&window).map_err(driver_status)?;
     Ok(Response::new(proto::CaptureWindowResponse {
       window: Some(window_to_proto(window)),
-      capture: Some(capture_to_proto(capture)),
+      capture: Some(stored_capture_to_proto(&self.captures, capture)),
     }))
   }
 
@@ -2137,7 +2239,7 @@ impl CaptureService for LocalCaptureService {
       .map_err(driver_status)?;
     Ok(Response::new(proto::CaptureDisplayResponse {
       display: Some(display_to_proto(captured.display)),
-      capture: Some(capture_to_proto(captured.capture)),
+      capture: Some(stored_capture_to_proto(&self.captures, captured.capture)),
     }))
   }
 
@@ -2156,7 +2258,7 @@ impl CaptureService for LocalCaptureService {
       .map_err(driver_status)?;
     Ok(Response::new(proto::CaptureRegionResponse {
       display: Some(display_to_proto(captured.display)),
-      capture: Some(capture_to_proto(captured.capture)),
+      capture: Some(stored_capture_to_proto(&self.captures, captured.capture)),
     }))
   }
 }
@@ -2259,16 +2361,31 @@ fn display_to_proto(display: auv_driver::Display) -> proto::Display {
   }
 }
 
+/// A capture with its pixels, for callers that explicitly asked for them.
 pub(super) fn capture_to_proto(capture: auv_driver::Capture) -> proto::CapturedFrame {
-  let width = capture.image.width();
-  let height = capture.image.height();
+  let mut frame = capture_metadata_to_proto(&capture);
+  frame.image = Some(auv_api_proto::auv::api::image::v1::RgbaFrame {
+    width: capture.image.width(),
+    height: capture.image.height(),
+    data: capture.image.into_raw(),
+  });
+  frame
+}
+
+/// Stores a capture and returns its reference and metadata, without pixels
+/// (see "Image Payloads" in AGENTS.md).
+fn stored_capture_to_proto(captures: &CaptureStore, capture: auv_driver::Capture) -> proto::CapturedFrame {
+  let mut frame = capture_metadata_to_proto(&capture);
+  frame.r#ref = Some(proto::CaptureRef {
+    capture_id: captures.insert(capture),
+  });
+  frame
+}
+
+fn capture_metadata_to_proto(capture: &auv_driver::Capture) -> proto::CapturedFrame {
   proto::CapturedFrame {
-    origin: capture.origin.map(position_to_proto),
-    image: Some(auv_api_proto::auv::api::image::v1::RgbaFrame {
-      width,
-      height,
-      data: capture.image.into_raw(),
-    }),
+    origin: capture.origin.clone().map(position_to_proto),
+    image: None,
     bounds: Some(proto::ScreenRect {
       x: capture.bounds.origin.x,
       y: capture.bounds.origin.y,
@@ -2276,8 +2393,13 @@ pub(super) fn capture_to_proto(capture: auv_driver::Capture) -> proto::CapturedF
       height: capture.bounds.size.height,
     }),
     scale_factor: capture.scale_factor,
-    backend: capture.backend,
-    fallback_reason: capture.fallback_reason,
+    backend: capture.backend.clone(),
+    fallback_reason: capture.fallback_reason.clone(),
+    r#ref: None,
+    pixel_size: Some(auv_api_proto::auv::api::image::v1::PixelSize {
+      width: capture.image.width(),
+      height: capture.image.height(),
+    }),
   }
 }
 
@@ -2312,6 +2434,16 @@ pub(super) async fn serve_inherited() -> Result<(), String> {
   let portal_state_root = std::env::var_os(super::STATE_ROOT_ENV).map(|root| std::path::PathBuf::from(root).join("portal"));
   let driver = auv::local::driver(portal_state_root).map_err(|error| error.to_string())?;
   let session = driver.open_local().map_err(|error| format!("failed to open local driver: {error}"))?;
+  let captures = CaptureStore::new(CaptureStoreOptions::from_env());
+  // Expiry also runs on inserts and reads; the sweep frees an idle Runner.
+  let sweeper = captures.clone();
+  tokio::spawn(async move {
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+    loop {
+      interval.tick().await;
+      sweeper.sweep();
+    }
+  });
   let display = DisplayServiceServer::new(LocalDisplayService {
     session: session.clone(),
   });
@@ -2320,14 +2452,14 @@ pub(super) async fn serve_inherited() -> Result<(), String> {
   });
   let text_recognition = TextRecognitionServiceServer::new(LocalTextRecognitionService {
     session: session.clone(),
+    captures: captures.clone(),
   })
   .max_decoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED)
   .max_encoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED);
-  // ScrollUntil observations carry full window captures by default.
   let input = InputServiceServer::new(LocalInputService {
     session: session.clone(),
-  })
-  .max_encoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED);
+    captures: captures.clone(),
+  });
   let permission = PermissionServiceServer::new(LocalPermissionService {
     session: session.clone(),
   });
@@ -2343,8 +2475,9 @@ pub(super) async fn serve_inherited() -> Result<(), String> {
     owner_thread: std::thread::current().id(),
   });
   let recent_frames_service = super::recent_frames::Service::new(session.clone());
-  let capture =
-    CaptureServiceServer::new(LocalCaptureService { session }).max_encoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED);
+  // GetCaptureImage can return full-resolution RGBA on explicit request.
+  let capture = CaptureServiceServer::new(LocalCaptureService { session, captures })
+    .max_encoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED);
   let recent_frames = RecentFramesServiceServer::new(recent_frames_service.clone())
     .max_decoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED)
     .max_encoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED);

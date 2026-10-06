@@ -252,11 +252,11 @@ fn invalid_requests_are_rejected_before_any_input() {
 }
 
 #[test]
-fn observer_sees_every_observation_with_capture_and_text_by_default() {
+fn observer_sees_every_observation_with_text_by_default() {
   let mut list = FakeList::new(260);
   let mut seen = Vec::new();
   scroll_until(&mut list, &request(ScrollUntilCondition::End), &mut |observation| {
-    assert!(observation.capture.is_some() && observation.text.is_some(), "{observation:?}");
+    assert!(observation.text.is_some(), "{observation:?}");
     seen.push((observation.steps, observation.motion.is_some(), observation.stop));
     Ok(ScrollUntilDecision::Continue)
   })
@@ -325,15 +325,12 @@ fn observer_errors_abort_the_loop() {
 }
 
 #[test]
-fn opted_out_observations_skip_capture_and_recognition() {
+fn opted_out_observations_skip_recognition() {
   let mut list = FakeList::new(260);
   let mut end = request(ScrollUntilCondition::End);
-  end.observe = ScrollUntilObserve {
-    capture: false,
-    text: false,
-  };
+  end.observe = ScrollUntilObserve { text: false };
   scroll_until(&mut list, &end, &mut |observation| {
-    assert!(observation.capture.is_none() && observation.text.is_none());
+    assert!(observation.text.is_none());
     Ok(ScrollUntilDecision::Continue)
   })
   .unwrap();

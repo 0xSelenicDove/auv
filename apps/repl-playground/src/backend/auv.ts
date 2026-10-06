@@ -3,7 +3,7 @@ import type { AuvClient, AuvConnection, Device, RunnerClient, WindowClient } fro
 import type { ClickOptions, Point, Rect, ScrollDelta, ScrollObservation, WindowSelector } from '../script-api/api'
 import type { Backend, CapturedFrame, DisplayInfo, InputReceipt, NormalizedRect, RunOutcomeKind, ScrollUntilOutcome, ScrollUntilRequest, TextSearchResult, WindowInfo } from './types'
 
-import { AuvRemoteError, connect, createAuv, createHttpTransport, InputDeliveryPath, MouseButton, pairDevice, ScrollUntilStopReason } from '@auv-js/sdk'
+import { AuvRemoteError, connect, createAuv, createHttpTransport, ImageEncoding, InputDeliveryPath, MouseButton, pairDevice, ScrollUntilStopReason } from '@auv-js/sdk'
 
 type CaptureResponse = Awaited<ReturnType<RunnerClient['displays']['capture']>>
 type NativeAction = Awaited<ReturnType<RunnerClient['input']['typeText']>>['action']
@@ -73,6 +73,13 @@ class AuvBackend implements Backend {
     return toFrame(response.capture, `display:${response.display?.displayId ?? displayId ?? 'primary'}`)
   }
 
+  async captureImage(frame: CapturedFrame, maxSize: { height: number, width: number }): Promise<Blob> {
+    // JPEG keeps a logical-resolution Retina window around 0.3–1 MB; PNG text
+    // edges are crisper but several times larger and slower to encode.
+    const image = await this.#runner.captures.image(frame.ref, { encoding: ImageEncoding.JPEG, maxSize })
+    return new Blob([image.data as Uint8Array<ArrayBuffer>], { type: 'image/jpeg' })
+  }
+
   async captureWindow(windowId: string): Promise<CapturedFrame> {
     const window = this.#runner.windows.from(windowId)
     const captured = await window.capture()
@@ -140,9 +147,7 @@ class AuvBackend implements Backend {
   }
 
   async recognizeText(frame: CapturedFrame, region?: NormalizedRect): Promise<TextSearchResult> {
-    if (!frame.native)
-      throw new Error('This frame did not come from AUV and cannot be sent to the recognizer')
-    return toRecognized(await this.#runner.recognizeText(frame.native as NativeFrame, region ? { region } : undefined))
+    return toRecognized(await this.#runner.recognizeText(frame.ref, region ? { region } : undefined))
   }
 
   async resolveWindow(selector: WindowSelector): Promise<WindowInfo> {
@@ -284,14 +289,13 @@ function toDuration(ms: number) {
 }
 
 function toFrame(capture: NativeFrame | undefined, source: string): CapturedFrame {
-  if (!capture?.image)
-    throw new Error('AUV returned a capture without pixels')
-  const { data, height, width } = capture.image
+  if (!capture?.ref)
+    throw new Error('AUV returned a capture without a reference')
+  const { height = 0, width = 0 } = capture.pixelSize ?? {}
   return {
     bounds: toRect(capture.bounds) ?? { height, width, x: 0, y: 0 },
     height,
-    native: capture,
-    rgba: data,
+    ref: capture.ref.captureId,
     scale: capture.scaleFactor || 1,
     source,
     width,

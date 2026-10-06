@@ -1,6 +1,7 @@
 # Capture references and positions
 
-Status: proposed (2026-10-06). Names marked *provisional* are open for review.
+Status: Part A implemented (2026-10-07, branch `feat/capture-refs`); Part B
+proposed. Names marked *provisional* are open for review.
 
 This note proposes two related simplifications of the driver API:
 
@@ -60,15 +61,18 @@ The rule this design follows is now in `AGENTS.md` ("Image Payloads", #251).
   Runner. The local Runner (`auv.core.local`) is persistent, so local
   references work across Runs.
 - **Capture store** (*provisional*): an in-memory, least-recently-used cache in
-  the Runner, bounded by bytes.
+  the Runner, bounded by bytes
+  (`crates/auv-cli/src/runner/capture_store.rs`).
   - It holds every capture the Runner produces: window, display and region
     captures, find-text evidence, and scroll-until steps.
-  - An evicted or unknown reference fails with `NOT_FOUND` ("capture
-    evicted").
-  - Default budget: 512 MiB. That is about 20 Retina window captures or 6
-    display captures.
-  - There is no release RPC in this slice. Eviction and Runner shutdown are the
-    only ways a capture leaves the store.
+  - An evicted, expired or unknown reference fails with `NOT_FOUND` ("… was
+    evicted, expired, or produced by another Runner; capture again").
+  - Default budget: 512 MiB (`AUV_CAPTURE_STORE_BUDGET_MIB`). That is about 20
+    Retina window captures or 6 display captures.
+  - Captures unused for 10 minutes expire (`AUV_CAPTURE_STORE_IDLE_SECONDS`); a
+    60 s sweeper returns the memory of an idle Runner.
+  - There is no release RPC. Eviction, expiry and Runner shutdown are the only
+    ways a capture leaves the store.
 - **Capture image fetch**: an explicit request for pixels, possibly bounded and
   encoded.
 
@@ -121,9 +125,13 @@ return `CapturedFrame` with `ref` and metadata, without `image`.
 nothing to return. A caller that wants pixels makes an explicit
 `GetCaptureImage` call.
 
-Two deferrals keep this slice focused:
+Deferrals that keep this slice focused:
 
-- `TODO(capture-store-release)`: there is no explicit release RPC. Add one
+- `TODO(capture-store-run-release)`: the owner approved freeing a Run's
+  captures when the Run ends, but Runners cannot see Runs (the daemon strips
+  the `auv-run-id` header before forwarding). Idle expiry stands in until
+  Runners receive Run identity and stop notifications.
+- There is no explicit release RPC (owner decision, 2026-10-06). Add one only
   when a long-running client needs to free memory before eviction.
 - `TODO(recent-frames-capture-refs)`: `GetRecentFrames` still returns frames
   with pixels. Frames should enter the capture store and travel as
@@ -137,8 +145,9 @@ Two deferrals keep this slice focused:
 | Rust `recognize_text` | Takes `auv_driver::Capture` | Takes a capture reference, or a caller-owned `Capture` |
 | `auv-cli-invoke` artifacts (`display.capture`, `screen.captureRegion`, find-text) | Writes a PNG from response pixels | Explicitly fetches PNG-encoded bytes via `GetCaptureImage` |
 | `auv-game-balatro` OCR | Captures, then `recognize_text(capture)` (round trip) | `recognize_text(reference, region)` |
-| JS SDK | `capture()` returns pixels; `recognizeText(frame)` | `capture()` returns metadata plus `ref`; `runner.captures.image(ref, { maxSize, encoding })`; `recognizeText(ref)` |
-| repl-playground | Decodes 25 MB RGBA per capture; keeps raw pixels within a budget for OCR | Fetches a logical-resolution PNG/JPEG thumbnail; `createImageBitmap(blob)` decodes off the main thread; OCR by reference; the raw-frame budget is deleted |
+| `auv-scan` scroll-until | `observe.capture` opt-out; `capture: Option<Capture>` | Every observation carries its capture (the loop captures each step for motion anyway); `observe` keeps only `text` |
+| JS SDK | `capture()` returns pixels; `recognizeText(frame)` | `capture()` returns metadata plus `ref`; `runner.captures.image(frame, { maxSize, encoding })`; `recognizeText(frame)` by reference, `recognizeText({ frame })` for caller-owned pixels |
+| repl-playground | Decodes 25 MB RGBA per capture; keeps raw pixels within a budget for OCR | Fetches a logical-resolution JPEG; `createImageBitmap(blob)` decodes off the main thread; OCR by reference; the raw-frame budget is deleted; replay records images by reference outside the ordered call log |
 
 Run recording keeps its current shape in this slice. `auv-cli-invoke`
 persists PNG artifacts, now by explicit fetch. Persisting evidence on the AUV
@@ -216,12 +225,18 @@ Each slice updates `TERMS_AND_CONCEPTS.md`, the SDK README and
   (archived) describes `RecognizeText` consuming a typed capture. It is already
   archived and needs no change.
 
-## Open questions
+## Decisions and open questions
+
+Decided by the owner on 2026-10-06:
+
+- The store budget is 512 MiB and configurable on the Runner (environment
+  variable, above).
+- JPEG quality is fixed at 85 (`NOTICE(capture-jpeg-quality)`).
+- No release RPC.
+- Captures should be freed when their Run ends; deferred as
+  `TODO(capture-store-run-release)` (see above).
+
+Still open:
 
 - **Names.** `CaptureRef`, "capture store" and `GetCaptureImage` are
   provisional.
-- **Store budget.** Is 512 MiB right? Should it be a Runner option?
-- **Encodings.** Should JPEG quality be fixed (for example 85), or a request
-  field?
-- **Release RPC.** Should the store ever need explicit release, or is LRU
-  eviction enough until the video stream lands?

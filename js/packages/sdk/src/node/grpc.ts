@@ -126,7 +126,10 @@ function grpcError(error: ServiceError): AuvRpcError {
 }
 
 function grpcTransport(target: string, credentials: ChannelCredentials): Transport {
-  const client = new Client(target, credentials)
+  // NOTICE(grpc-message-size): grpc-js rejects messages over 4 MiB by default,
+  // smaller than one full-resolution `GetCaptureImage` RGBA frame (a 6K
+  // display is ~80 MB). Match the Rust clients' `GRPC_MESSAGE_SIZE_UNLIMITED`.
+  const client = new Client(target, credentials, { 'grpc.max_receive_message_length': -1, 'grpc.max_send_message_length': -1 })
   return {
     close() {
       client.close()

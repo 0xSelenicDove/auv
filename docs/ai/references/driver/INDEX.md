@@ -77,8 +77,9 @@ Count: **64**
 - [`2026-10-03-wgc-gpu-load-degradation.md`](2026-10-03-wgc-gpu-load-degradation.md): GPU 负载下 WGC vs GDI 延迟与退化比实测报告（RTX 4070 Ti 100% 满载下 WGC P50 为 11.28ms，退化比 1.05x，新帧率 100%）。
 - [`2026-10-06-scroll-motion-design.md`](2026-10-06-scroll-motion-design.md): Timed scroll (timing functions, cumulative quantization, `ScrollWindowPointMotion`, `input.scroll --duration-ms`), Linux uinput high-resolution wheel, live velocity control (`StreamScroll`, SDK `scrollWith` generators), scroll-until (`ScrollUntil` with observations and client predicates, `input.scrollUntil`, shared viewport pixel motion), and live evidence on macOS, Windows, and Linux (Linux with the #246 capture fix).
 - [`2026-10-06-capture-references-and-positions-design.md`](2026-10-06-capture-references-and-positions-design.md)
-  (proposed: captures stay in the Runner and travel as references; one
-  `Position`-based coordinate model)
+  (Part A implemented: captures stay in the Runner's capture store and travel
+  as `CaptureRef`s, `GetCaptureImage` is the only pixel transfer; Part B
+  proposed: one `Position`-based coordinate model)
 - [`2026-10-06-scroll-delta-contract.md`](2026-10-06-scroll-delta-contract.md): Scroll delta convention (logical px, positive = down) and its implementation across drivers, `ScrollWindowPoint`, `input.scroll`, and the JS SDK; Playwright/CUA comparison; macOS Chrome/Electron and Windows Edge evidence (occlusion backgrounding blocks macOS background scroll; Windows posted wheel reaches Chromium only in the foreground; Linux portal and uinput fixed to discrete 120 px notches on GNOME).
 - [qqmusic-background-control.md](qqmusic-background-control.md): Living document tracking QQ Music background control without stealing foreground focus across SMTC, CoreAudio, and UIA phases.
 - [windows-capture-parity.md](windows-capture-parity.md): Living document tracking Windows capture latency parity with macOS ScreenCaptureKit across baseline, WGC v1, and GPU-load degradation phases.

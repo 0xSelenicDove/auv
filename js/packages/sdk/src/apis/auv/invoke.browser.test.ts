@@ -45,14 +45,16 @@ describe('typed remote invoke from a browser', () => {
     try {
       const auv = createAuv(connection).runner({ runnerClass: 'auv.core.local' })
       const recognition = await auv.recognizeText({
-        backend: 'auv-js-integration',
-        bounds: { height: 16, width: 64, x: 0, y: 0 },
-        image: {
-          data: new Uint8Array(64 * 16 * 4).fill(255),
-          height: 16,
-          width: 64,
+        frame: {
+          backend: 'auv-js-integration',
+          bounds: { height: 16, width: 64, x: 0, y: 0 },
+          image: {
+            data: new Uint8Array(64 * 16 * 4).fill(255),
+            height: 16,
+            width: 64,
+          },
+          scaleFactor: 1,
         },
-        scaleFactor: 1,
       })
       expect(recognition.$typeName).toBe('auv.api.driver.v1.RecognizeTextResponse')
       expect(recognition.text).toBe('')

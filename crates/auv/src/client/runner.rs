@@ -11,7 +11,16 @@ use auv_api_proto::auv::api::driver::v1 as proto;
 
 use crate::error::ClientError;
 
-/// Message-size policy for Runner RPCs that carry raw image frames.
+mod capture;
+
+use capture::runner_capture_from_proto;
+pub use capture::{
+  CaptureImage, CaptureImageEncoding, CaptureImageOptions, CaptureRef, CapturesClient, DisplayCapture, RecognitionSource, RegionCapture,
+  RunnerCapture,
+};
+
+/// Message-size policy for Runner RPCs that carry raw image frames
+/// (`GetCaptureImage`, and `RecognizeText` over a caller-owned image).
 ///
 /// Tonic defaults decoded responses to 4 MiB, which is smaller than one
 /// ordinary desktop RGBA capture. Runner servers already use this project-wide
@@ -87,8 +96,8 @@ pub struct DisplayTextRecognition {
   pub display: auv_driver::Display,
   /// Query matches.
   pub matches: auv_driver::OcrMatches,
-  /// Source capture used as evidence.
-  pub capture: auv_driver::Capture,
+  /// Source capture used as evidence, held by the Runner.
+  pub capture: RunnerCapture,
 }
 
 /// Typed result of finding text in a resolved window.
@@ -98,8 +107,8 @@ pub struct WindowTextRecognition {
   pub window: auv_driver::Window,
   /// Query matches.
   pub matches: auv_driver::OcrMatches,
-  /// Source capture used as evidence.
-  pub capture: auv_driver::Capture,
+  /// Source capture used as evidence, held by the Runner.
+  pub capture: RunnerCapture,
 }
 
 /// Typed capture of a resolved window.
@@ -107,8 +116,8 @@ pub struct WindowTextRecognition {
 pub struct WindowCapture {
   /// Resolved source window.
   pub window: auv_driver::Window,
-  /// Captured pixels and bounds.
-  pub capture: auv_driver::Capture,
+  /// The capture, held by the Runner; fetch pixels with [`RunnerClient::captures`].
+  pub capture: RunnerCapture,
 }
 
 /// Typed result of a delivered screen-point click.
@@ -257,10 +266,30 @@ pub enum ScrollUntilEvent {
   /// One observation, in order. When `awaiting_decision` is set, the Runner
   /// waits for [`ScrollUntilSession::decide`] before continuing.
   Observation {
-    observation: auv_scan::ScrollUntilObservation,
+    observation: ScrollUntilObservation,
     awaiting_decision: bool,
   },
   Completed(auv_scan::ScrollUntilResult),
+}
+
+/// What a Runner's scroll-until loop saw at one point. Mirrors
+/// [`auv_scan::ScrollUntilObservation`], with the capture held by the Runner.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScrollUntilObservation {
+  /// Steps delivered so far.
+  pub steps: u32,
+  /// Logical pixels delivered so far.
+  pub delivered: auv_driver::Scroll,
+  /// Motion since the previous observation; `None` before the first step.
+  pub motion: Option<auv_scan::ViewportPixelMotion>,
+  pub no_motion_streak: u32,
+  /// The window capture this observation was made from.
+  pub capture: RunnerCapture,
+  /// Text recognized in the capture, unless opted out. Region bounds are
+  /// offsets from the recognition origin.
+  pub text: Option<auv_driver::TextRecognition>,
+  /// Set when a built-in condition or the budget ends the loop here.
+  pub stop: Option<auv_scan::ScrollUntilStopReason>,
 }
 
 /// Caller side of a scroll-until operation. Dropping the session disconnects;
@@ -379,7 +408,7 @@ impl RunnerClient {
     self.client.routed_transport(self.route.clone()).map_err(capability_status)
   }
 
-  fn transport(&self) -> Result<auv_api_client::RoutedTransport, CapabilityError> {
+  pub(super) fn transport(&self) -> Result<auv_api_client::RoutedTransport, CapabilityError> {
     self.extension_transport()
   }
 
@@ -418,19 +447,33 @@ impl RunnerClient {
     }
   }
 
-  /// Runs OCR against a capture already obtained from this Runner.
+  /// Returns explicit pixel access for captures this Runner holds.
+  pub fn captures(&self) -> CapturesClient {
+    CapturesClient {
+      runner: self.clone(),
+    }
+  }
+
+  /// Runs OCR on a capture this Runner holds (by reference; no pixels travel)
+  /// or on a caller-owned image (pixels are sent).
   pub async fn recognize_text(
     &self,
-    capture: auv_driver::Capture,
+    source: impl Into<RecognitionSource>,
     region: Option<NormalizedRegion>,
     custom_words: Vec<String>,
     recognition_languages: Vec<String>,
   ) -> Result<auv_driver::TextRecognition, CapabilityError> {
+    use proto::recognize_text_request::Source;
+    let source = match source.into() {
+      RecognitionSource::Capture(reference) => Source::CaptureRef(proto::CaptureRef {
+        capture_id: reference.id().to_string(),
+      }),
+      RecognitionSource::Image(image) => Source::Capture(capture_to_proto(image)),
+    };
     let response = proto::text_recognition_service_client::TextRecognitionServiceClient::new(self.transport()?)
-      .max_decoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
       .max_encoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
       .recognize_text(proto::RecognizeTextRequest {
-        capture: Some(capture_to_proto(capture)?),
+        source: Some(source),
         region: region.map(normalized_region_to_proto),
         custom_words,
         recognition_languages,
@@ -630,31 +673,23 @@ impl DisplaysClient {
   }
 
   /// Captures one selected or primary display.
-  pub async fn capture(&self, selector: Option<DisplaySelector>) -> Result<auv_driver::DisplayCapture, CapabilityError> {
+  pub async fn capture(&self, selector: Option<DisplaySelector>) -> Result<DisplayCapture, CapabilityError> {
     let response = proto::capture_service_client::CaptureServiceClient::new(self.runner.transport()?)
-      .max_decoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
-      .max_encoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
       .capture_display(proto::CaptureDisplayRequest {
         selector: selector.map(display_selector_to_proto),
       })
       .await
       .map_err(capability_status)?
       .into_inner();
-    Ok(auv_driver::DisplayCapture {
+    Ok(DisplayCapture {
       display: display_from_proto(required(response.display, "CaptureDisplay response omitted Display")?)?,
-      capture: capture_from_proto(required(response.capture, "CaptureDisplay response omitted CapturedFrame")?)?,
+      capture: runner_capture_from_proto(required(response.capture, "CaptureDisplay response omitted CapturedFrame")?)?,
     })
   }
 
   /// Captures a screen-coordinate region on one display.
-  pub async fn capture_region(
-    &self,
-    region: auv_driver::Rect,
-    selector: Option<DisplaySelector>,
-  ) -> Result<auv_driver::RegionCapture, CapabilityError> {
+  pub async fn capture_region(&self, region: auv_driver::Rect, selector: Option<DisplaySelector>) -> Result<RegionCapture, CapabilityError> {
     let response = proto::capture_service_client::CaptureServiceClient::new(self.runner.transport()?)
-      .max_decoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
-      .max_encoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
       .capture_region(proto::CaptureRegionRequest {
         region: Some(rect_to_proto(region)),
         selector: selector.map(display_selector_to_proto),
@@ -662,9 +697,9 @@ impl DisplaysClient {
       .await
       .map_err(capability_status)?
       .into_inner();
-    Ok(auv_driver::RegionCapture {
+    Ok(RegionCapture {
       display: display_from_proto(required(response.display, "CaptureRegion response omitted Display")?)?,
-      capture: capture_from_proto(required(response.capture, "CaptureRegion response omitted CapturedFrame")?)?,
+      capture: runner_capture_from_proto(required(response.capture, "CaptureRegion response omitted CapturedFrame")?)?,
     })
   }
 
@@ -685,8 +720,6 @@ impl DisplaysClient {
     options: FindTextOptions,
   ) -> Result<DisplayTextRecognition, CapabilityError> {
     let response = proto::text_recognition_service_client::TextRecognitionServiceClient::new(self.runner.transport()?)
-      .max_decoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
-      .max_encoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
       .find_display_text(proto::FindDisplayTextRequest {
         selector: selector.map(display_selector_to_proto),
         query: query.into(),
@@ -700,7 +733,7 @@ impl DisplaysClient {
     Ok(DisplayTextRecognition {
       display: display_from_proto(required(response.display, "FindDisplayText response omitted Display")?)?,
       matches: ocr_matches_from_proto(response.matches)?,
-      capture: capture_from_proto(required(response.capture, "FindDisplayText response omitted source capture")?)?,
+      capture: runner_capture_from_proto(required(response.capture, "FindDisplayText response omitted source capture")?)?,
     })
   }
 }
@@ -799,8 +832,6 @@ impl WindowClient {
   /// Captures the resolved window.
   pub async fn capture(&self) -> Result<WindowCapture, CapabilityError> {
     let response = proto::capture_service_client::CaptureServiceClient::new(self.runner.transport()?)
-      .max_decoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
-      .max_encoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
       .capture_window(proto::CaptureWindowRequest {
         window: Some(self.window_ref.clone()),
       })
@@ -809,7 +840,7 @@ impl WindowClient {
       .into_inner();
     Ok(WindowCapture {
       window: window_from_proto(required(response.window, "CaptureWindow response omitted Window")?)?,
-      capture: capture_from_proto(required(response.capture, "CaptureWindow response omitted CapturedFrame")?)?,
+      capture: runner_capture_from_proto(required(response.capture, "CaptureWindow response omitted CapturedFrame")?)?,
     })
   }
 
@@ -821,8 +852,6 @@ impl WindowClient {
   /// Finds text using explicit recognition options.
   pub async fn find_text_with(&self, query: impl Into<String>, options: FindTextOptions) -> Result<WindowTextRecognition, CapabilityError> {
     let response = proto::text_recognition_service_client::TextRecognitionServiceClient::new(self.runner.transport()?)
-      .max_decoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
-      .max_encoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
       .find_window_text(proto::FindWindowTextRequest {
         window: Some(self.window_ref.clone()),
         query: query.into(),
@@ -836,7 +865,7 @@ impl WindowClient {
     Ok(WindowTextRecognition {
       window: window_from_proto(required(response.window, "FindWindowText response omitted Window")?)?,
       matches: ocr_matches_from_proto(response.matches)?,
-      capture: capture_from_proto(required(response.capture, "FindWindowText response omitted source capture")?)?,
+      capture: runner_capture_from_proto(required(response.capture, "FindWindowText response omitted source capture")?)?,
     })
   }
 
@@ -948,7 +977,6 @@ impl WindowClient {
       .await
       .map_err(|_| CapabilityError::InvalidResponse("ScrollUntil request stream failed to open".into()))?;
     let responses = proto::input_service_client::InputServiceClient::new(self.runner.transport()?)
-      .max_decoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
       .scroll_until(tokio_stream::wrappers::ReceiverStream::new(receiver))
       .await
       .map_err(capability_status)?
@@ -967,7 +995,7 @@ impl WindowClient {
     point: auv_driver::WindowPoint,
     request: auv_scan::ScrollUntilRequest,
     options: auv_driver::ScrollOptions,
-    mut predicate: impl FnMut(&auv_scan::ScrollUntilObservation) -> bool,
+    mut predicate: impl FnMut(&ScrollUntilObservation) -> bool,
   ) -> Result<auv_scan::ScrollUntilResult, CapabilityError> {
     let mut session = self.scroll_until(point, request, options, true).await?;
     while let Some(event) = session.next().await? {
@@ -2088,7 +2116,6 @@ fn scroll_until_begin_to_proto(
     }),
     options: Some(scroll_options_to_proto(options)?),
     observe: Some(proto::ScrollUntilObserve {
-      omit_capture: !request.observe.capture,
       omit_text: !request.observe.text,
     }),
     await_decisions,
@@ -2118,12 +2145,12 @@ fn scroll_until_event_from_proto(value: proto::ScrollUntilResponse) -> Result<Sc
   };
   match required(value.event, "ScrollUntil response omitted event")? {
     Event::Observation(value) => Ok(ScrollUntilEvent::Observation {
-      observation: auv_scan::ScrollUntilObservation {
+      observation: ScrollUntilObservation {
         steps: value.steps,
         delivered: scroll(value.delivered, "scroll-until observation omitted delivered")?,
         motion: value.motion.map(motion),
         no_motion_streak: value.no_motion_streak,
-        capture: value.capture.map(capture_from_proto).transpose()?,
+        capture: runner_capture_from_proto(required(value.capture, "scroll-until observation omitted its capture")?)?,
         text: value.text.map(text_recognition_from_proto).transpose()?,
         stop: scroll_until_stop_reason_from_proto(value.stop)?,
       },
@@ -2277,36 +2304,23 @@ fn window_from_proto(window: proto::Window) -> Result<auv_driver::Window, Capabi
   })
 }
 
-fn capture_from_proto(capture: proto::CapturedFrame) -> Result<auv_driver::Capture, CapabilityError> {
-  let image = required(capture.image, "CapturedFrame omitted its RGBA image")?;
-  let bounds = required(capture.bounds, "CapturedFrame omitted its screen bounds")?;
-  let image = image::RgbaImage::from_raw(image.width, image.height, image.data)
-    .ok_or_else(|| CapabilityError::InvalidResponse("CapturedFrame contains malformed RGBA8 data".to_string()))?;
-  Ok(auv_driver::Capture {
-    origin: capture.origin.map(position_from_proto).transpose()?,
-    image,
-    bounds: auv_driver::Rect::new(bounds.x, bounds.y, bounds.width, bounds.height),
-    scale_factor: capture.scale_factor,
-    backend: capture.backend,
-    fallback_reason: capture.fallback_reason,
-  })
-}
-
-fn capture_to_proto(capture: auv_driver::Capture) -> Result<proto::CapturedFrame, CapabilityError> {
-  let width = capture.image.width();
-  let height = capture.image.height();
-  Ok(proto::CapturedFrame {
+/// A caller-owned image for `RecognizeText`; it has no capture reference.
+fn capture_to_proto(capture: auv_driver::Capture) -> proto::CapturedFrame {
+  let (width, height) = capture.image.dimensions();
+  proto::CapturedFrame {
+    r#ref: None,
     origin: capture.origin.map(position_to_proto),
     image: Some(auv_api_proto::auv::api::image::v1::RgbaFrame {
       width,
       height,
       data: capture.image.into_raw(),
     }),
+    pixel_size: Some(auv_api_proto::auv::api::image::v1::PixelSize { width, height }),
     bounds: Some(rect_to_proto(capture.bounds)),
     scale_factor: capture.scale_factor,
     backend: capture.backend,
     fallback_reason: capture.fallback_reason,
-  })
+  }
 }
 
 fn ocr_matches_from_proto(matches: Vec<proto::TextMatch>) -> Result<auv_driver::OcrMatches, CapabilityError> {

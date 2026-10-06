@@ -14,6 +14,7 @@ export {
 } from '../../gen/auv/api/driver/v1/input_pb'
 
 export { BuiltInCursor, Easing } from '../../gen/auv/api/driver/v1/overlay_pb'
+export { ImageEncoding } from '../../gen/auv/api/image/v1/image_pb'
 export { createAuv } from './client'
 
 export type { AuvClient, CreateClientOptions } from './client'
@@ -27,9 +28,13 @@ export type {
 } from './discover'
 export { createRunnerClient } from './driver'
 export type {
+  CaptureImage,
+  CaptureImageOptions,
+  CaptureTarget,
   FindDisplayTextOptions,
   FindWindowTextOptions,
   PressKeyOptions,
+  RecognitionSource,
   RecognizeTextOptions,
   RunnerClient,
   RunnerRouteOptions,

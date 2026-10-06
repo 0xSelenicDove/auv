@@ -10,7 +10,7 @@ import type { DurationSchema } from '@bufbuild/protobuf/wkt'
 
 import type { FocusTextRequestSchema } from '../../gen/auv/api/driver/macos/v1/accessibility_pb'
 import type { ActivateBundleIdRequestSchema } from '../../gen/auv/api/driver/macos/v1/application_pb'
-import type { CapturedFrameSchema } from '../../gen/auv/api/driver/v1/capture_pb'
+import type { CapturedFrameSchema, CaptureRefSchema, GetCaptureImageRequestSchema } from '../../gen/auv/api/driver/v1/capture_pb'
 import type { Display, DisplaySelectorSchema } from '../../gen/auv/api/driver/v1/display_pb'
 import type { ScreenPointSchema, ScreenRectSchema, WindowPointSchema } from '../../gen/auv/api/driver/v1/geometry_pb'
 import type {
@@ -54,18 +54,48 @@ import { InputService } from '../../gen/auv/api/driver/v1/input_pb'
 import { OverlayService } from '../../gen/auv/api/driver/v1/overlay_pb'
 import { TextRecognitionService } from '../../gen/auv/api/driver/v1/text_recognition_pb'
 import { WindowSchema, WindowService } from '../../gen/auv/api/driver/v1/window_pb'
+import { ImageEncoding } from '../../gen/auv/api/image/v1/image_pb'
 import { AuvProtocolError, AuvRpcError } from '../../transport/errors'
 import { invokeDuplex, invokeServerStream, invokeUnary } from './invoke'
 
+/** Pixels fetched from the Runner. `data` is RGBA8 rows for `ImageEncoding.RGBA`, otherwise PNG or JPEG bytes. */
+export interface CaptureImage {
+  data: Uint8Array
+  encoding: ImageEncoding
+  height: number
+  width: number
+}
+/** How `captures.image` shapes pixels: crop to `region`, fit inside `maxSize`, then encode (RGBA by default). */
+export interface CaptureImageOptions extends InputFields<typeof GetCaptureImageRequestSchema, 'capture'>, OperationOptions {}
+/**
+ * A capture held by the Runner: its ID, its `CaptureRef`, or a `CapturedFrame`
+ * returned by a capture, find-text, or scroll-until call (structurally typed,
+ * so plain objects work).
+ */
+export type CaptureTarget = string | { captureId: string } | { ref?: { captureId: string } }
+
 export interface FindDisplayTextOptions extends InputFields<typeof FindDisplayTextRequestSchema, 'query' | 'selector'>, OperationOptions {}
+
 export interface FindWindowTextOptions extends InputFields<typeof FindWindowTextRequestSchema, 'query' | 'window'>, OperationOptions {}
+
 export interface PressKeyOptions extends OperationOptions {
   settle?: Init<typeof DurationSchema>
 }
 
-export interface RecognizeTextOptions extends InputFields<typeof RecognizeTextRequestSchema, 'capture'>, OperationOptions {}
+/** What `recognizeText` reads: a Runner-held capture, or a caller-owned image (`frame`, pixels are sent). */
+export type RecognitionSource = CaptureTarget | { frame: Init<typeof CapturedFrameSchema> }
+
+export interface RecognizeTextOptions extends InputFields<typeof RecognizeTextRequestSchema, 'source'>, OperationOptions {}
 
 export interface RunnerClient {
+  /**
+   * Explicit pixel access. Captures return a reference and metadata; pixels
+   * leave the Runner only through this call. A reference fails with
+   * NOT_FOUND once the Runner evicted or expired it.
+   */
+  readonly captures: {
+    image: (capture: CaptureTarget, options?: CaptureImageOptions) => Promise<CaptureImage>
+  }
   readonly displays: {
     capture: (selector?: Init<typeof DisplaySelectorSchema>, options?: OperationOptions) => Promise<Shape<typeof CaptureService.method.captureDisplay.output>>
     captureRegion: (region: Init<typeof ScreenRectSchema>, selector?: Init<typeof DisplaySelectorSchema>, options?: OperationOptions) => Promise<Shape<typeof CaptureService.method.captureRegion.output>>
@@ -111,7 +141,8 @@ export interface RunnerClient {
     remove: (options?: OperationOptions) => Promise<void>
     show: (request: Init<typeof ShowOverlayRequestSchema>, options?: OperationOptions) => Promise<void>
   }
-  recognizeText: (capture: Init<typeof CapturedFrameSchema>, options?: RecognizeTextOptions) => Promise<Shape<typeof TextRecognitionService.method.recognizeText.output>>
+  /** Runs OCR on a Runner-held capture (no pixels travel) or on `{ frame }`, a caller-owned image. */
+  recognizeText: (source: RecognitionSource, options?: RecognizeTextOptions) => Promise<Shape<typeof TextRecognitionService.method.recognizeText.output>>
   readonly windows: {
     /**
      * A client for a window on this route, without a call. Takes a client from any route
@@ -161,7 +192,8 @@ export interface ScrollUntilCallOptions extends OperationOptions {
 /**
  * `scrollUntil` begin fields; the window, point, and decision mode come from
  * the call. Without a `condition`, the loop stops at the end (no visual motion).
- * Observations carry the capture and recognized text unless `observe` opts out.
+ * Observations carry the capture by reference (fetch pixels with
+ * `captures.image`) and the recognized text unless `observe.omitText` is set.
  */
 export type ScrollUntilOptions = InputFields<typeof ScrollUntilBeginSchema, 'awaitDecisions' | 'point' | 'window'>
 
@@ -369,6 +401,20 @@ export function createRunnerClient(connection: AuvConnection, route: RunnerRoute
   }
 
   return {
+    captures: {
+      image: async (capture, options = {}) => {
+        const { signal, ...request } = options
+        const response = await unary(CaptureService.method.getCaptureImage, { ...request, capture: captureRefOf(capture) }, { signal })
+        switch (response.image.case) {
+          case 'encoded':
+            return response.image.value
+          case 'rgba':
+            return { data: response.image.value.data, encoding: ImageEncoding.RGBA, height: response.image.value.height, width: response.image.value.width }
+          default:
+            throw new AuvProtocolError('GetCaptureImageResponse omitted image')
+        }
+      },
+    },
     displays: {
       capture: (selector, options) => unary(CaptureService.method.captureDisplay, { selector }, options),
       captureRegion: (region, selector, options) => unary(CaptureService.method.captureRegion, { region, selector }, options),
@@ -421,9 +467,12 @@ export function createRunnerClient(connection: AuvConnection, route: RunnerRoute
         await unary(OverlayService.method.showOverlay, request, options)
       },
     },
-    recognizeText: (capture, options = {}) => {
+    recognizeText: (source, options = {}) => {
       const { signal, ...request } = options
-      return unary(TextRecognitionService.method.recognizeText, { ...request, capture }, { signal })
+      const value = typeof source === 'object' && 'frame' in source
+        ? { case: 'capture' as const, value: source.frame }
+        : { case: 'captureRef' as const, value: captureRefOf(source) }
+      return unary(TextRecognitionService.method.recognizeText, { ...request, source: value }, { signal })
     },
     windows: {
       from: target => window(windowOf(target)),
@@ -445,6 +494,16 @@ export function createRunnerClient(connection: AuvConnection, route: RunnerRoute
       },
     },
   }
+}
+
+function captureRefOf(target: CaptureTarget): Init<typeof CaptureRefSchema> {
+  if (typeof target === 'string')
+    return { captureId: target }
+  if ('captureId' in target)
+    return { captureId: target.captureId }
+  if (!target.ref)
+    throw new TypeError('CapturedFrame has no capture reference; pass a frame returned by the Runner')
+  return { captureId: target.ref.captureId }
 }
 
 function combineSignals(first?: AbortSignal, second?: AbortSignal): AbortSignal | undefined {

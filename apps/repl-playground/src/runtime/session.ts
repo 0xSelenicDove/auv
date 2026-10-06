@@ -1,6 +1,6 @@
 import type { BirpcReturn } from 'birpc'
 
-import type { RecordedCall } from '../backend/replay'
+import type { Recording } from '../backend/replay'
 import type { Backend } from '../backend/types'
 import type { Rect } from '../script-api/api'
 import type { BindSite, StepSite } from '../stepper/compile'
@@ -84,7 +84,7 @@ class ExecSession {
   #lastLine: null | number = null
   #lineHits = new Map<number, number>()
   #liveTimer?: number
-  #recording?: { entries: RecordedCall[], label: string }
+  #recording?: Recording
   #runBackend: Backend | null = null
   #running = false
   #seq = 0
@@ -142,7 +142,7 @@ class ExecSession {
       return
     this.#running = true
     const recorder = !options.replay && live ? new RecordingBackend(live) : undefined
-    this.#runBackend = options.replay ? new ReplayBackend(this.#recording!.entries, this.#recording!.label) : recorder ?? live
+    this.#runBackend = options.replay ? new ReplayBackend(this.#recording!) : recorder ?? live
     this.#seq = 0
     this.#lineHits = new Map()
     this.#lastLine = null
@@ -187,7 +187,7 @@ class ExecSession {
       usePlayground.setState({ timings })
       await this.#runBackend?.endRun(outcome.status === 'ok' ? 'succeeded' : outcome.status === 'stopped' ? 'canceled' : 'failed')
       if (recorder) {
-        this.#recording = { entries: recorder.entries, label: recorder.label }
+        this.#recording = { entries: recorder.entries, images: recorder.images, label: recorder.label }
         usePlayground.setState({ hasRecording: true })
       }
       void this.refreshAxTree().catch(() => {})
@@ -214,7 +214,7 @@ class ExecSession {
       for (const display of displays) {
         try {
           const frame = await backend.captureDisplay(display.id)
-          const bitmap = await decodeBitmap(frame)
+          const bitmap = await decodeBitmap(backend, frame)
           actions.setLiveFrame(display.id, { bitmap, bounds: frame.bounds, capturedAt: Date.now() })
         }
         catch (error) {
@@ -338,7 +338,7 @@ export async function activateBackend(backend: Backend | null): Promise<void> {
   // One snapshot per display so the canvas is not empty before live mode.
   for (const display of displays) {
     void backend.captureDisplay(display.id)
-      .then(async frame => actions.setLiveFrame(display.id, { bitmap: await decodeBitmap(frame), bounds: frame.bounds, capturedAt: Date.now() }))
+      .then(async frame => actions.setLiveFrame(display.id, { bitmap: await decodeBitmap(backend, frame), bounds: frame.bounds, capturedAt: Date.now() }))
       .catch(error => console.warn(`Initial capture failed for display ${display.id}`, error))
   }
   void session.refreshAxTree().catch(() => {})
