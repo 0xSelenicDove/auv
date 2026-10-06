@@ -727,15 +727,18 @@ python3 evals/osworld/agent_action_relay.py \
 
 It validates the episode's installed guest-binary evidence and paired
 profile, refuses old action traces, opens only the existing AUV forward,
-and emits a `ready` JSONL line with the Run ID. It does not run setup or
-evaluation, choose an action, or create/delete Kubernetes resources.
+and emits a `ready` JSONL line with the Run ID, total/idle deadlines, and
+single-use checkpoint rule. It does not run setup or evaluation, choose an
+action, or create/delete Kubernetes resources.
 
 Run the `boot → install → setup` phases above; the checked-in relay keeps
 `Episode.forward(auv=True)` open around the foreground child and proposal
 loop. Launch it in a PTY or another transport proven to keep stdin open:
 a non-PTY `exec_command` launch closed stdin immediately in one live attempt.
-Wait for `ready`, request the first `capture`, and show only its AUV PNG to the
-blind agent. Relay one typed action proposal, wait for its receipt, request a
+Wait for `ready` and pass its `limits` and `rules` to the blind agent before
+its first proposal; do not rely on a separately remembered protocol summary.
+Request the first `capture` and show only its AUV PNG to the blind agent.
+Relay one typed action proposal, wait for its receipt, request a
 new `capture`, and repeat. The agent should explicitly `finish` or `abort`;
 EOF is not a successful terminal message. The Rust action child now allows
 240 seconds between requests, but its 570-second total deadline still applies.
