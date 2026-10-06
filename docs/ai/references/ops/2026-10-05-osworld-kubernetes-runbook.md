@@ -726,6 +726,38 @@ manual deletion. Preserve the hot PVC/PV. The old attended sequence remains
 useful to debug a changed Chrome layout, but its exact coordinates should
 not be extended to VLC or V2.1 without a separately audited policy.
 
+### Attended VLC V1 observation — not a batch policy
+
+A fresh VLC V1 guest later passed one attended AUV-only gate with raw pinned
+evaluator score `1.0`; the [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md)
+contains the exact action order, checkpoints, hashes, and UID cleanup.
+For a supervised rerun, use the same fresh-ID/port/overlay and pinned task
+requirements as the Chrome attended gate, but select task
+`5ac2891a-eacd-4954-b339-98abba077adb`. Observe each AUV checkpoint before
+sending the next typed action. In the validated episode, Ctrl+P opened
+Simple Preferences, `All` at `(638,898)` reached a *fully redrawn* Advanced
+Preferences page, search for `play and exit` exposed the Playlist tree,
+selecting Playlist showed the target checkbox already unchecked, and Save
+at `(1211,901)` wrote the desired state. The setup wrote
+`play-and-exit=1` to disk *after* VLC started; the GUI showed its in-memory
+unchecked default. Never blindly toggle the checkbox from that observation.
+
+This path is not yet a deterministic controller. A different guest may show
+a stale page, a checked box, or different geometry. OCR of one full-frame
+capture missed the Advanced title, and OCR text does not establish the
+checkbox state. Freeze an image-based checked/unchecked predicate with both
+positive and negative controls before any automated Save. Keep using the
+pinned evaluator to verify disk semantics, and keep reset in a `finally`
+boundary with UID-preconditioned deletion.
+
+A second fresh V1 guest reproduced an important stop condition: after All,
+the title changed to Advanced while the right pane still showed Simple
+Preferences, unchanged for more than seven seconds. That episode aborted
+before target interaction and has **no evaluator score**. A title or All
+radio alone is therefore not an adequate gate. Require visible right-pane
+Playlist and the target label before considering the checkbox, and stop
+without Save when they do not appear; see the [failure evidence](2026-10-05-osworld-kubernetes-x11-evidence.md).
+
 ### Guest-local current-head gate through an owner Unix socket
 
 The 2026-10-06 V1 guest-local gate followed the Ubuntu 22.04 build recipe in

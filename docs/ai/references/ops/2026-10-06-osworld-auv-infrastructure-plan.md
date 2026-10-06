@@ -443,6 +443,24 @@ V2.1 task setup/evaluator and asset coverage remain separate. See the
 [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md) and
 [runbook](2026-10-05-osworld-kubernetes-runbook.md).
 
+A subsequent **attended** fresh V1 VLC episode reached Advanced Preferences,
+visually identified the `Play and exit` checkbox as already unchecked, and
+saved through paired AUV. The pinned evaluator returned raw `1.0` and
+UID-safe cleanup preserved the hot disk. Setup had written
+`play-and-exit=1` after VLC launched, so the in-memory unchecked default
+needed a Save, not a blind toggle. This gives an observed path for a second
+policy but does not yet freeze its visual predicates: full-frame OCR missed
+one Advanced title and text recognition does not classify the checkbox.
+The next narrow slice is to validate an explicit checked/unchecked image
+predicate against positive and negative controls, then replay the exact
+VLC path through a fail-closed controller on a fresh guest. Only after that
+may Chrome and VLC form a predeclared two-task **scripted** denominator.
+The immediate fresh ON/OFF-control attempt safely aborted: after `All`,
+Advanced appeared in the title but Simple content persisted for more than
+seven seconds. It produced no evaluator score or checked-target sample.
+Before another automation attempt, diagnose or bound that redraw state with
+right-pane evidence; a title-only gate is demonstrably insufficient.
+
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
 approval.` After the owner approved access, read-only dry-runs at revision

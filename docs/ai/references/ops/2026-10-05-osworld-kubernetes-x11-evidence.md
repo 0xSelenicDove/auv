@@ -1224,7 +1224,80 @@ or an official full-provider benchmark result. Its OCR gates were checked
 against archived positive and failed-static screenshots before this run;
 their robustness across other Chrome layouts is unproven. A successful
 foreground action still reports input delivery, not independent X11 receiver
-verification. VLC task solving and V2.1 task evaluation remain open.
+verification. Scripted VLC task solving and V2.1 task evaluation remain open.
+
+### Attended VLC V1 task-directed gate
+
+A separate fresh V1 overlay on `liet-gpu-1` completed the pinned VLC task
+`5ac2891a-eacd-4954-b339-98abba077adb` on 2026-10-06. This was an
+**attended** paired-AUV episode, not the scripted Chrome batch or a frozen
+two-task denominator. The selected task JSON SHA256 was
+`4e038a7bb4c3770186209d68402e678ff723238cb31684fe452f0b0c6f4665da`.
+The OSWorld setup plane prepared the guest; only AUV delivered task GUI
+input and screenshots. No CUA, VNC input, xdotool, PyAutoGUI, or OSWorld GUI
+relay was used for the action phase.
+
+The operator used one interactive AUV Run
+`fbdf8d9d91d6eb6fa9a195f5aa00aaae`: capture VLC; Ctrl+P; capture Simple
+Preferences; click `All` at `(638,898)`; capture a fully redrawn Advanced
+Preferences page; focus search at `(696,253)`; type `play and exit`; capture
+the filtered Playlist tree; click Playlist at `(642,310)`; capture the
+`Play and exit` checkbox at about `(906,395)` **already unchecked**; click
+Save at `(1211,901)` without toggling the checkbox; capture the returned
+main window; finish. The UI state matters: setup had written
+`play-and-exit=1` to disk after launching VLC, while its in-memory
+preferences displayed the default unchecked value. Save rewrote the disk
+configuration. Do not turn this into a blind toggle action.
+
+The [checkpoint index](/private/tmp/auv-osworld-vlc-attended-1006a/vlc-attended-a/checkpoints.json)
+SHA256 was `cc762a48a00c5483ca9b265f10e3415b2a50de1be7dbd09a4e94c8aac2c060fa`.
+The [target-checkbox checkpoint](/private/tmp/auv-osworld-vlc-attended-1006a/vlc-attended-a/checkpoint-0005.png)
+SHA256 was `15199be39279b027f3d602925b558e93d585f908d0188e7a478981144331faf5`;
+the [action request index](/private/tmp/auv-osworld-vlc-attended-1006a/vlc-attended-a/action-requests.json)
+SHA256 was `d68a3097e8152a3360e13c3b79d198bc47dc6ff42c3556e72370956f4a135a77`.
+The [final PNG](/private/tmp/auv-osworld-vlc-attended-1006a/vlc-attended-a/final-screenshot.png)
+SHA256 was `64c0561f2a70989ed33caeeffbbfb0223068d95390f46ed1bfe857e7351ac9ac`;
+the [atomic sidecar](/private/tmp/auv-osworld-vlc-attended-1006a/vlc-attended-a/action_evidence.json)
+SHA256 was `e195a8cf03547d45a7a3d6a8980b114217fdeef9e31319f6163c8cec02067462`.
+The pinned evaluator's transcribed [result](/private/tmp/auv-osworld-vlc-attended-1006a/gate-result.json)
+(SHA256 `0fd331dd831589be00d1f361cfa8b3c5adc0111d24c5ef71971d830f60f1c1df`)
+returned raw `1.0`. All typed input attempts reported delivery succeeded
+with `verified=false`; semantic success rests on the evaluator, not that
+delivery flag.
+
+UID-preconditioned reset removed the task-owned runtime Pod
+`c0d4dcc1-689e-4b7c-9961-bd9d776a8d04`, Service
+`62099692-8c82-42f6-944a-aa271db79134`, and proxy Pod
+`650b3c53-02d2-46ee-9c53-959d292fe2f8`; a subsequent label query was
+empty. Local forwards and action process stopped. The hot PVC/PV remained
+Bound with UIDs `34143535-4ac2-42f2-a443-08db3f6b49ff` and
+`8e8e46f1-0670-4a55-b06a-8caebb4d5a73`. One fresh screenshot is not
+enough to freeze a robust visual policy: full-frame OCR missed the advanced
+title in one capture, and OCR alone cannot prove checkbox checkedness. A
+replay with an explicitly checked/unchecked image predicate is still needed.
+
+A second fresh VLC V1 attempt to capture that same checkbox in ON/OFF
+states did **not** reach the target. In paired AUV Run
+`b2c59d714831d56c157f60c3c8ba3cef`, Ctrl+P first required another
+capture before Simple Preferences appeared. After AUV clicked `All`, the
+title changed to Advanced but the right pane continued showing stale Simple
+content across three checkpoints, including one after more than seven
+seconds. The controller/operator sent `abort`; no target click, Save, or
+evaluator followed, so this attempt has **no score**, not `0.0`. The
+[checkpoint index](/private/tmp/auv-osworld-vlc-onoff-1006b/vlc-onoff-b/checkpoints.json)
+SHA256 was `945b92d3ef73f4e192076cec70f9e4165345a36c62cd649d8b6010350aa9f876`;
+the [action request index](/private/tmp/auv-osworld-vlc-onoff-1006b/vlc-onoff-b/action-requests.json)
+SHA256 was `5d04013a59c41ee6134a62ae9ff9f6cb5a4b6ba5944eb735092ceb3da5f14b74`.
+The aborted sidecar had `final_artifact=null` and SHA256
+`af10518f243d411a45178853e5438ed46b15f1a34274e9b4aa6b22e721dac427`.
+UID-safe reset removed the task-owned proxy Pod
+`9c3328fd-5b9b-4b50-a287-a78343d7bff0`, Service
+`bbf40601-2437-4527-b648-b1b59e0016fe`, and runtime Pod
+`5b2663ec-0b3d-40b0-b17a-76504274106d`; no matching resource or local
+forward remained. Hot PVC/PV UIDs were unchanged. This reproduces the
+intermittent stale-pane boundary and leaves the checked-target pixel
+control uncollected; do not freeze an unattended VLC policy from the single
+positive episode.
 
 ## Operational checklist
 
