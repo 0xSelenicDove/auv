@@ -155,8 +155,9 @@ templates must not silently be repurposed as benchmark attempts.
 predeclared sequence. The fixed paired-remote adapter above invokes this
 binary with only its audited template plan. The original Chrome and VLC
 capture-only controls remain negative controls. The
-entry accepts only `--plan /absolute/path/to/plan.json` and the two runner
-environment paths. One paired-context plan is:
+entry accepts `--plan /absolute/path/to/plan.json` or the separate attended
+`--interactive --context /absolute/path/to/context.json` mode, plus the two
+runner environment paths. One paired-context fixed plan is:
 
 ```json
 {
@@ -206,6 +207,58 @@ held input and finish the Run. Neither delivery nor screenshot is an OSWorld
 task score. The local schema, artifact, and sidecar tests are automated; the
 entry's real Runner/cancellation gate is ignored until run on an isolated
 Xorg guest with a live AUV daemon.
+
+The attended interactive mode takes a strict context file without an action
+array; for example:
+
+```json
+{
+  "version": 1,
+  "context": {
+    "kind": "paired",
+    "device_id": "full-canonical-device-id",
+    "config_profile": "episode-profile",
+    "profiles_file": "/absolute/path/to/paired-profiles.json"
+  }
+}
+```
+
+Set the same two absolute episode paths, then run
+`auv-osworld-action --interactive --context /absolute/context.json` in the
+foreground with a JSONL stdin/stdout pipe. It emits a `ready` line containing
+the newly persisted AUV Run ID. Send one newline-terminated JSON object per
+request, with consecutive `seq` starting at 1:
+
+```json
+{"seq":1,"op":"capture"}
+{"seq":2,"op":"action","action":{"action_type":"CLICK","x":1270,"y":638}}
+{"seq":3,"op":"capture"}
+{"seq":4,"op":"finish"}
+```
+
+`capture` writes `checkpoint-0001.png`, then atomically updates
+`checkpoints.json` with its relative path and SHA256 before responding with
+`{"seq":1,"op":"capture","artifact":...}`. Each `action` uses the same
+Runner and responds with its unmodified typed `InputActionResult` delivery;
+`input-action-results.json` is updated first. `action-requests.json` retains
+each validated request before execution. `finish` captures the final PNG and
+ends the Run; its response is the final `action_evidence.json` object, byte-for-
+byte identical to the final stdout line. `abort`, EOF, SIGTERM/Ctrl+C, protocol
+failure, or timeout attempts release/finish and exits nonzero. The Run ID is
+already atomic in the sidecar even when there is no final PNG. The sidecar has
+no benchmark score; task evaluation remains a separate phase.
+
+The protocol rejects unknown fields and commands, shell/OSWorld GUI relay,
+`EXECUTE`, and action-level `WAIT`/`DONE`/`FAIL`; only `finish`/`abort` control
+the session. Limits are 64 KiB per line, 1 MiB of total requests, 1,000
+actions, 32 checkpoint captures,
+60 seconds idle, and 570 seconds after the Run is ready. This is an attended
+local diagnostic interface, not a new arbitrary-action Kubernetes phase:
+`batch_runner.py` still closes action stdin and the capture-only controls stay
+unchanged. The ignored isolated-Xorg gate checks one Run across before/after
+captures and typed input; until it is run, live cleanup and Chrome dialog
+readiness are unproven. No adaptive observation harness or Chrome task-solving
+script is provided here.
 
 ### Batch runner outcome
 

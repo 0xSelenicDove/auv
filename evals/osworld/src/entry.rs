@@ -3,7 +3,7 @@
 use std::{
   fs,
   future::Future,
-  io::Read as _,
+  io::{Read as _, Write as _},
   path::{Path, PathBuf},
   time::Duration,
 };
@@ -20,10 +20,65 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tempfile::NamedTempFile;
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt};
 
-use crate::{Action, ActionExecutor, ControlSignal, parse_action};
+use crate::{Action, ActionExecutor, ActionOutcome, ControlSignal, parse_action};
 
 const MAX_FINAL_SETTLE_MS: u64 = 5_000;
+const MAX_INTERACTIVE_LINE_BYTES: usize = 64 * 1024;
+const MAX_INTERACTIVE_REQUEST_BYTES: usize = 1024 * 1024;
+const MAX_INTERACTIVE_ACTIONS: usize = 1_000;
+const MAX_INTERACTIVE_CAPTURES: usize = 32;
+const INTERACTIVE_BUDGET: Duration = Duration::from_secs(570);
+const INTERACTIVE_IDLE: Duration = Duration::from_secs(60);
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "op", deny_unknown_fields)]
+enum RawInteractiveRequest {
+  #[serde(rename = "action")]
+  Action { seq: u64, action: Value },
+  #[serde(rename = "capture")]
+  Capture { seq: u64 },
+  #[serde(rename = "finish")]
+  Finish { seq: u64 },
+  #[serde(rename = "abort")]
+  Abort { seq: u64 },
+}
+
+enum InteractiveRequest {
+  Action { seq: u64, action: Action },
+  Capture { seq: u64 },
+  Finish,
+  Abort,
+}
+
+fn parse_interactive_request(line: &[u8], expected_seq: u64) -> Result<InteractiveRequest, String> {
+  if line.len() > MAX_INTERACTIVE_LINE_BYTES {
+    return Err("interactive request line exceeds 64 KiB".into());
+  }
+  let raw: RawInteractiveRequest = serde_json::from_slice(line).map_err(|error| format!("invalid interactive request: {error}"))?;
+  let seq = match &raw {
+    RawInteractiveRequest::Action { seq, .. }
+    | RawInteractiveRequest::Capture { seq }
+    | RawInteractiveRequest::Finish { seq }
+    | RawInteractiveRequest::Abort { seq } => *seq,
+  };
+  if seq != expected_seq {
+    return Err(format!("interactive sequence must be {expected_seq}"));
+  }
+  match raw {
+    RawInteractiveRequest::Action { seq, action } => {
+      let action = parse_action(&action).map_err(|error| error.to_string())?;
+      if matches!(action, Action::Wait | Action::Done | Action::Fail) {
+        return Err("interactive action must deliver typed GUI input; use finish or abort for control".into());
+      }
+      Ok(InteractiveRequest::Action { seq, action })
+    }
+    RawInteractiveRequest::Capture { seq } => Ok(InteractiveRequest::Capture { seq }),
+    RawInteractiveRequest::Finish { .. } => Ok(InteractiveRequest::Finish),
+    RawInteractiveRequest::Abort { .. } => Ok(InteractiveRequest::Abort),
+  }
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,24 +104,26 @@ enum Context {
   },
 }
 
-struct ValidatedPlan {
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct InteractiveContext {
+  version: u8,
   context: Context,
-  actions: Vec<Action>,
-  final_settle_ms: u64,
 }
 
-impl Plan {
-  fn validate(self) -> Result<ValidatedPlan, String> {
+impl InteractiveContext {
+  fn validate(self) -> Result<Context, String> {
     if self.version != 1 {
-      return Err("action plan version must be 1".into());
+      return Err("interactive context version must be 1".into());
     }
-    if self.actions.is_empty() || self.actions.len() > 1000 {
-      return Err("action plan needs 1..=1000 predeclared actions".into());
-    }
-    if self.final_settle_ms > MAX_FINAL_SETTLE_MS {
-      return Err(format!("final_settle_ms must be 0..={MAX_FINAL_SETTLE_MS}"));
-    }
-    match &self.context {
+    self.context.validate()?;
+    Ok(self.context)
+  }
+}
+
+impl Context {
+  fn validate(&self) -> Result<(), String> {
+    match self {
       Context::Paired {
         device_id,
         config_profile,
@@ -85,6 +142,28 @@ impl Plan {
         }
       }
     }
+    Ok(())
+  }
+}
+
+struct ValidatedPlan {
+  context: Context,
+  actions: Vec<Action>,
+  final_settle_ms: u64,
+}
+
+impl Plan {
+  fn validate(self) -> Result<ValidatedPlan, String> {
+    if self.version != 1 {
+      return Err("action plan version must be 1".into());
+    }
+    if self.actions.is_empty() || self.actions.len() > 1000 {
+      return Err("action plan needs 1..=1000 predeclared actions".into());
+    }
+    if self.final_settle_ms > MAX_FINAL_SETTLE_MS {
+      return Err(format!("final_settle_ms must be 0..={MAX_FINAL_SETTLE_MS}"));
+    }
+    self.context.validate()?;
     let actions = self.actions.iter().map(parse_action).collect::<Result<Vec<_>, _>>().map_err(|error| error.to_string())?;
     Ok(ValidatedPlan {
       context: self.context,
@@ -101,6 +180,41 @@ fn read_plan(path: &Path) -> Result<ValidatedPlan, String> {
   let bytes = fs::read(path).map_err(|error| format!("cannot read action plan: {error}"))?;
   let plan: Plan = serde_json::from_slice(&bytes).map_err(|error| format!("invalid action plan schema: {error}"))?;
   plan.validate()
+}
+
+fn read_interactive_context(path: &Path) -> Result<Context, String> {
+  if !path.is_absolute() {
+    return Err("interactive context path must be absolute".into());
+  }
+  let bytes = fs::read(path).map_err(|error| format!("cannot read interactive context: {error}"))?;
+  let value: InteractiveContext = serde_json::from_slice(&bytes).map_err(|error| format!("invalid interactive context schema: {error}"))?;
+  value.validate()
+}
+
+async fn read_interactive_line<R: AsyncBufRead + Unpin>(reader: &mut R) -> Result<Option<Vec<u8>>, String> {
+  let mut bytes = Vec::new();
+  let read = (&mut *reader)
+    .take((MAX_INTERACTIVE_LINE_BYTES + 1) as u64)
+    .read_until(b'\n', &mut bytes)
+    .await
+    .map_err(|error| format!("interactive input failed: {error}"))?;
+  if read == 0 {
+    return Ok(None);
+  }
+  if read > MAX_INTERACTIVE_LINE_BYTES {
+    return Err("interactive request line exceeds 64 KiB".into());
+  }
+  if bytes.last() != Some(&b'\n') {
+    return Err("interactive request must end with newline".into());
+  }
+  Ok(Some(bytes))
+}
+
+fn emit_interactive(value: &Value) -> Result<(), String> {
+  let mut output = std::io::stdout().lock();
+  serde_json::to_writer(&mut output, value).map_err(|error| error.to_string())?;
+  output.write_all(b"\n").map_err(|error| error.to_string())?;
+  output.flush().map_err(|error| error.to_string())
 }
 
 fn episode_paths() -> Result<(PathBuf, PathBuf), String> {
@@ -143,14 +257,18 @@ fn emit_terminal(mut output: impl std::io::Write, sidecar: &Path, value: &Value)
 }
 
 fn save_capture(dir: &Path, capture: auv_driver::DisplayCapture) -> Result<Value, String> {
+  save_named_capture(dir, "final-screenshot.png", capture)
+}
+
+fn save_named_capture(dir: &Path, name: &str, capture: auv_driver::DisplayCapture) -> Result<Value, String> {
   let mut temp = NamedTempFile::new_in(dir).map_err(|error| error.to_string())?;
   DynamicImage::ImageRgba8(capture.capture.image).write_to(&mut temp, ImageFormat::Png).map_err(|error| error.to_string())?;
   temp.as_file().sync_all().map_err(|error| error.to_string())?;
   let mut bytes = Vec::new();
   temp.reopen().map_err(|error| error.to_string())?.read_to_end(&mut bytes).map_err(|error| error.to_string())?;
   let digest = format!("{:x}", Sha256::digest(&bytes));
-  temp.persist(dir.join("final-screenshot.png")).map_err(|error| error.to_string())?;
-  Ok(json!({"path": "final-screenshot.png", "sha256": digest}))
+  temp.persist(dir.join(name)).map_err(|error| error.to_string())?;
+  Ok(json!({"path": name, "sha256": digest}))
 }
 
 async fn connect(context: &Context) -> Result<(Client, String), String> {
@@ -207,6 +325,84 @@ async fn settle_before_capture(final_settle_ms: u64, cancel: impl Future<Output 
   }
 }
 
+struct Session {
+  dir: PathBuf,
+  sidecar: PathBuf,
+  run_id: String,
+  executor: ActionExecutor,
+  deliveries: Vec<Vec<InputActionResult>>,
+  final_artifact: Option<Value>,
+  checkpoints: Vec<Value>,
+}
+
+impl Session {
+  async fn start(context: &Context) -> Result<Self, String> {
+    let (dir, sidecar) = episode_paths()?;
+    let (client, device_id) = connect(context).await?;
+    let mut run_options = RunOptions {
+      selection: RunSelection::New,
+      ..Default::default()
+    };
+    run_options.device = auv::resource::DeviceSelector::by_id(&device_id);
+    let runner = client.runner_with(run_options, RunnerOptions::default()).await.map_err(|error| error.to_string())?;
+    let run_id = runner.run().id.to_string();
+    let executor = ActionExecutor::new(runner);
+    // Persist the observed Run before any GUI delivery or protocol response.
+    if let Err(error) = atomic_json(&sidecar, &evidence(&run_id, None)) {
+      let cleanup = executor.finish(RunOutcome::Canceled).await;
+      return Err(match cleanup {
+        Ok(_) => error,
+        Err(cleanup) => format!("{error}; cleanup: {cleanup}"),
+      });
+    }
+    Ok(Self {
+      dir,
+      sidecar,
+      run_id,
+      executor,
+      deliveries: Vec::new(),
+      final_artifact: None,
+      checkpoints: Vec::new(),
+    })
+  }
+
+  fn persist_delivery(&mut self, step: &ActionOutcome) -> Result<(), String> {
+    self.deliveries.push(step.delivery.clone());
+    atomic_json(&self.dir.join("input-action-results.json"), &json!(self.deliveries))
+  }
+
+  fn persist_final_capture(&mut self, capture: auv_driver::DisplayCapture) -> Result<(), String> {
+    let artifact = save_capture(&self.dir, capture)?;
+    self.final_artifact = Some(artifact);
+    atomic_json(&self.sidecar, &evidence(&self.run_id, self.final_artifact.clone()))
+  }
+
+  fn persist_checkpoint(&mut self, capture: auv_driver::DisplayCapture) -> Result<Value, String> {
+    let name = format!("checkpoint-{:04}.png", self.checkpoints.len() + 1);
+    let artifact = save_named_capture(&self.dir, &name, capture)?;
+    self.checkpoints.push(artifact.clone());
+    atomic_json(&self.dir.join("checkpoints.json"), &json!(self.checkpoints))?;
+    Ok(artifact)
+  }
+
+  async fn finish(self, outcome: RunOutcome, error: Option<String>) -> Result<(), String> {
+    let mut error = error;
+    if let Err(failure) = self.executor.finish(outcome).await {
+      error = Some(match error {
+        Some(primary) => format!("{primary}; finish: {failure}"),
+        None => format!("finish: {failure}"),
+      });
+    }
+    let terminal = evidence(&self.run_id, self.final_artifact);
+    // Re-persist after finish so terminal stdout mirrors durable sidecar.
+    emit_terminal(std::io::stdout().lock(), &self.sidecar, &terminal)?;
+    match error {
+      Some(error) => Err(error),
+      None => Ok(()),
+    }
+  }
+}
+
 /// Execute a predeclared sequence, then print the final sidecar JSON on the
 /// final stdout line. Errors remain process failures, not benchmark scores.
 // TODO(osworld-action-entry-live): Runner finish and cancellation release are
@@ -217,34 +413,14 @@ async fn settle_before_capture(final_settle_ms: u64, cancel: impl Future<Output 
 // an owner-approved observation contract and fresh UI-state evidence.
 pub async fn run(plan_path: &Path) -> Result<(), String> {
   let plan = read_plan(plan_path)?;
-  let (dir, sidecar) = episode_paths()?;
-  let (client, device_id) = connect(&plan.context).await?;
-  let mut run_options = RunOptions {
-    selection: RunSelection::New,
-    ..Default::default()
-  };
-  run_options.device = auv::resource::DeviceSelector::by_id(&device_id);
-  let runner = client.runner_with(run_options, RunnerOptions::default()).await.map_err(|error| error.to_string())?;
-  let run_id = runner.run().id.to_string();
-  let mut executor = ActionExecutor::new(runner);
-  // Persist the observed Run before any GUI delivery. A later timeout may
-  // prevent terminal stdout, but the runner can still retain this ID.
-  if let Err(error) = atomic_json(&sidecar, &evidence(&run_id, None)) {
-    let cleanup = executor.finish(RunOutcome::Canceled).await;
-    return Err(match cleanup {
-      Ok(_) => error,
-      Err(cleanup) => format!("{error}; cleanup: {cleanup}"),
-    });
-  }
-
-  let mut deliveries: Vec<Vec<InputActionResult>> = Vec::new();
+  let mut session = Session::start(&plan.context).await?;
   let mut outcome = RunOutcome::Succeeded;
   let mut error = None;
   let cancel = interrupted();
   tokio::pin!(cancel);
   for action in plan.actions {
     let result = tokio::select! {
-      result = executor.execute(action) => Some(result),
+      result = session.executor.execute(action) => Some(result),
       _ = &mut cancel => None,
     };
     match result {
@@ -259,8 +435,7 @@ pub async fn run(plan_path: &Path) -> Result<(), String> {
         break;
       }
       Some(Ok(step)) => {
-        deliveries.push(step.delivery);
-        if let Err(failure) = atomic_json(&dir.join("input-action-results.json"), &json!(deliveries)) {
+        if let Err(failure) = session.persist_delivery(&step) {
           outcome = RunOutcome::Failed;
           error = Some(format!("input evidence persistence failed: {failure}"));
           break;
@@ -283,10 +458,9 @@ pub async fn run(plan_path: &Path) -> Result<(), String> {
     error = Some("final settle interrupted".to_string());
   }
 
-  let mut final_artifact = None;
   if outcome == RunOutcome::Succeeded {
     let captured = tokio::select! {
-      result = executor.capture_final() => Some(result),
+      result = session.executor.capture_final() => Some(result),
       _ = &mut cancel => None,
     };
     match captured {
@@ -298,34 +472,142 @@ pub async fn run(plan_path: &Path) -> Result<(), String> {
         outcome = RunOutcome::Failed;
         error = Some(failure.to_string());
       }
-      Some(Ok(capture)) => match save_capture(&dir, capture) {
-        Ok(artifact) => {
-          final_artifact = Some(artifact);
-          if let Err(failure) = atomic_json(&sidecar, &evidence(&run_id, final_artifact.clone())) {
-            outcome = RunOutcome::Failed;
-            error = Some(format!("final sidecar persistence failed: {failure}"));
-          }
-        }
+      Some(Ok(capture)) => match session.persist_final_capture(capture) {
+        Ok(()) => {}
         Err(failure) => {
           outcome = RunOutcome::Failed;
-          error = Some(format!("final PNG persistence failed: {failure}"));
+          error = Some(format!("final capture persistence failed: {failure}"));
         }
       },
     }
   }
-  if let Err(failure) = executor.finish(outcome).await {
-    error = Some(match error {
-      Some(primary) => format!("{primary}; finish: {failure}"),
-      None => format!("finish: {failure}"),
-    });
+  session.finish(outcome, error).await
+}
+
+/// Foreground JSONL control over one persistent AUV Run/Runner.
+/// Intermediate responses are JSONL; the final line remains the exact action
+/// sidecar object used by the batch runner. This mode is not wired to the
+/// capture-only Kubernetes adapter or its stdin=DEVNULL batch phase.
+// TODO(osworld-interactive-batch): Batch integration needs an owner-audited
+// controller transport; do not silently add arbitrary action argv or relax
+// batch_runner's stdin policy to expose this protocol.
+pub async fn run_interactive(context_path: &Path) -> Result<(), String> {
+  let context = read_interactive_context(context_path)?;
+  let mut session = Session::start(&context).await?;
+  // The bounded foreground protocol begins once the Run ID is durable.
+  let deadline = tokio::time::Instant::now() + INTERACTIVE_BUDGET;
+  let mut input = tokio::io::BufReader::new(tokio::io::stdin());
+  let cancel = interrupted();
+  tokio::pin!(cancel);
+  let mut expected_seq = 1;
+  let mut actions = 0;
+  let mut captures = 0;
+  let mut requests = Vec::<Value>::new();
+  let mut request_bytes = 0;
+
+  if let Err(error) = emit_interactive(&json!({
+    "op": "ready", "version": 1, "run_id": session.run_id,
+    "limits": {"actions": MAX_INTERACTIVE_ACTIONS, "captures": MAX_INTERACTIVE_CAPTURES,
+               "line_bytes": MAX_INTERACTIVE_LINE_BYTES, "request_bytes": MAX_INTERACTIVE_REQUEST_BYTES,
+               "budget_seconds": INTERACTIVE_BUDGET.as_secs(),
+               "idle_seconds": INTERACTIVE_IDLE.as_secs()},
+  })) {
+    return session.finish(RunOutcome::Failed, Some(format!("ready response failed: {error}"))).await;
   }
-  let terminal = evidence(&run_id, final_artifact);
-  // Re-persist after finish so terminal stdout always mirrors durable sidecar.
-  emit_terminal(std::io::stdout().lock(), &sidecar, &terminal)?;
-  match error {
-    Some(error) => Err(error),
-    None => Ok(()),
-  }
+
+  let (outcome, error) = loop {
+    let now = tokio::time::Instant::now();
+    if now >= deadline {
+      break (RunOutcome::Canceled, Some("interactive session deadline reached".into()));
+    }
+    let read_deadline = (now + INTERACTIVE_IDLE).min(deadline);
+    let line = tokio::select! {
+      biased;
+      _ = &mut cancel => break (RunOutcome::Canceled, Some("interactive session interrupted".into())),
+      result = tokio::time::timeout_at(read_deadline, read_interactive_line(&mut input)) => match result {
+        Ok(Ok(Some(line))) => line,
+        Ok(Ok(None)) => break (RunOutcome::Canceled, Some("interactive input closed before finish".into())),
+        Ok(Err(error)) => break (RunOutcome::Failed, Some(error)),
+        Err(_) => break (RunOutcome::Canceled, Some("interactive input deadline reached".into())),
+      },
+    };
+    let request = match parse_interactive_request(&line, expected_seq) {
+      Ok(request) => request,
+      Err(error) => break (RunOutcome::Failed, Some(error)),
+    };
+    request_bytes += line.len();
+    if request_bytes > MAX_INTERACTIVE_REQUEST_BYTES {
+      break (RunOutcome::Failed, Some("interactive request byte limit reached".into()));
+    }
+    let raw: Value = serde_json::from_slice(&line).expect("validated interactive JSON");
+    requests.push(raw);
+    if let Err(error) = atomic_json(&session.dir.join("action-requests.json"), &json!(requests)) {
+      break (RunOutcome::Failed, Some(format!("interactive request persistence failed: {error}")));
+    }
+    match request {
+      InteractiveRequest::Action { seq, action } => {
+        if actions >= MAX_INTERACTIVE_ACTIONS {
+          break (RunOutcome::Failed, Some("interactive action limit reached".into()));
+        }
+        actions += 1;
+        let step = tokio::select! {
+          biased;
+          _ = &mut cancel => break (RunOutcome::Canceled, Some("interactive action interrupted".into())),
+          _ = tokio::time::sleep_until(deadline) => break (RunOutcome::Canceled, Some("interactive session deadline reached".into())),
+          result = session.executor.execute(action) => match result {
+            Ok(step) => step,
+            Err(error) => break (RunOutcome::Failed, Some(error.to_string())),
+          },
+        };
+        if let Err(error) = session.persist_delivery(&step) {
+          break (RunOutcome::Failed, Some(format!("interactive input evidence persistence failed: {error}")));
+        }
+        if let Err(error) = emit_interactive(&json!({"seq": seq, "op": "action", "delivery": step.delivery})) {
+          break (RunOutcome::Failed, Some(format!("interactive action response failed: {error}")));
+        }
+      }
+      InteractiveRequest::Capture { seq } => {
+        if captures >= MAX_INTERACTIVE_CAPTURES {
+          break (RunOutcome::Failed, Some("interactive capture limit reached".into()));
+        }
+        captures += 1;
+        let frame = tokio::select! {
+          biased;
+          _ = &mut cancel => break (RunOutcome::Canceled, Some("interactive capture interrupted".into())),
+          _ = tokio::time::sleep_until(deadline) => break (RunOutcome::Canceled, Some("interactive session deadline reached".into())),
+          result = session.executor.capture_final() => match result {
+            Ok(frame) => frame,
+            Err(error) => break (RunOutcome::Failed, Some(error.to_string())),
+          },
+        };
+        let artifact = match session.persist_checkpoint(frame) {
+          Ok(artifact) => artifact,
+          Err(error) => break (RunOutcome::Failed, Some(format!("interactive checkpoint persistence failed: {error}"))),
+        };
+        if let Err(error) = emit_interactive(&json!({"seq": seq, "op": "capture", "artifact": artifact})) {
+          break (RunOutcome::Failed, Some(format!("interactive capture response failed: {error}")));
+        }
+      }
+      InteractiveRequest::Finish => {
+        let frame = tokio::select! {
+          biased;
+          _ = &mut cancel => break (RunOutcome::Canceled, Some("interactive final capture interrupted".into())),
+          _ = tokio::time::sleep_until(deadline) => break (RunOutcome::Canceled, Some("interactive session deadline reached".into())),
+          result = session.executor.capture_final() => match result {
+            Ok(frame) => frame,
+            Err(error) => break (RunOutcome::Failed, Some(error.to_string())),
+          },
+        };
+        if let Err(error) = session.persist_final_capture(frame) {
+          break (RunOutcome::Failed, Some(format!("interactive final capture persistence failed: {error}")));
+        }
+        break (RunOutcome::Succeeded, None);
+      }
+      InteractiveRequest::Abort => break (RunOutcome::Canceled, Some("interactive session aborted".into())),
+    }
+    expected_seq += 1;
+  };
+  session.finish(outcome, error).await
 }
 
 #[cfg(test)]
@@ -408,6 +690,70 @@ mod tests {
     }
   }
 
+  #[test]
+  fn interactive_jsonl_accepts_only_ordered_typed_gui_requests() {
+    let click = parse_interactive_request(br#"{"seq":1,"op":"action","action":{"action_type":"CLICK","x":1269,"y":638}}"#, 1).unwrap();
+    assert!(matches!(
+      click,
+      InteractiveRequest::Action {
+        seq: 1,
+        action: Action::Click { .. }
+      }
+    ));
+    assert!(matches!(parse_interactive_request(br#"{"seq":2,"op":"capture"}"#, 2).unwrap(), InteractiveRequest::Capture { seq: 2 }));
+    for invalid in [
+      br#"{"seq":1,"op":"action","action":{"action_type":"EXECUTE","command":"xdotool click 1"}}"#.as_slice(),
+      br#"{"seq":1,"op":"action","action":"WAIT"}"#.as_slice(),
+      br#"{"seq":1,"op":"action","action":"DONE"}"#.as_slice(),
+      br#"{"seq":1,"op":"capture","command":"python x.py"}"#.as_slice(),
+      br#"{"seq":1,"op":"shell","command":"echo hi"}"#.as_slice(),
+      br#"{"seq":2,"op":"capture"}"#.as_slice(),
+      br#"{"seq":1,"op":"action","action":{"action_type":"CLICK","x":0,"y":0},"extra":true}"#.as_slice(),
+    ] {
+      assert!(parse_interactive_request(invalid, 1).is_err());
+    }
+    assert!(matches!(parse_interactive_request(br#"{"seq":3,"op":"finish"}"#, 3).unwrap(), InteractiveRequest::Finish));
+    assert!(matches!(parse_interactive_request(br#"{"seq":4,"op":"abort"}"#, 4).unwrap(), InteractiveRequest::Abort));
+  }
+
+  #[test]
+  fn interactive_context_is_strict_and_requires_explicit_endpoint_or_profile() {
+    let dir = tempfile::tempdir().unwrap();
+    let context_path = dir.path().join("context.json");
+    fs::write(
+      &context_path,
+      br#"{"version":1,"context":{"kind":"guest-local","device_id":"device","daemon_endpoint":"unix:///tmp/auv.sock"}}"#,
+    )
+    .unwrap();
+    assert!(matches!(read_interactive_context(&context_path).unwrap(), Context::GuestLocal { .. }));
+    assert!(read_interactive_context(Path::new("context.json")).is_err());
+    for invalid in [
+      json!({"version":2,"context":{"kind":"guest-local","device_id":"device","daemon_endpoint":"unix:///tmp/auv.sock"}}),
+      json!({"version":1,"context":{"kind":"guest-local","device_id":"device","daemon_endpoint":"http://relay"}}),
+      json!({"version":1,"context":{"kind":"guest-local","device_id":"device","daemon_endpoint":"unix:///tmp/auv.sock","command":"xdotool click 1"}}),
+      json!({"version":1,"context":{"kind":"paired","device_id":"device","config_profile":"episode","profiles_file":"relative.json"}}),
+    ] {
+      fs::write(&context_path, serde_json::to_vec(&invalid).unwrap()).unwrap();
+      assert!(read_interactive_context(&context_path).is_err());
+    }
+  }
+
+  #[tokio::test]
+  async fn interactive_reader_rejects_truncated_and_oversized_jsonl() {
+    use tokio::io::AsyncWriteExt;
+    let (mut writer, reader) = tokio::io::duplex(MAX_INTERACTIVE_LINE_BYTES + 16);
+    writer.write_all(b"{\"seq\":1,\"op\":\"capture\"}\n").await.unwrap();
+    writer.write_all(b"{\"seq\":2").await.unwrap();
+    drop(writer);
+    let mut reader = tokio::io::BufReader::new(reader);
+    assert!(read_interactive_line(&mut reader).await.unwrap().is_some());
+    assert!(read_interactive_line(&mut reader).await.is_err());
+    let (mut writer, reader) = tokio::io::duplex(MAX_INTERACTIVE_LINE_BYTES + 16);
+    writer.write_all(&vec![b' '; MAX_INTERACTIVE_LINE_BYTES + 1]).await.unwrap();
+    drop(writer);
+    assert!(read_interactive_line(&mut tokio::io::BufReader::new(reader)).await.is_err());
+  }
+
   #[tokio::test]
   async fn interrupt_during_final_settle_prevents_capture() {
     let began = std::time::Instant::now();
@@ -439,6 +785,11 @@ mod tests {
         fallback_reason: None,
       },
     };
+    let checkpoint = save_named_capture(dir.path(), "checkpoint-0001.png", capture.clone()).unwrap();
+    atomic_json(&dir.path().join("checkpoints.json"), &json!([checkpoint.clone()])).unwrap();
+    let checkpoint_bytes = fs::read(dir.path().join("checkpoint-0001.png")).unwrap();
+    assert_eq!(checkpoint["sha256"], format!("{:x}", Sha256::digest(&checkpoint_bytes)));
+    assert_eq!(serde_json::from_slice::<Value>(&fs::read(dir.path().join("checkpoints.json")).unwrap()).unwrap()[0], checkpoint);
     let artifact = save_capture(dir.path(), capture).unwrap();
     assert_eq!(artifact["path"], "final-screenshot.png");
     let bytes = fs::read(dir.path().join("final-screenshot.png")).unwrap();

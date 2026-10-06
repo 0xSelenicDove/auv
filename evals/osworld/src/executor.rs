@@ -84,8 +84,8 @@ impl ActionExecutor {
     }
   }
 
-  /// Capture the final display through this episode's routed Runner, after
-  /// the last typed action and before finishing its Run.
+  /// Capture the display through this episode's routed Runner, either at an
+  /// attended checkpoint or before finishing its Run.
   pub async fn capture_final(&self) -> Result<auv_driver::DisplayCapture, ExecuteError> {
     Ok(self.runner.displays().capture(None).await?)
   }
