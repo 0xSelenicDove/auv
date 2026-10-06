@@ -83,6 +83,31 @@ JSON object on its final stdout line:
 The screenshot file must be inside the episode directory. The runner verifies
 its bytes against the digest and compares terminal stdout with the sidecar.
 
+## Offline agent decision gate
+
+`agent_action_gateway.py` is a benchmark-local protocol component for an
+already-running `auv-osworld-action --interactive` process. A caller supplies
+the Rust entry's `ready` receipt and a one-request/one-response foreground
+exchange function. The gateway does not start the child or call a model.
+It accepts only ordered `capture`, typed `action`, `finish`, and `abort`
+proposals. Each action must cite the latest screenshot's Run ID, filename,
+and SHA256; the gateway checks the PNG bytes and `checkpoints.json` before
+forwarding the unchanged action to Rust. It also checks action delivery
+against `input-action-results.json`, terminal results against
+`action_evidence.json`, and persists proposals, pending forwards, and
+responses in `agent_decisions.json`. A forward with an ambiguous or invalid
+response closes the gate without retrying the possible GUI input.
+
+Caller-selected action and capture budgets cannot exceed the Rust entry's
+advertised limits. Rust remains responsible for typed action parameter
+validation, actual AUV delivery, the Run lifecycle, and its own deadline.
+The gateway has 11 offline tests, including stale/tampered screenshot,
+replayed sequence, forbidden operation, budget, sidecar mismatch, and terminal
+receipt cases. It has **not** been connected to a model, foreground child
+transport, or Kubernetes episode, and does not prevent an agent with separate
+shell/browser tools from bypassing it. It is not evidence of a live benchmark
+score or an enforced agent tool sandbox.
+
 ## Fixed paired-remote typed-action infrastructure trial
 
 `k8s_typed_action_adapter.py` is a separate, fail-closed manifest and action

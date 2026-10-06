@@ -619,6 +619,15 @@ The next approved slice should freeze an actual agent action protocol and
 model identity, enforce the allowed tool surface, record one correlated Run,
 and predeclare a larger denominator before booting any task VM.
 
+An offline `agent_action_gateway.py` now covers the first part of that slice:
+it binds each proposed GUI action to a hash-verified screenshot in the same
+Run, cross-checks Rust checkpoint/action/terminal sidecars, enforces
+caller-declared action and capture budgets, and records sequential decisions.
+Its 11 offline regression tests pass. It is not yet wired to a model or the
+foreground Rust process, and it cannot enforce what other tools a Codex
+sub-agent may call. Model identity, transport, tool isolation, and a live
+gateway-driven episode therefore remain open.
+
 ## Operating rules
 
 - Work through these items in order; each item may be delegated to one bounded
