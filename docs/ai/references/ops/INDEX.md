@@ -40,6 +40,8 @@ Count: **35**
 - [`2026-10-06-osworld-v2-task044-episode.md`](2026-10-06-osworld-v2-task044-episode.md): One bounded blind AUV-only Task044 Shotcut attempt, partial evaluator score, protocol limitations, artifact hashes, and cleanup evidence.
 - [`2026-10-07-osworld-v2-task099-bridge-acceptance.md`](2026-10-07-osworld-v2-task099-bridge-acceptance.md): V2.1 Task099 file-only bridge, current-head AUV capture, and fixed AUV input through a fresh six-phase K8s lifecycle; no agent score.
 - [`2026-10-07-osworld-v2-task099-codex-agent-attempt.md`](2026-10-07-osworld-v2-task099-codex-agent-attempt.md): Separate exploratory Codex sub-agent attempt over the AUV relay, deadline/incomplete result, raw Task099 evaluator zero, and UID-safe cleanup.
+- [`2026-10-07-osworld-v2-task044-bridge-audit.md`](2026-10-07-osworld-v2-task044-bridge-audit.md): Offline pinned Task044 setup/evaluator bridge audit, original scoring boundaries, dependency pin, and explicit live-evidence limits.
+- [`2026-10-07-osworld-v2-codex-agent-cohort.md`](2026-10-07-osworld-v2-codex-agent-cohort.md): Frozen two-task V2.1 Codex sub-agent pilot membership, AUV-only action policy, 540-second relay budget, denominator, scoring layers, and cleanup gate; no results yet.
 
 ## Related
 

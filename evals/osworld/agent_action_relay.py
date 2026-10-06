@@ -60,6 +60,9 @@ def adapter_module(adapter: str):
     if adapter == "v2-task099":
         import k8s_v2_task099_adapter
         return k8s_v2_task099_adapter
+    if adapter == "v2-task044":
+        import k8s_v2_task044_adapter
+        return k8s_v2_task044_adapter
     raise ValueError("unreviewed Kubernetes episode adapter")
 
 
@@ -219,7 +222,7 @@ def main() -> int:
     parser.add_argument("--episode-dir", type=Path, required=True, help="absolute fresh episode directory")
     parser.add_argument("--action-binary", type=Path, required=True, help="absolute auv-osworld-action binary")
     parser.add_argument("--action-sha256", required=True, help="operator-measured SHA256 of action binary")
-    parser.add_argument("--adapter", choices=("v1", "v2-task099"), default="v1",
+    parser.add_argument("--adapter", choices=("v1", "v2-task099", "v2-task044"), default="v1",
                         help="reviewed Kubernetes episode adapter (default: v1)")
     parser.add_argument("--max-actions", type=int, default=32)
     parser.add_argument("--max-captures", type=int, default=32)

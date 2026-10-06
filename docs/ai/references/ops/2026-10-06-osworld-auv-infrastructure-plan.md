@@ -630,11 +630,18 @@ sub-agent via the V2-capable AUV relay. It completed 13 actions and 14
 captures, reached Google Maps Street View, but timed out before writing the
 answer or a terminal receipt; unchanged upstream evaluation returned `0.0`.
 The relay does not enforce isolation from the agent's other tools, and this
-one-task attempt is not a cohort or completion rate. The next gate is a
-predeclared V2.1 multi-task cohort with a verifiable model/tool boundary and
-audited per-task assets and evaluators. See the
+one-task attempt is not a cohort or completion rate. The Task044 setup and
+evaluator bridge now has pinned source, asset, and OpenCV checks plus offline
+boundary tests. A six-phase capture-only Task044 adapter and an attended
+`v2-task044` AUV relay route have also passed local tests, but neither has
+fresh live acceptance. A two-task V2.1 Codex-agent
+pilot has been [predeclared](2026-10-07-osworld-v2-codex-agent-cohort.md)
+before either cohort guest boots. It remains exploratory because Codex tool
+isolation is prompt-only; a verifiable model/tool boundary is still a later
+gate. See the
 [fixed-control acceptance](2026-10-07-osworld-v2-task099-bridge-acceptance.md)
-and [agent attempt](2026-10-07-osworld-v2-task099-codex-agent-attempt.md).
+and [agent attempt](2026-10-07-osworld-v2-task099-codex-agent-attempt.md),
+and the [Task044 bridge audit](2026-10-07-osworld-v2-task044-bridge-audit.md).
 
 ### 5. Agent/harness evaluation — two selected V2.1 attempts, no rate
 

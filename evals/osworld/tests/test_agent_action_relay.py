@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 import agent_action_relay as relay  # noqa: E402
 import k8s_phase_adapter as phase  # noqa: E402
 import k8s_v2_task099_adapter as v2_phase  # noqa: E402
+import k8s_v2_task044_adapter as v2_task044  # noqa: E402
 from test_agent_action_transport import FAKE_CHILD  # noqa: E402
 
 
@@ -122,6 +123,33 @@ class AgentActionRelayTest(unittest.TestCase):
             self.assertEqual(FakeEpisode.forwards, [(False, True)])
             self.assertEqual(json.loads(output.getvalue().splitlines()[0])["op"], "ready")
 
+    def test_task044_preflight_uses_pinned_config_and_episode_forward(self):
+        paired_path = self.directory / "paired-device.json"
+        paired = json.loads(paired_path.read_text())
+        paired["guest_auv_sha256"] = v2_task044.GUEST_AUV_SHA256
+        paired_path.write_text(json.dumps(paired))
+        with patch.object(v2_task044, "load_config", return_value=self.config) as load_config, \
+             patch.object(v2_task044, "Episode", FakeEpisode):
+            config, directory, binary, context = relay.prepare(
+                self.config_path, self.directory, self.binary, self.binary_hash,
+                adapter="v2-task044")
+            load_config.assert_called_once_with(self.config_path.resolve())
+            self.assertEqual(context["context"]["device_id"], "device-1")
+            read_fd, write_fd = os.pipe()
+            os.write(write_fd, b'{"op":"abort","seq":1}\n')
+            os.close(write_fd)
+            try:
+                output = io.StringIO()
+                FakeEpisode.forwards.clear()
+                code = relay.relay(config, directory, binary, {**context, "mode": "happy"},
+                                   max_actions=2, max_captures=2, input_fd=read_fd,
+                                   output=output, adapter="v2-task044")
+            finally:
+                os.close(read_fd)
+            self.assertEqual(code, 1)
+            self.assertEqual(FakeEpisode.forwards, [(False, True)])
+            self.assertEqual(json.loads(output.getvalue().splitlines()[0])["op"], "ready")
+
     def test_help_describes_single_use_checkpoint_and_total_deadline(self):
         output = io.StringIO()
         with patch.object(sys, "argv", ["agent_action_relay.py", "--help"]), \
@@ -132,6 +160,7 @@ class AgentActionRelayTest(unittest.TestCase):
         help_text = " ".join(output.getvalue().split())
         self.assertIn("total session", help_text)
         self.assertIn("verified action receipt consumes its checkpoint", help_text)
+        self.assertIn("v2-task044", help_text)
 
     def test_rejects_existing_trace_and_sidecar_before_child(self):
         for name in ("agent_decisions.json", "action_evidence.json", "checkpoint-0002.png"):

@@ -542,3 +542,55 @@ is independently enforced. One selected Task099 Codex sub-agent attempt
 completed 13 AUV actions and 14 captures before the relay's session deadline,
 but did not save `position.txt`; pinned raw evaluation was `0.0`. See the
 [attempt record](../../docs/ai/references/ops/2026-10-07-osworld-v2-task099-codex-agent-attempt.md).
+
+## V2.1 Task044 file/launch evaluator bridge
+
+`v2_task044_evaluator.py` pins the V2.1 revision, Task044 and official file
+getter bytes, the gated video SHA256/size, and `opencv-python==4.8.1.78`.
+Use a clean upstream checkout and a Python environment with that exact OpenCV
+wheel (not `opencv-python-headless`). Its `prepare` runs the original Task044
+setup through only `/setup/upload` and `/setup/launch`, verifies the guest's
+uploaded video by readback, and writes an episode marker. All GUI observation
+and input between phases must use installed AUV. Its `evaluate` runs the
+original Task044 scorer through `/file` for only the source, project, and
+export paths; it prints the raw float and a batch-ledger score projection.
+It never calls `/execute` or a GUI-action endpoint.
+
+```sh
+python3 evals/osworld/v2_task044_evaluator.py prepare \
+  --upstream /absolute/clean/OSWorld-V2 \
+  --task-source /absolute/pinned/task_044.py \
+  --asset /absolute/pinned/task_044/promo_video.mp4 \
+  --episode-dir /absolute/new/episode \
+  --endpoint http://127.0.0.1:5000
+
+# Perform the Task044 action phase through AUV only, then:
+python3 evals/osworld/v2_task044_evaluator.py evaluate \
+  --upstream /absolute/clean/OSWorld-V2 \
+  --task-source /absolute/pinned/task_044.py \
+  --asset /absolute/pinned/task_044/promo_video.mp4 \
+  --episode-dir /absolute/new/episode \
+  --endpoint http://127.0.0.1:5000
+```
+
+The local marker does **not** bind a Pod UID or prove a fresh overlay. Verify
+both in the six-phase Kubernetes scheduler before using this bridge for a
+batch. A missing export or project is the upstream `0.0`; transport, cache,
+source-integrity, or pinned-decoder failures produce no score. The
+[Task044 bridge audit](../../docs/ai/references/ops/2026-10-07-osworld-v2-task044-bridge-audit.md)
+records the offline checks. No new Kubernetes episode or agent result follows
+from those checks.
+
+`k8s_v2_task044_adapter.py` binds this bridge to the existing six-phase,
+UID-audited V2.1 Pod lifecycle. Its `action` phase is one paired-AUV capture
+and a byte-verified PNG/Run receipt: a negative infrastructure control, not
+a Shotcut edit. Generate a single-task manifest with the pinned Python
+environment and a fresh config using the same common lifecycle fields as
+Task099, plus absolute `task_source`/`asset` paths and measured
+`host_auv_sha256`. The Task044 adapter does not take Task099's foreground
+action-binary fields. Inspect the manifest before running `batch_runner.py`.
+An attended blind-agent action phase can instead use
+`agent_action_relay.py --adapter v2-task044` after successful `boot`,
+`install`, and `setup`; the relay does not enforce tool isolation beyond its
+own AUV route. The adapter and relay have passed local tests but have not yet
+passed a fresh live Task044 episode.
