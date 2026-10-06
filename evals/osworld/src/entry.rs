@@ -488,9 +488,9 @@ pub async fn run(plan_path: &Path) -> Result<(), String> {
 /// Intermediate responses are JSONL; the final line remains the exact action
 /// sidecar object used by the batch runner. This mode is not wired to the
 /// capture-only Kubernetes adapter or its stdin=DEVNULL batch phase.
-// TODO(osworld-interactive-batch): Batch integration needs an owner-audited
-// controller transport; do not silently add arbitrary action argv or relax
-// batch_runner's stdin policy to expose this protocol.
+// NOTICE: The pinned Chrome V1 task controller uses this entry through its own
+// foreground pipe. batch_runner still closes its action stdin; do not expose
+// arbitrary action argv or relax that boundary to generalize the controller.
 pub async fn run_interactive(context_path: &Path) -> Result<(), String> {
   let context = read_interactive_context(context_path)?;
   let mut session = Session::start(&context).await?;

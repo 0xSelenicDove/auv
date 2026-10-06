@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 
 RUNNER_PATH = Path(__file__).resolve().parents[1] / "batch_runner.py"
@@ -37,6 +38,30 @@ child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])
 evidence = {'run_ids': ['run-before-timeout'], 'final_artifact': None}
 Path(os.environ['AUV_OSWORLD_ACTION_EVIDENCE']).write_text(json.dumps(evidence))
 print(json.dumps(evidence), flush=True)
+time.sleep(60)
+"""
+
+COOPERATIVE_ACTION = """
+import json, os, signal, time
+from pathlib import Path
+root = Path(os.environ['AUV_OSWORLD_EPISODE_DIR'])
+def stop(_signal, _frame):
+    time.sleep(0.35)
+    (root / 'graceful-exit').write_text('finished')
+    print(json.dumps({'run_ids':['run-cooperative'], 'final_artifact':None}), flush=True)
+    raise SystemExit(0)
+signal.signal(signal.SIGTERM, stop)
+Path(os.environ['AUV_OSWORLD_ACTION_EVIDENCE']).write_text(json.dumps({'run_ids':['run-cooperative'], 'final_artifact':None}))
+print('ready', flush=True)
+time.sleep(60)
+"""
+
+UNCOOPERATIVE_ACTION = """
+import json, os, signal, time
+from pathlib import Path
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+Path(os.environ['AUV_OSWORLD_ACTION_EVIDENCE']).write_text(json.dumps({'run_ids':['run-uncooperative'], 'final_artifact':None}))
+print('ready', flush=True)
 time.sleep(60)
 """
 
@@ -114,6 +139,30 @@ class BatchRunnerTest(unittest.TestCase):
         else:
             self.fail("the action child is still executing after the deadline")
 
+    def test_action_timeout_allows_bounded_cooperative_sigterm_cleanup(self):
+        config = manifest(action=COOPERATIVE_ACTION)
+        config["episodes"][0]["phases"]["action"]["timeout_seconds"] = 0.2
+        result, directory = self.run_fixture(config)
+        action = result["episodes"][0]["phases"]["action"]
+        self.assertEqual(action["status"], "timeout")
+        self.assertTrue(action["group_terminated"])
+        self.assertTrue(action["termination_graceful"])
+        self.assertEqual((directory / "episode-1" / "graceful-exit").read_text(), "finished")
+        self.assertEqual(result["episodes"][0]["score"], 0.75)
+
+    def test_action_timeout_forces_kill_after_grace_and_marks_uncertain_release(self):
+        config = manifest(action=UNCOOPERATIVE_ACTION)
+        config["episodes"][0]["phases"]["action"]["timeout_seconds"] = 0.2
+        with patch.object(runner, "ACTION_TERM_GRACE_SECONDS", 0.3):
+            result, _ = self.run_fixture(config)
+        action = result["episodes"][0]["phases"]["action"]
+        self.assertEqual(action["status"], "timeout")
+        self.assertTrue(action["group_terminated"])
+        self.assertFalse(action["termination_graceful"])
+        self.assertEqual(result["episodes"][0]["score"], 0.75)
+        self.assertIn({"layer": "action_release", "reason": "forced_kill_unverified"},
+                      result["episodes"][0]["failure_layers"])
+
     def test_evaluator_failure_keeps_score_absent(self):
         result, _ = self.run_fixture(manifest(evaluator="raise RuntimeError('evaluation unavailable')"))
         episode = result["episodes"][0]
@@ -160,6 +209,27 @@ class BatchRunnerTest(unittest.TestCase):
         self.assertIsNone(episode["auv"]["final_artifact"])
         self.assertEqual(episode["failure_layers"][0]["layer"], "action_evidence")
         self.assertEqual(episode["score"], 0.75)
+
+    def test_scripted_controller_trace_is_bound_to_policy_run_and_checkpoint(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            image = directory / "checkpoint-0001.png"
+            image.write_bytes(b"AUV checkpoint")
+            artifact = {"path": image.name, "sha256": runner._sha256(image)}
+            trace = {"schema_version": 1, "policy_sha256": "pinned-policy", "run_id": "run-1",
+                     "status": "finished", "checks": [{"artifact": artifact, "matched": True}]}
+            (directory / "controller_decisions.json").write_text(json.dumps(trace))
+            phase = {"status": "ok"}
+            bound = runner._controller_evidence(directory, phase, "pinned-policy", ["run-1"])
+            self.assertEqual(bound["checks"], 1)
+            self.assertEqual(bound["sha256"], runner._sha256(directory / "controller_decisions.json"))
+            with self.assertRaisesRegex(ValueError, "policy SHA256 differs"):
+                runner._controller_evidence(directory, phase, "different", ["run-1"])
+            with self.assertRaisesRegex(ValueError, "Run ID differs"):
+                runner._controller_evidence(directory, phase, "pinned-policy", ["run-2"])
+            image.write_bytes(b"tampered")
+            with self.assertRaisesRegex(ValueError, "checkpoint SHA256 differs"):
+                runner._controller_evidence(directory, phase, "pinned-policy", ["run-1"])
 
     def test_setup_failure_skips_action_evaluation_but_runs_cleanup(self):
         config = manifest()

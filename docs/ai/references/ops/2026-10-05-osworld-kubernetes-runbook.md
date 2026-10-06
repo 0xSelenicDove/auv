@@ -675,6 +675,57 @@ failed. The observed raw Chrome score was `1.0`; the [evidence note](2026-10-05-
 records hashes and the exact boundary. This is one attended method-body
 evaluator result, not an unattended batch or OSWorld completion rate.
 
+### Scripted Chrome V1 one-task batch
+
+For the fixed Chrome `Favorites` task only, `k8s_task_controller.py` now
+connects the interactive AUV entry to the six-phase batch runner. It leaves
+the runner's action stdin closed: the controller is the action-phase process
+and opens a private foreground JSONL pipe to `auv-osworld-action`. The pinned
+policy sends five typed actions and requires spatial OCR gates on AUV
+checkpoint PNGs before continuing. This is a deterministic script, not an
+autonomous agent. The 2026-10-06 fresh batch completed with raw pinned
+evaluator score `1.0`, denominator one, no failure layers, and UID-safe
+cleanup; see the [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
+
+Start with a fresh `k8s_phase_adapter.py` episode config as described above.
+Set `task_id` explicitly to
+`2ad9387a-65d8-4e33-ad5b-7580065a27ca`; select new DNS-label-safe
+`batch_id`, `episode_id`, runtime Pod/Service/proxy names, and two unused
+loopback ports. Recheck `liet-gpu-1` readiness, the hot PVC/PV identity,
+image and binary hashes, and absence of the new resource names. A local
+batch input has exactly five fields:
+
+```json
+{
+  "batch_id": "unique-chrome-batch",
+  "episode": "/absolute/path/to/new-episode-config.json",
+  "action_binary": "/absolute/path/to/pinned/auv-osworld-action",
+  "tesseract_binary": "/absolute/path/to/pinned/tesseract",
+  "eng_traineddata": "/absolute/path/to/pinned/eng.traineddata"
+}
+```
+
+The controller checks the episode/task, current policy bytes, host action
+binary, Tesseract 5.5.2 executable, and English model against SHA256 pins
+before manifest generation. The audited display is 1920×1080; a different
+layout, missing OCR word, or failed typed delivery aborts the action rather
+than guessing another input. Use a new output directory for each attempt:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 /Users/neko/.pixi/envs/pip/bin/python evals/osworld/k8s_task_controller.py manifest --batch /absolute/path/to/new-batch.json > /absolute/path/to/reviewed-manifest.json
+PYTHONDONTWRITEBYTECODE=1 /Users/neko/.pixi/envs/pip/bin/python evals/osworld/batch_runner.py --manifest /absolute/path/to/reviewed-manifest.json --output-dir /absolute/path/to/new-output
+```
+
+Inspect `ledger.json` for all six phase statuses, failure layers, raw score,
+Run ID, controller trace hash, final PNG hash, and cleanup report. Also
+inspect `controller_decisions.json`, `checkpoints.json`, the checkpoint PNGs,
+and `action_evidence.json`. On timeout, a forced kill marks AUV held-input
+release unverified; do not infer remote release from local process exit.
+If reset fails, inspect the task-owned labels and UID journal before any
+manual deletion. Preserve the hot PVC/PV. The old attended sequence remains
+useful to debug a changed Chrome layout, but its exact coordinates should
+not be extended to VLC or V2.1 without a separately audited policy.
+
 ### Guest-local current-head gate through an owner Unix socket
 
 The 2026-10-06 V1 guest-local gate followed the Ubuntu 22.04 build recipe in

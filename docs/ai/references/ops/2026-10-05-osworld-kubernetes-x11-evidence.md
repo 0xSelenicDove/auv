@@ -1183,6 +1183,49 @@ Bound with UIDs `34143535-4ac2-42f2-a443-08db3f6b49ff` and
 [cleanup journal](/private/tmp/auv-osworld-v1-guestlocal-1006g/cleanup-journal.json)
 records exact task-owned UIDs.
 
+### Scripted Chrome V1 visual-controller batch
+
+On 2026-10-06, a fresh paired-remote V1 overlay on `liet-gpu-1` ran the
+fixed Chrome bookmark-folder task `2ad9387a-65d8-4e33-ad5b-7580065a27ca`
+through the six-phase batch runner. The predeclared denominator was **one**.
+The task JSON matched SHA256
+`4ddb526e5f3b9efa72a01e3ccae86ee4d698f480e4a526f9dfde85fd9499559c`;
+the pinned V1 revision was `b138d348256078fa634fc3b73567a7337c793e6b`.
+The [batch input](/private/tmp/auv-osworld-v1-scripted-1006n/batch.json),
+[episode config](/private/tmp/auv-osworld-v1-scripted-1006n/episode.json), and
+[generated manifest](/private/tmp/auv-osworld-v1-scripted-1006n/manifest.json)
+record the selected node, runtime image, qcow2, binaries, ports, and resource
+names. The interactive action binary SHA256 was
+`441acdbb3c06b9f916f5b090eb4c94c257643d2105d2a36cdfe758af847b4bf8`;
+the five-action policy SHA256 was
+`4e7c4fde21e452b2007ced6f25e2649e40b1c37094bee2b064da6c9ba73a28dc`.
+The controller used pinned Tesseract 5.5.2 and English model bytes to gate
+the next AUV action on spatial OCR of AUV checkpoint PNGs. It needed seven
+observations for the four gates; all gates passed. No CUA, VNC input,
+xdotool, PyAutoGUI, or OSWorld GUI relay was used for the task actions.
+
+The [durable ledger](/private/tmp/auv-osworld-v1-scripted-1006n/output/ledger.json)
+reports all six phases `ok`, no failure layers, and the pinned method-body
+evaluator's raw score **`1.0`**. The single AUV Run ID was
+`663a9979ded03bd661e187da564b578f`; the
+[controller decisions](/private/tmp/auv-osworld-v1-scripted-1006n/output/chrome-scripted-n/controller_decisions.json)
+SHA256 was `2ea4b1be695eaf89fe7a5a461665d94c67071dc28fa56c3f3066cbdeff3788ea`.
+The [final AUV PNG](/private/tmp/auv-osworld-v1-scripted-1006n/output/chrome-scripted-n/final-screenshot.png)
+SHA256 was `9709691aafa74395e70854daa887e14104fbaeca7f48812db7a90a9b21179955`;
+the [atomic sidecar](/private/tmp/auv-osworld-v1-scripted-1006n/output/chrome-scripted-n/action_evidence.json)
+SHA256 was `c81c47f05d675e1889ae41bb9d205c384ec8860a8fb4b657f17b95834641bb93`.
+Reset removed only its recorded proxy Pod, Service, and runtime Pod with UID
+preconditions. The retained hot PVC/PV stayed Bound with UIDs
+`34143535-4ac2-42f2-a443-08db3f6b49ff` and
+`8e8e46f1-0670-4a55-b06a-8caebb4d5a73`.
+
+This is one deterministic scripted baseline, not an autonomous-agent score
+or an official full-provider benchmark result. Its OCR gates were checked
+against archived positive and failed-static screenshots before this run;
+their robustness across other Chrome layouts is unproven. A successful
+foreground action still reports input delivery, not independent X11 receiver
+verification. VLC task solving and V2.1 task evaluation remain open.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

@@ -22,6 +22,7 @@ import time
 
 
 PHASES = ("boot", "install", "setup", "action", "evaluate", "reset")
+ACTION_TERM_GRACE_SECONDS = 8.0
 IDENTITY_FIELDS = (
     "benchmark", "benchmark_revision", "task_id", "task_sha256", "topology",
     "runtime_image", "qcow2", "auv_source", "auv_binary_sha256", "auv_target", "runner_identity",
@@ -98,43 +99,50 @@ def _validate_manifest(manifest: dict) -> None:
                 raise ValueError(f"{episode_id}/{name}: timeout_seconds must be positive and finite")
 
 
-def _stop_group(process: subprocess.Popen, grace_seconds: float = 0.2) -> bool:
-    """Signal the Unix group and check for remaining non-zombie members.
+def _group_has_live_members(pgid: int) -> bool | None:
+    """Return None when process-group quiescence cannot be verified."""
+    observed = subprocess.run(["ps", "-eo", "pgid=,stat="], capture_output=True, text=True, check=False)
+    if observed.returncode != 0:
+        return None
+    for row in observed.stdout.splitlines():
+        fields = row.split()
+        if len(fields) == 2 and fields[0].isdigit() and int(fields[0]) == pgid and not fields[1].startswith("Z"):
+            return True
+    return False
+
+
+def _stop_group(process: subprocess.Popen, grace_seconds: float = 0.2) -> tuple[bool, bool]:
+    """TERM, wait for the *whole* Unix group, then KILL if still live.
 
     NOTICE: A descendant that deliberately detaches into another process group
     cannot be contained by this host-side runner. That needs a task-owned
     container/cgroup adapter before remote batch claims are made.
+
+    Return (group_terminated, term_was_sufficient). A successful parent wait
+    alone does not prove that its AUV child finished releasing held input.
     """
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
         pass
-    try:
-        process.wait(timeout=grace_seconds)
-    except subprocess.TimeoutExpired:
-        pass
+    deadline = time.monotonic() + grace_seconds
+    while True:
+        process.poll()
+        members = _group_has_live_members(process.pid)
+        if members is False:
+            return True, True
+        if members is None or time.monotonic() >= deadline:
+            break
+        time.sleep(min(0.05, max(0, deadline - time.monotonic())))
     try:
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:
         pass
     try:
-        process.wait(timeout=grace_seconds)
+        process.wait(timeout=0.2)
     except subprocess.TimeoutExpired:
-        return False
-    try:
-        os.killpg(process.pid, 0)
-    except ProcessLookupError:
-        return True
-    # A killed orphan can remain a zombie while init reaps it. killpg(pid, 0)
-    # still sees that group; ps distinguishes it from a running descendant.
-    observed = subprocess.run(["ps", "-eo", "pgid=,stat="], capture_output=True, text=True, check=False)
-    if observed.returncode != 0:
-        return False
-    for row in observed.stdout.splitlines():
-        fields = row.split()
-        if len(fields) == 2 and fields[0].isdigit() and int(fields[0]) == process.pid and not fields[1].startswith("Z"):
-            return False
-    return True
+        return False, False
+    return _group_has_live_members(process.pid) is False, False
 
 
 def _run_phase(name: str, spec: dict, directory: Path, environment: dict[str, str]) -> dict:
@@ -162,21 +170,23 @@ def _run_phase(name: str, spec: dict, directory: Path, environment: dict[str, st
             try:
                 process.wait(timeout=spec["timeout_seconds"])
             except subprocess.TimeoutExpired:
-                stopped = _stop_group(process)
-                result.update(status="timeout" if stopped else "termination_failed", exit_code=process.poll(), group_terminated=stopped)
+                stopped, graceful = _stop_group(process, ACTION_TERM_GRACE_SECONDS if name == "action" else 0.2)
+                result.update(status="timeout" if stopped else "termination_failed", exit_code=process.poll(),
+                              group_terminated=stopped, termination_graceful=graceful)
             except KeyboardInterrupt:
-                stopped = _stop_group(process)
-                result.update(status="interrupted", exit_code=process.poll(), group_terminated=stopped)
+                stopped, graceful = _stop_group(process, ACTION_TERM_GRACE_SECONDS if name == "action" else 0.2)
+                result.update(status="interrupted", exit_code=process.poll(),
+                              group_terminated=stopped, termination_graceful=graceful)
                 interrupted = True
             except BaseException:
-                _stop_group(process)
+                _stop_group(process, ACTION_TERM_GRACE_SECONDS if name == "action" else 0.2)
                 raise
             else:
                 # An action command must not leave same-group children running.
-                stopped = _stop_group(process)
+                stopped, graceful = _stop_group(process, ACTION_TERM_GRACE_SECONDS if name == "action" else 0.2)
                 result.update(
                     status="ok" if process.returncode == 0 and stopped else "exit_failed" if stopped else "termination_failed",
-                    exit_code=process.returncode, group_terminated=stopped,
+                    exit_code=process.returncode, group_terminated=stopped, termination_graceful=graceful,
                 )
     result["ended_utc"] = _utc()
     result["elapsed_monotonic_ns"] = time.monotonic_ns() - start_ns
@@ -197,7 +207,34 @@ def _last_json_line(path: Path) -> dict:
     return value
 
 
-def _action_evidence(directory: Path, phase: dict) -> dict:
+def _controller_evidence(directory: Path, phase: dict, policy_sha256: str, run_ids: list[str]) -> dict:
+    """Bind a scripted controller's decisions to its observed AUV checkpoints."""
+    path = directory / "controller_decisions.json"
+    if not path.exists():
+        if phase["status"] == "ok":
+            raise ValueError("successful scripted action has no controller decision trace")
+        return {"status": "absent"}
+    decisions = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(decisions, dict) or decisions.get("schema_version") != 1 or decisions.get("policy_sha256") != policy_sha256:
+        raise ValueError("controller decision schema or policy SHA256 differs")
+    if decisions.get("run_id") is not None and [decisions["run_id"]] != run_ids:
+        raise ValueError("controller Run ID differs from AUV sidecar")
+    checks = decisions.get("checks")
+    if not isinstance(checks, list) or any(not isinstance(check, dict) for check in checks):
+        raise ValueError("controller decision checks are invalid")
+    for check in checks:
+        artifact = check.get("artifact")
+        if not isinstance(artifact, dict) or not re.fullmatch(r"checkpoint-[0-9]{4}\.png", str(artifact.get("path"))) or not re.fullmatch(r"[0-9a-f]{64}", str(artifact.get("sha256"))):
+            raise ValueError("controller checkpoint has invalid identity")
+        image = (directory / artifact["path"]).resolve(strict=True)
+        if not image.is_relative_to(directory.resolve()) or _sha256(image) != artifact["sha256"]:
+            raise ValueError("controller checkpoint SHA256 differs")
+    if phase["status"] == "ok" and (decisions.get("status") != "finished" or not checks):
+        raise ValueError("successful scripted action has no finished controller trace")
+    return {"status": decisions.get("status"), "path": path.name, "sha256": _sha256(path), "checks": len(checks)}
+
+
+def _action_evidence(directory: Path, phase: dict, identity: dict | None = None) -> dict:
     """Compare the producer's terminal stdout with its durable sidecar.
 
     The producer writes its AUV Run IDs progressively to the sidecar. On a
@@ -243,7 +280,10 @@ def _action_evidence(directory: Path, phase: dict) -> dict:
             terminal = None  # A killed process can leave a truncated line.
         if terminal is not None and (terminal.get("run_ids") != run_ids or terminal.get("final_artifact") != artifact):
             raise ValueError("action stdout and sidecar AUV Run IDs/artifact disagree")
-    return {"run_ids": run_ids, "final_artifact": artifact, "evidence_status": "verified", "sidecar_sha256": _sha256(path)}
+    result = {"run_ids": run_ids, "final_artifact": artifact, "evidence_status": "verified", "sidecar_sha256": _sha256(path)}
+    if identity is not None and "controller_policy_sha256" in identity:
+        result["controller"] = _controller_evidence(directory, phase, identity["controller_policy_sha256"], run_ids)
+    return result
 
 
 def _score(phase: dict) -> tuple[dict, float]:
@@ -297,9 +337,11 @@ def run_batch(manifest: dict, output_dir: Path) -> dict:
                 _write_ledger(path, ledger)
                 if name == "action":
                     try:
-                        episode["auv"] = _action_evidence(directory, phase)
+                        episode["auv"] = _action_evidence(directory, phase, spec["identity"])
                     except (OSError, ValueError, json.JSONDecodeError) as error:
                         episode["failure_layers"].append({"layer": "action_evidence", "detail": str(error)})
+                    if phase.get("termination_graceful") is False:
+                        episode["failure_layers"].append({"layer": "action_release", "reason": "forced_kill_unverified"})
                     _write_ledger(path, ledger)
                 if phase["status"] != "ok":
                     episode["failure_layers"].append({"layer": name, "reason": phase["status"]})
@@ -330,9 +372,11 @@ def run_batch(manifest: dict, output_dir: Path) -> dict:
             episode["phases"][name] = error.phase
             if name == "action":
                 try:
-                    episode["auv"] = _action_evidence(directory, error.phase)
+                    episode["auv"] = _action_evidence(directory, error.phase, spec["identity"])
                 except (OSError, ValueError, json.JSONDecodeError) as evidence_error:
                     episode["failure_layers"].append({"layer": "action_evidence", "detail": str(evidence_error)})
+                if error.phase.get("termination_graceful") is False:
+                    episode["failure_layers"].append({"layer": "action_release", "reason": "forced_kill_unverified"})
             episode["failure_layers"].append({"layer": "runner", "reason": "interrupted"})
             _write_ledger(path, ledger)
         except KeyboardInterrupt:

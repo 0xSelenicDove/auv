@@ -208,7 +208,7 @@ V2.1 2.71 s). Exact test executable, binary, and result hashes are in the
 evidence note. This closes the guest-local adapter-delivery gate, not a full
 paired-remote episode or a task-evaluator gate.
 
-### 4. Batch scheduler and evaluator pilot — one live capture control passed; multi-task action batch pending
+### 4. Batch scheduler and evaluator pilot — two-task transport batch passed; task-solving batch pending
 
 Only after action gates pass, run a small, reproducible official-task batch on
 fresh overlays. Each episode needs a known image revision, task assets and
@@ -428,6 +428,20 @@ This closes the current-head **guest-local transport/lifecycle** gate, not a
 task evaluator or independent X11 ButtonRelease receiver gate. The next
 unclosed boundary is an audited controller for a frozen task-solving batch;
 V2.1 asset/setup/evaluator coverage remains separate.
+
+A fail-closed scripted visual controller then passed a **fresh one-task Chrome
+V1 batch** on `liet-gpu-1`. The five-action policy and Tesseract build/model
+were SHA-pinned; four spatial screenshot gates took seven AUV observations
+inside one Run. All six phases completed, the pinned Chrome method-body
+evaluator returned raw `1.0`, no failure layers were recorded, and UID-safe
+cleanup preserved the hot PVC/PV. This closes one deterministic task-solving
+baseline and proves the controller can drive the real six-phase path; it is
+not an autonomous-agent rate or a two-task task-solving batch. The next slice
+is a separately audited VLC visual policy or another predeclared task with a
+stable observed transition, followed by a frozen multi-task denominator.
+V2.1 task setup/evaluator and asset coverage remain separate. See the
+[evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md) and
+[runbook](2026-10-05-osworld-kubernetes-runbook.md).
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires

@@ -136,18 +136,22 @@ the runner's process group. The action binary owns atomic sidecar updates and
 identical final stdout; the runner validates both plus the PNG digest. No
 arbitrary action argv, shell/Python GUI source, or OSWorld GUI relay is
 accepted. The host must be able to reach the guest AUV daemon through the
-existing paired port-forward. No live typed-action batch has passed yet.
+existing paired port-forward. A frozen two-task typed-move infrastructure
+batch passed; its `0.0` scores were expected and are not task-solving rates.
 The manifest records the action-entry implementation commit
 `349e5c18812337ac9ee7088418eed9ecce53bde4` separately from the measured
 binary SHA256. This identifies reviewed source; it does not prove a
 reproducible build from that commit. The persisted plan's action array is
 re-read and compared with the audited template before launching the binary.
-Paired-RPC held-input release/Run finish on hard timeout remains unproven:
-`batch_runner.py` currently gives TERM only a 0.2-second grace before KILL.
+Paired-RPC held-input release/Run finish on hard timeout remains unproven.
+The batch runner now gives the action process group at most eight seconds
+after TERM before KILL, records whether TERM alone stopped the group, and
+marks a forced kill as an unverified input-release failure layer. A graceful
+process-group exit still does not independently prove the remote Run outcome.
 
-TODO: Real Chrome/VLC solution scripts remain deferred until their typed AUV
-sequences are independently audited and approved; the fixed infrastructure
-templates must not silently be repurposed as benchmark attempts.
+The infrastructure templates must not silently be repurposed as benchmark
+attempts. A separate scripted Chrome pilot is described below; VLC task
+solving still needs its own audited visual policy.
 
 ## Local typed-action entry
 
@@ -257,8 +261,45 @@ local diagnostic interface, not a new arbitrary-action Kubernetes phase:
 `batch_runner.py` still closes action stdin and the capture-only controls stay
 unchanged. The ignored isolated-Xorg gate checks one Run across before/after
 captures and typed input; until it is run, live cleanup and Chrome dialog
-readiness are unproven. No adaptive observation harness or Chrome task-solving
-script is provided here.
+readiness were tested in a later attended gate. The interactive entry remains
+a transport, not an agent policy. The separate scripted Chrome controller
+below supplies a fixed observation policy.
+
+### Scripted Chrome V1 controller — local implementation, no batch result yet
+
+`k8s_task_controller.py` accepts one operator-audited Chrome V1 episode and a
+SHA-pinned `auv-osworld-action --interactive` host binary. The manifest
+contains exactly one episode, so its fixed denominator is one; this is an
+end-to-end pilot, not a multi-task benchmark rate. A local batch input has
+exactly these fields:
+
+```json
+{
+  "batch_id": "unique-chrome-batch",
+  "episode": "/absolute/path/to/chrome-episode-config.json",
+  "action_binary": "/absolute/path/to/auv-osworld-action",
+  "tesseract_binary": "/absolute/path/to/tesseract",
+  "eng_traineddata": "/absolute/path/to/eng.traineddata"
+}
+```
+
+The controller reuses the pinned V1 boot/install/setup/evaluate/reset and
+UID-checked resource cleanup. In the action phase it reads only AUV checkpoint
+PNGs, uses a pinned Tesseract build/model and 1920×1080 spatial OCR gates,
+and sends the SHA-pinned five typed actions for the Chrome `Favorites` folder.
+Each gate allows at most three observations; an ambiguous state ends the
+action without guessing another GUI input. Rust persists the Run ID, original
+`InputActionResult` values, checkpoint hashes, and final sidecar; the
+controller persists its OCR decisions. The batch runner binds the decision
+trace and checkpoint hashes to the pinned policy and Run. Only the selected
+upstream evaluator phase supplies the raw score. This is a deterministic
+scripted baseline, not autonomous-agent completion. Local archived screenshot
+and process-group tests pass. A fresh one-task Chrome V1 batch subsequently
+completed on `liet-gpu-1` with raw pinned evaluator score `1.0`, seven
+checkpoint observations, no failure layers, and UID-safe reset. That is a
+single scripted task result, not an agent rate or a multi-task benchmark.
+See the [evidence note](../../docs/ai/references/ops/2026-10-05-osworld-kubernetes-x11-evidence.md)
+for Run and artifact hashes.
 
 ### Batch runner outcome
 
