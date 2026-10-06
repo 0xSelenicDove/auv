@@ -606,11 +606,16 @@ Task099 class, upstream `get_vm_file` body, and gated image bytes; calls the
 original task methods; and rejects upload/readback, file transport, or answer
 cache failures instead of treating those failures as a legitimate `0.0`.
 Focused offline tests include the expected no-answer zero and exact-coordinate
-full score. The bridge does not boot or identify a Pod, enforce AUV-only action
-execution, run Task044, or schedule a V2.1 batch. Its next acceptance gate is
-a fresh Task099 guest with UID-pinned port-forward, AUV Run evidence, exact
-upstream raw result, and UID-safe reset. Until then its evidence level is
-offline boundary tests, not live V2.1 task execution.
+full score. A fresh official V2.1 KVM guest subsequently passed the bridge's
+image-upload/readback and no-answer evaluation: upstream raw score `0.0`,
+direct `/file` HTTP 404 for `position.txt`, and UID-preconditioned cleanup.
+The new guest did not have AUV installed, so no screenshot or action Run was
+recorded. This establishes a live **file-only negative control**, not an
+AUV task episode. The bridge does not boot or identify a Pod, enforce AUV-only
+action execution, run Task044, or schedule a V2.1 batch. The next gate is a
+fresh UID-pinned Task099 episode with a source-pinned installed AUV binary,
+action/capture evidence, exact upstream raw result, and safe reset. See the
+[live acceptance record](2026-10-07-osworld-v2-task099-bridge-acceptance.md).
 
 ### 5. Agent/harness evaluation — two selected V2.1 attempts, no rate
 
