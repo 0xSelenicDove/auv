@@ -668,6 +668,20 @@ batch agent score. Next is still tool-isolated model I/O and a pinned model
 identity, followed by guest-local gateway and a predeclared cohort. See the
 [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
 
+The guest-local relay slice now reuses the same gateway and single
+Run loop but connects to the desktop owner's Unix socket inside the official
+Ubuntu guest. Its preflight requires SHA-pinned Linux AUV/action binaries,
+an owner-owned socket, a unique online local Device ID reported by the AUV
+daemon, a fresh episode directory, and bounded proposals. The complete
+118-test Python suite passes with 10 existing skips. A fresh V1 guest-local
+control used the checked-in relay for one `capture → MOVE_TO → capture →
+finish` Run; host-key-verified SFTP copies of its AUV PNGs matched the
+gateway/Rust evidence. It used older SHA-pinned Linux ELFs and no task
+setup/evaluator, so it is not current-head Linux behavior or a benchmark
+score. The model's AUV-only tool restriction and pinned model identity remain
+open independently of the relay topology. See the [evidence note]
+(2026-10-05-osworld-kubernetes-x11-evidence.md).
+
 ## Operating rules
 
 - Work through these items in order; each item may be delegated to one bounded

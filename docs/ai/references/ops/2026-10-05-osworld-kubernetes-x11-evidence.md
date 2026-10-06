@@ -1663,6 +1663,54 @@ no Pods or Services for the episode. The V1 hot PVC/PV UIDs remained
 `34143535-4ac2-42f2-a443-08db3f6b49ff` and
 `8e8e46f1-0670-4a55-b06a-8caebb4d5a73`.
 
+### Guest-local attended relay control on a fresh V1 overlay
+
+On 2026-10-06, a separate fresh V1 QEMU/KVM overlay on `liet-gpu-1`
+exercised the checked-in `agent_action_guest_local.py` through the desktop
+owner's Unix socket. This was a **non-solving infrastructure control**, not
+an OSWorld task attempt. The V1 qcow2 SHA256 was
+`6bf667a852b3c307f61d9f09c42559351f45e0607e428b4997becf534cf4d313`;
+the runtime image was pinned to
+`happysixd/osworld-docker@sha256:0e6497a9295647cf05bf2b2af522fdd79bdeba2737595259cab310a3bcf6baa9`.
+The guest Linux `auv` and `auv-osworld-action` ELFs were SHA-verified older
+builds from source commit `49745a5ad1b56ca26c2c06d2cba90bc3ed0e0a5b`,
+**not the current PR head**. The new Python relay and its three sibling files
+were copied and checked byte-for-byte. The full OSWorld Python test suite
+also passed offline: 118 tests, 10 existing skips.
+
+Non-GUI bootstrap created a temporary, unprivileged key-only SSH server as
+guest UID 1000; its ED25519 host key was pinned before SSH/SFTP. Neither
+OSWorld setup nor evaluator APIs carried task GUI input or screenshots. The
+guest AUV daemon listened on `unix:///home/user/auv.sock`; its read-only
+Device list reported exactly one online local Device ID
+`d7744c4f370dd25b68758d1c75d6ace2d034d5592d3f9223c61c985a820f61d8`.
+The relay completed one Run `10f511f1e5be9692db6f37876cab3ebb` with
+`capture → MOVE_TO(600,500) → capture → finish`. Before the move, the first
+AUV PNG was copied by host-key-verified SFTP and SHA-checked against the
+receipt (`aeb7008173b61fbb65c9b5b2a68c280c4b2f2717f62f300f4b9bd7d6d164fc69`).
+The second checkpoint and final PNG both hash to
+`e16e493b345fef67be7516b01193452caaafa7f59796c10f52b0aefbaf773f4a`.
+The [gateway decisions](/private/tmp/auv-osworld-v1-gl-relay-1006-S0YY6f/evidence/agent_decisions.json)
+record four ordered receipts and `finished`, matching the [Rust terminal
+sidecar](/private/tmp/auv-osworld-v1-gl-relay-1006-S0YY6f/evidence/action_evidence.json)
+and two-checkpoint index. The original [input
+result](/private/tmp/auv-osworld-v1-gl-relay-1006-S0YY6f/evidence/input-action-results.json)
+selected `foreground_system_events` with `succeeded=true`, `verified=false`:
+delivery succeeded, but pointer movement was not independently observed.
+
+No task setup or evaluator ran, so there is **no raw score** for this control.
+The adapter's initial `boot` call was interrupted when a second local
+port-forward occupied its setup port; the forward was stopped and the same
+runtime Pod/container/overlay then passed the adapter's stability and identity
+checks. UID-preconditioned reset removed only the task-owned runtime/proxy
+Pods and Service; a read-only postcheck found them absent. The V1 hot PVC/PV
+UIDs above and V2 hot PVC remained Bound. The temporary SSH private key was
+deleted. The [full local report](/private/tmp/auv-osworld-v1-gl-relay-1006-S0YY6f/report.md)
+records the bootstrap package versions, host-key fingerprint, exact resource
+UIDs, and SFTP artifacts. This closes the guest-local **relay transport gate**,
+not current-head Linux ELF behavior, semantic input verification, enforced
+model-tool isolation, or an agent benchmark rate.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

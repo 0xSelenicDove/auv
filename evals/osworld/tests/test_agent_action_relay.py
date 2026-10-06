@@ -15,6 +15,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import agent_action_relay as relay  # noqa: E402
+import k8s_phase_adapter as phase  # noqa: E402
 from test_agent_action_transport import FAKE_CHILD  # noqa: E402
 
 
@@ -46,12 +47,12 @@ class AgentActionRelayTest(unittest.TestCase):
         self.binary.chmod(0o700)
         self.binary_hash = hashlib.sha256(self.binary.read_bytes()).hexdigest()
         (self.directory / "paired-device.json").write_text(json.dumps({"device_id": "device-1",
-            "guest_auv_sha256": relay.GUEST_AUV_SHA256}))
+            "guest_auv_sha256": phase.GUEST_AUV_SHA256}))
         self.profile_path = self.directory / "paired-profiles.json"
         self.profile_path.write_text(json.dumps({"profiles": {"episode-1": {
             "device_id": "device-1", "device_name": "guest", "endpoint": "http://127.0.0.1:38001",
             "device_credential": "test-secret"}}}))
-        self.config_patch = patch.object(relay, "load_config", return_value=self.config)
+        self.config_patch = patch.object(phase, "load_config", return_value=self.config)
         self.config_patch.start()
         self.addCleanup(self.config_patch.stop)
 
@@ -70,7 +71,7 @@ class AgentActionRelayTest(unittest.TestCase):
             os.close(write_fd)
         output = io.StringIO()
         FakeEpisode.forwards.clear()
-        with patch.object(relay, "Episode", FakeEpisode):
+        with patch.object(phase, "Episode", FakeEpisode):
             try:
                 code = relay.relay(config, directory, binary, prepared,
                                    max_actions=2, max_captures=2, input_fd=read_fd, output=output)

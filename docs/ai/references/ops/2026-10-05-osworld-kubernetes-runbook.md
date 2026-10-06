@@ -912,6 +912,47 @@ retained hot image PVC/PV must stay Bound. This gate proves guest-local AUV
 action/Run lifecycle, **not** an OSWorld evaluator score; a same-test second
 Run does not replace an independent X11 `ButtonRelease` receiver trace.
 
+For a guest-local **agent** session, use the installed
+`evals/osworld/agent_action_guest_local.py` with the three sibling files
+`agent_action_relay.py`, `agent_action_gateway.py`, and
+`agent_action_transport.py` in one guest directory. Copy their reviewed bytes
+through the same host-key-verified SSH/SFTP path above and compare SHA256 on
+both sides before execution. The guest entry does not import the Kubernetes
+adapter, open a port-forward, pair a Device, call OSWorld setup/evaluator
+APIs, choose an action, or read a model. Run it over SSH as the same
+**unprivileged desktop UID** that owns the actual `/home/user/auv.sock`, with
+one new absolute guest episode directory and explicit operator-measured
+SHA256 values for both installed Linux ELFs:
+
+```sh
+python3 /home/user/auv-evals/agent_action_guest_local.py \
+  --episode-dir /home/user/osworld-episode-unique \
+  --action-binary /home/user/auv-osworld-action \
+  --action-sha256 ACTION_ELF_SHA256 \
+  --auv-binary /home/user/auv \
+  --auv-sha256 AUV_ELF_SHA256 \
+  --daemon-endpoint unix:///home/user/auv.sock \
+  --device-id FULL_CANONICAL_DEVICE_ID \
+  --max-actions 32 --max-captures 32
+```
+
+Preflight requires an owner Unix socket, rejects TCP and symlinks, and verifies
+the exact canonical Device ID through the installed AUV's read-only
+`devices list --endpoint ... --json` output (`source=daemon`, `local=true`,
+`status=online`). The `ready` and proposal/receipt JSONL contract is the
+same as the paired relay. Keep SSH stdin open until `finish` or `abort`; EOF
+before a terminal receipt cancels the Run. A `capture` receipt names a PNG
+path **inside the guest** and its SHA256. Copy only that AUV-produced file by
+SFTP over the verified host key to a new host artifact path; compare the
+host copy's SHA256 to the receipt before showing it to the agent or using its
+checkpoint identity in a proposal. The copy is evidence transfer, not a
+second GUI capture or input path. Host-key pinning and the host-side SFTP
+destination are operator responsibilities; no AUV receipt authenticates SSH
+or proves that host bytes were copied. Preserve the guest Run sidecars and
+the host proposal/receipt transcript as separate evidence. This entry has
+offline fake-child/Unix ownership tests only; an agent OSWorld score requires
+a separate fresh-VM run and pinned evaluator.
+
 This runbook reproduces the infrastructure and both AUV control topologies. It
 does not yet provide:
 

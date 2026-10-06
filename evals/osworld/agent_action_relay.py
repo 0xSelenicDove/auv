@@ -8,6 +8,7 @@ not call the evaluator, and only opens the already-owned Pod's AUV forward.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -17,7 +18,6 @@ import time
 
 from agent_action_gateway import AgentActionGateway, DIGEST
 from agent_action_transport import ForegroundActionTransport, MAX_LINE_BYTES, MAX_SESSION_BYTES
-from k8s_phase_adapter import Episode, GUEST_AUV_SHA256, load_config, sha256
 
 
 # Keep the relay below Rust's 240-second idle and 570-second total limits.
@@ -45,8 +45,18 @@ def absolute_file(path: Path, label: str) -> Path:
     return resolved
 
 
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def paired_context(config: dict, directory: Path) -> dict:
     """Check install evidence without printing the paired bearer credential."""
+    from k8s_phase_adapter import GUEST_AUV_SHA256
+
     paired = json.loads((directory / "paired-device.json").read_text(encoding="utf-8"))
     if not isinstance(paired, dict) or not isinstance(paired.get("device_id"), str) or not paired["device_id"]:
         raise ValueError("paired Device ID evidence is missing")
@@ -68,6 +78,8 @@ def paired_context(config: dict, directory: Path) -> dict:
 
 
 def prepare(config_path: Path, directory_path: Path, binary_path: Path, binary_sha256: str) -> tuple[dict, Path, Path, dict]:
+    from k8s_phase_adapter import load_config
+
     config_path = absolute_file(config_path, "config")
     if not directory_path.is_absolute():
         raise ValueError("episode directory must be an absolute path")
@@ -143,31 +155,40 @@ def proposal_lines(input_fd: int, child: ForegroundActionTransport, *, deadline:
 
 def relay(config: dict, directory: Path, binary: Path, context: dict, *, max_actions: int,
           max_captures: int, input_fd: int, output) -> int:
+    from k8s_phase_adapter import Episode
+
+    episode = Episode(config, directory)
+    with episode.forward(auv=True):
+        return run_session(directory, binary, context, max_actions=max_actions,
+                           max_captures=max_captures, input_fd=input_fd, output=output)
+
+
+def run_session(directory: Path, binary: Path, context: dict, *, max_actions: int,
+                max_captures: int, input_fd: int, output) -> int:
+    """Own one foreground AUV Run; topology-specific setup happens before this boundary."""
     context_path = write_context(directory, context)
     gate = None
     try:
-        episode = Episode(config, directory)
-        with episode.forward(auv=True):
-            with ForegroundActionTransport(binary, context_path, directory) as child:
-                gate = AgentActionGateway(directory, child.ready, child.exchange,
-                                          max_actions=max_actions, max_captures=max_captures)
-                deadline = time.monotonic() + SESSION_SECONDS
-                emit({"op": "ready", "run_id": gate.run_id, "episode_dir": str(directory),
-                      "limits": {"actions": max_actions, "captures": max_captures}}, output)
-                for count, proposal in enumerate(proposal_lines(input_fd, child, deadline=deadline), 1):
-                    if count > MAX_PROPOSALS or time.monotonic() >= deadline:
-                        raise TimeoutError("proposal count or session budget exceeded")
-                    receipt = gate.submit(proposal)
-                    reply = {"op": "receipt", "seq": proposal["seq"], "receipt": receipt}
-                    if proposal["op"] == "capture":
-                        # Gateway has already verified checkpoint index and PNG bytes.
-                        reply["checkpoint_path"] = str(directory / receipt["artifact"]["path"])
-                        reply["checkpoint_sha256"] = receipt["artifact"]["sha256"]
-                    if gate.closed:
-                        reply["status"] = gate.trace["status"]
-                    emit(reply, output)
-                    if gate.closed:
-                        return 0 if gate.trace["status"] == "finished" else 1
+        with ForegroundActionTransport(binary, context_path, directory) as child:
+            gate = AgentActionGateway(directory, child.ready, child.exchange,
+                                      max_actions=max_actions, max_captures=max_captures)
+            deadline = time.monotonic() + SESSION_SECONDS
+            emit({"op": "ready", "run_id": gate.run_id, "episode_dir": str(directory),
+                  "limits": {"actions": max_actions, "captures": max_captures}}, output)
+            for count, proposal in enumerate(proposal_lines(input_fd, child, deadline=deadline), 1):
+                if count > MAX_PROPOSALS or time.monotonic() >= deadline:
+                    raise TimeoutError("proposal count or session budget exceeded")
+                receipt = gate.submit(proposal)
+                reply = {"op": "receipt", "seq": proposal["seq"], "receipt": receipt}
+                if proposal["op"] == "capture":
+                    # Gateway has already verified checkpoint index and PNG bytes.
+                    reply["checkpoint_path"] = str(directory / receipt["artifact"]["path"])
+                    reply["checkpoint_sha256"] = receipt["artifact"]["sha256"]
+                if gate.closed:
+                    reply["status"] = gate.trace["status"]
+                emit(reply, output)
+                if gate.closed:
+                    return 0 if gate.trace["status"] == "finished" else 1
     except BaseException as error:
         if gate is not None and not gate.closed:
             gate.closed = True
@@ -201,8 +222,5 @@ def main() -> int:
         return 1
 
 
-# TODO(guest-local-relay): Unix-socket context is deferred because this entry
-# only has paired-profile install evidence. Add it after a guest-local episode
-# proves socket ownership, binary identity, and Run/artifact lifecycle.
 if __name__ == "__main__":
     raise SystemExit(main())
