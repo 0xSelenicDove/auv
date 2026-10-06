@@ -402,6 +402,20 @@ inside one persistent AUV Run, then decide when to send the next typed input.
 Do not infer that a fixed inter-action sleep will solve the race without
 observing the relevant dialog state first.
 
+A bounded benchmark-local `--interactive --context` JSONL entry now keeps
+typed actions and intermediate AUV captures in one persistent Runner. A fresh
+attended Chrome V1 episode used it to inspect the `Favorites` dialog before
+Save, click the visible button through AUV, and confirm the folder in the
+post-click AUV checkpoint. The pinned evaluator bridge returned raw `1.0`,
+and UID-safe reset completed. This closes one same-Runner **attended**
+task-directed gate. It does not prove why the static replays failed: adding
+observations also added time between actions. The entry is not wired into
+`batch_runner.py`, whose action stdin remains closed; no unattended agent
+policy or predeclared task-solving denominator has been evaluated. The next
+slice is an audited interactive controller/batch boundary, followed by a
+guest-local current-head build and held-input cancellation gate. See the
+[evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
+
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
 approval.` After the owner approved access, read-only dry-runs at revision

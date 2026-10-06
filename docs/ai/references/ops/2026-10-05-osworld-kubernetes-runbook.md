@@ -629,6 +629,52 @@ Local tests, with no cluster access, are:
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals/osworld/tests -p 'test_k8s_phase_adapter.py' -v
 ```
 
+### Attended Chrome V1 task-directed gate
+
+The benchmark-local `auv-osworld-action --interactive --context
+/absolute/context.json` now accepts one strict JSONL action/capture sequence
+over a single AUV Run. It is **not** the `batch_runner.py` action phase: the
+runner deliberately sets stdin to `DEVNULL`. For a supervised rerun, use a
+new episode ID, distinct resource names/ports, and a fresh episode directory
+with the pinned `k8s_phase_adapter.py` config above. Validate the config,
+then invoke its `boot`, `install`, and `setup` phases in order. After install,
+write a version-1 context JSON with `kind: paired`, the observed canonical
+`device_id`, `config_profile` equal to the episode ID, and the absolute
+`paired-profiles.json` path. The context file contains no action array.
+
+The interactive process requires `AUV_OSWORLD_EPISODE_DIR` and
+`AUV_OSWORLD_ACTION_EVIDENCE` pointing to that episode and its
+`action_evidence.json`. Keep the existing `Episode.forward(auv=True)` context
+open around the foreground process; a previous direct launch without the
+port-forward failed before obtaining a Run. The operator sends newline-ended
+requests and waits for each JSONL response before continuing:
+
+```json
+{"seq":1,"op":"capture"}
+{"seq":2,"op":"action","action":{"action_type":"HOTKEY","keys":["ctrl","shift","b"]}}
+{"seq":3,"op":"capture"}
+{"seq":4,"op":"action","action":{"action_type":"RIGHT_CLICK","x":400,"y":128}}
+{"seq":5,"op":"capture"}
+{"seq":6,"op":"action","action":{"action_type":"CLICK","x":500,"y":532}}
+{"seq":7,"op":"capture"}
+{"seq":8,"op":"action","action":{"action_type":"TYPING","text":"Favorites"}}
+{"seq":9,"op":"capture"}
+{"seq":10,"op":"action","action":{"action_type":"CLICK","x":1269,"y":638}}
+{"seq":11,"op":"capture"}
+{"seq":12,"op":"finish"}
+```
+
+These were the 2026-10-06 attended Chrome observations, **not** a fixed
+general-purpose script. Inspect each AUV checkpoint before selecting the next
+action; abort if the screenshot differs. Before Save, check that `Favorites`
+is entered and the button is visible at the chosen coordinate. After Save,
+check that the folder appears. On `finish`, compare the final stdout JSON
+with the atomic sidecar and verify the PNG SHA256. Run the pinned `evaluate`
+phase separately, then the UID-safe `reset` phase even if any earlier phase
+failed. The observed raw Chrome score was `1.0`; the [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md)
+records hashes and the exact boundary. This is one attended method-body
+evaluator result, not an unattended batch or OSWorld completion rate.
+
 This runbook reproduces the infrastructure and both AUV control topologies. It
 does not yet provide:
 

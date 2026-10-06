@@ -1077,6 +1077,53 @@ delay alone is therefore insufficient. The missing evidence is the UI state
 or otherwise failed from these two terminal images. No coordinates or action
 order were changed within either episode.
 
+### Attended same-Runner Chrome V1 positive gate
+
+An independently fresh V1 overlay on `liet-gpu-1` tested the benchmark-local
+interactive entry from head `bf5c6c04` (host Mach-O binary SHA256
+`441acdbb3c06b9f916f5b090eb4c94c257643d2105d2a36cdfe758af847b4bf8`).
+The [operator config](/private/tmp/auv-osworld-v1-interactive-1006m/config.json)
+SHA256 was `c471ca2737bbe5dc753f45e869d40aef4ab9d9b167165cd417dc434783614afc`;
+the task remained the pinned Chrome V1 JSON/revision. Boot validated a fresh
+qcow2 backing-file overlay and Pod UID. Install paired Device ID
+`999ebf70f12d169950e11cc4640d242c38a6f528e6b23ca985618fd79842cd7e`;
+the pinned upstream setup method returned true. An initial launch without the
+phase-owned port-forward failed at connection before creating a Run or
+delivering GUI input. The attended launch then used the adapter's UID-checked
+`forward(auv=True)` context, not the OSWorld GUI relay.
+
+One AUV Runner/Run, `a9db99a6a866414d75b5912392c43d02`, captured the
+initial Chrome desktop and interleaved the same five typed actions used by
+the static attempts: Ctrl+Shift+B, right-click `(400,128)`, click Add folder
+`(500,532)`, type `Favorites`, and click Save `(1269,638)`. The
+[request record](/private/tmp/auv-osworld-v1-interactive-1006m/chrome-interactive-m/action-requests.json)
+SHA256 is `9ae2884ab3e594ad5ff9726e1c9fa7f6fdefda6d9a9f67886a9c9c647b20495c`.
+All five original typed deliveries reported successful
+`foreground_system_events` attempts with `verified=false`; delivery alone
+did not prove the UI state. The [pre-Save AUV checkpoint](/private/tmp/auv-osworld-v1-interactive-1006m/chrome-interactive-m/checkpoint-0005.png)
+SHA256 `5e108b7e251aa6fcfa1ee0c4fc05fb4aff11a5e655631fad727ac2d91bcdd695`
+shows `Favorites` entered, `Bookmarks bar` selected, and Save at the scripted
+coordinate. The [post-Save checkpoint](/private/tmp/auv-osworld-v1-interactive-1006m/chrome-interactive-m/checkpoint-0006.png)
+SHA256 `716759054a53669dd35ae69fb64156c1985e82060ab7a66bd165bab8333bc1bf`
+shows the dialog closed and `Favorites` on the bookmark bar. The
+[checkpoint index](/private/tmp/auv-osworld-v1-interactive-1006m/chrome-interactive-m/checkpoints.json)
+SHA256 is `6a71e0fb48147a03c6ab575bfe14ac47f31f4f9322968696d998df72419ed4db`;
+the final same-Runner PNG SHA256 is
+`bbcdf2dc5ff1db647bea5f4067e7ef6f06574f29c72dec684f597596455861b3`,
+matching the [atomic sidecar](/private/tmp/auv-osworld-v1-interactive-1006m/chrome-interactive-m/action_evidence.json)
+SHA256 `c7329e6576352edd1781b8105af4244ac85c720134e64c339353d59db70eb535`.
+
+The unchanged pinned V1 `DesktopEnv.evaluate()` method-body bridge returned
+raw score **`1.0`** after official postconfig. This is one attended,
+task-directed positive gate, not an unattended batch, full upstream provider
+run, or representative OSWorld success rate. Inter-action observation and
+elapsed time differ from the failed static replays; the comparison does not
+isolate which factor made Save effective. Direct phase invocations did not
+create a six-phase `batch_runner.py` ledger. UID-safe reset removed only the
+task-owned Pod/Service/proxy; an independent label query found none, and the
+V1 hot PVC/PV UIDs stayed `34143535-4ac2-42f2-a443-08db3f6b49ff` and
+`8e8e46f1-0670-4a55-b06a-8caebb4d5a73`.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

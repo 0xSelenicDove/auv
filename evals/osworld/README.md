@@ -229,7 +229,7 @@ foreground with a JSONL stdin/stdout pipe. It emits a `ready` line containing
 the newly persisted AUV Run ID. Send one newline-terminated JSON object per
 request, with consecutive `seq` starting at 1:
 
-```json
+```jsonl
 {"seq":1,"op":"capture"}
 {"seq":2,"op":"action","action":{"action_type":"CLICK","x":1270,"y":638}}
 {"seq":3,"op":"capture"}
