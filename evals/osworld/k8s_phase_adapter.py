@@ -291,7 +291,7 @@ class Episode:
                     process.kill()
                     process.wait(timeout=2)
 
-    def delete_owned(self, origin: str, item: dict) -> None:
+    def request_deletion(self, origin: str, item: dict) -> None:
         """Kubernetes checks UID under its DELETE lock, not in a prior GET."""
         plural = "pods" if item["kind"] == "pod" else "services" if item["kind"] == "service" else None
         if plural is None:
@@ -299,21 +299,37 @@ class Episode:
         url = f"{origin}/api/v1/namespaces/{self.config['namespace']}/{plural}/{item['name']}"
         body = {"apiVersion": "v1", "kind": "DeleteOptions", "preconditions": {"uid": item["uid"]}}
         deletion = request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"}, method="DELETE")
-        with request.urlopen(deletion, timeout=30) as response:
+        # Keep three sequential API requests plus the shared 120s observation
+        # inside the reset phase's 180s hard deadline.
+        with request.urlopen(deletion, timeout=10) as response:
             if response.status not in (200, 202):
                 raise RuntimeError(f"Kubernetes UID-preconditioned DELETE returned HTTP {response.status}")
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            try:
-                remaining = self.get(item["kind"], item["name"])
-            except RuntimeError as error:
-                if "NotFound" in str(error) or "not found" in str(error):
-                    return
-                raise
-            if remaining["metadata"].get("uid") != item["uid"]:
-                raise ValueError(f"{item['kind']}/{item['name']} was replaced after deletion")
-            time.sleep(0.25)
-        raise TimeoutError(f"UID-preconditioned deletion did not remove {item['kind']}/{item['name']}")
+
+    def wait_deleted(self, items: list[dict], timeout_seconds: float = 120) -> None:
+        """Observe all accepted deletions under one reset-phase budget.
+
+        A Pod can remain terminating past its 30-second grace period. A shared
+        budget prevents three sequential waits from exhausting reset's 180s
+        hard deadline before the remaining owned objects are removed.
+        """
+        deadline = time.monotonic() + timeout_seconds
+        pending = {(item["kind"], item["name"]): item["uid"] for item in items}
+        while pending and time.monotonic() < deadline:
+            for (kind, name), uid in list(pending.items()):
+                try:
+                    remaining = self.get(kind, name)
+                except RuntimeError as error:
+                    if "NotFound" in str(error) or "not found" in str(error):
+                        del pending[(kind, name)]
+                        continue
+                    raise
+                if remaining["metadata"].get("uid") != uid:
+                    raise ValueError(f"{kind}/{name} was replaced after deletion")
+            if pending:
+                time.sleep(0.25)
+        if pending:
+            targets = ", ".join(f"{kind}/{name} uid={uid}" for (kind, name), uid in sorted(pending.items()))
+            raise TimeoutError(f"UID-preconditioned deletion did not remove: {targets}")
 
     def _post(self, route: str, value: dict) -> dict:
         url = f"http://127.0.0.1:{self.config['setup_local_port']}{route}"
@@ -493,8 +509,10 @@ class Episode:
                     role = "qemu" if item["name"] == self.config["runtime_pod"] else "proxy" if item["name"] == self.config["proxy_pod"] else None
                     if observed["metadata"].get("uid") != item["uid"] or observed["metadata"].get("labels") != self._labels(role):
                         raise ValueError(f"refusing to delete replaced {item['kind']}/{item['name']}")
-                    self.delete_owned(origin, item)
-                    removed.append({"kind": item["kind"], "name": item["name"], "uid": item["uid"]})
+                for item in reversed(owned):
+                    self.request_deletion(origin, item)
+                self.wait_deleted(owned)
+                removed = [{"kind": item["kind"], "name": item["name"], "uid": item["uid"]} for item in reversed(owned)]
             retained = self._retained_pvc()
             if self.identity_path.exists() and retained != json.loads(self.identity_path.read_text())["retained_pvc"]:
                 raise ValueError("retained hot PVC/PV identity changed")

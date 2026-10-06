@@ -238,16 +238,78 @@ class AdapterTest(unittest.TestCase):
         item = {"kind": "pod", "name": "chrome-vm", "uid": "exact-uid"}
         response = MagicMock()
         response.status = 200
-        with patch.object(adapter.request, "urlopen") as urlopen, \
-             patch.object(self.episode, "get", side_effect=RuntimeError("NotFound")):
+        with patch.object(adapter.request, "urlopen") as urlopen:
             urlopen.return_value.__enter__.return_value = response
-            self.episode.delete_owned("http://127.0.0.1:12345", item)
+            self.episode.request_deletion("http://127.0.0.1:12345", item)
         outgoing = urlopen.call_args.args[0]
         self.assertEqual(outgoing.get_method(), "DELETE")
         self.assertEqual(outgoing.full_url, "http://127.0.0.1:12345/api/v1/namespaces/bench/pods/chrome-vm")
         self.assertEqual(json.loads(outgoing.data), {
             "apiVersion": "v1", "kind": "DeleteOptions", "preconditions": {"uid": "exact-uid"},
         })
+
+    def test_delete_waits_past_pod_grace_period_for_accepted_uid(self):
+        # ROOT CAUSE:
+        # If an accepted Pod DELETE disappears just after its 30-second grace
+        # period, the old 30-second observation budget falsely failed reset.
+        # The fix keeps the UID-preconditioned request and waits separately
+        # long enough to observe the same object actually disappear.
+        item = {"kind": "pod", "name": "chrome-vm", "uid": "exact-uid"}
+        now = [0.0]
+
+        def get_after_grace(_kind, _name):
+            if now[0] >= 40:
+                raise RuntimeError("NotFound")
+            return {"metadata": {"uid": "exact-uid"}}
+
+        with patch.object(self.episode, "get", side_effect=get_after_grace), \
+             patch.object(adapter.time, "monotonic", side_effect=lambda: now[0]), \
+             patch.object(adapter.time, "sleep", side_effect=lambda seconds: now.__setitem__(0, now[0] + seconds)):
+            self.episode.wait_deleted([item])
+        self.assertGreaterEqual(now[0], 40)
+
+    def test_shared_delete_budget_reports_pending_uid_without_false_success(self):
+        items = [
+            {"kind": "pod", "name": "chrome-vm", "uid": "vm-uid"},
+            {"kind": "service", "name": "chrome-svc", "uid": "svc-uid"},
+        ]
+        now = [0.0]
+
+        def get_one_stuck(kind, name):
+            if kind == "service":
+                raise RuntimeError("NotFound")
+            return {"metadata": {"uid": "vm-uid"}}
+
+        with patch.object(self.episode, "get", side_effect=get_one_stuck), \
+             patch.object(adapter.time, "monotonic", side_effect=lambda: now[0]), \
+             patch.object(adapter.time, "sleep", side_effect=lambda seconds: now.__setitem__(0, now[0] + seconds)):
+            with self.assertRaisesRegex(TimeoutError, "pod/chrome-vm uid=vm-uid"):
+                self.episode.wait_deleted(items, timeout_seconds=1)
+
+    def test_reset_requests_all_uid_deletes_before_shared_wait(self):
+        owned = [
+            {"kind": "pod", "name": "chrome-vm", "uid": "vm-uid"},
+            {"kind": "service", "name": "chrome-svc", "uid": "svc-uid"},
+            {"kind": "pod", "name": "chrome-proxy", "uid": "proxy-uid"},
+        ]
+        adapter.write_json(self.episode.owned_path, owned)
+        events = []
+
+        def observed(kind, name):
+            uid = next(item["uid"] for item in owned if item["kind"] == kind and item["name"] == name)
+            role = "qemu" if name == "chrome-vm" else "proxy" if name == "chrome-proxy" else None
+            return {"metadata": {"uid": uid, "labels": self.episode._labels(role)}}
+
+        with patch.object(self.episode, "api_proxy", return_value=nullcontext("http://127.0.0.1:12345")), \
+             patch.object(self.episode, "get", side_effect=observed), \
+             patch.object(self.episode, "request_deletion", side_effect=lambda _origin, item: events.append(("delete", item["uid"]))), \
+             patch.object(self.episode, "wait_deleted", side_effect=lambda items: events.append(("wait", [item["uid"] for item in items]))), \
+             patch.object(self.episode, "_retained_pvc", return_value={"name": "osworld-v1-hot"}):
+            self.episode.reset()
+        self.assertEqual(events, [
+            ("delete", "proxy-uid"), ("delete", "svc-uid"), ("delete", "vm-uid"),
+            ("wait", ["vm-uid", "svc-uid", "proxy-uid"]),
+        ])
 
     def test_api_proxy_stays_in_runner_group_and_is_closed(self):
         process = MagicMock()
