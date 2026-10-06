@@ -677,6 +677,14 @@ evaluator result, not an unattended batch or OSWorld completion rate.
 
 ### Attended one-Run agent gateway canary
 
+For a **new** exploratory Chrome→VLC agent cohort, freeze the
+[two-episode declaration](2026-10-06-osworld-v1-codex-agent-cohort.md) in a
+commit before booting either VM. Its fixed denominator and shared prompt/
+budget policy apply to both fresh Codex sub-agents. The attended relay below
+is not a `batch_runner.py` action phase because the runner closes phase stdin;
+do not report its two rows as an unattended batch ledger or official OSWorld
+rate.
+
 For an agent-selected task attempt, do not send unreviewed agent JSONL
 directly to `auv-osworld-action`. Keep one foreground interactive child under
 `agent_action_transport.py` and pass proposals through

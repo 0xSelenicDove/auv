@@ -2,7 +2,7 @@
 
 Setup, tooling, feature gates, cross-cutting notes
 
-Count: **29**
+Count: **30**
 
 - [`2026-05-12-setup.md`](2026-05-12-setup.md)
 - [`2026-05-13-airi-desktop-reuse.md`](2026-05-13-airi-desktop-reuse.md)
@@ -33,6 +33,7 @@ Count: **29**
 - [`2026-10-05-osworld-kubernetes-x11-evidence.md`](2026-10-05-osworld-kubernetes-x11-evidence.md): Live paired/shared-socket X11 evidence, QEMU Pod design, and pinned one- and two-task scripted V1 batch results and failures.
 - [`2026-10-05-osworld-kubernetes-runbook.md`](2026-10-05-osworld-kubernetes-runbook.md): Operator runbook for booting retained OSWorld V1/V2.1 qcow2 images on ihome, installing AUV, exercising both control topologies, and rerunning fixed V1 scripted tasks.
 - [`2026-10-06-osworld-auv-infrastructure-plan.md`](2026-10-06-osworld-auv-infrastructure-plan.md): Ordered TODO and acceptance gates for aligning the X11 PR, mapping OSWorld actions, revalidating official guests, batching tasks, and evaluating an agent.
+- [`2026-10-06-osworld-v1-codex-agent-cohort.md`](2026-10-06-osworld-v1-codex-agent-cohort.md): Frozen exploratory Chrome→VLC V1 Codex-agent membership, shared policy, denominator, and evidence/claim boundaries.
 - [`2026-10-06-osworld-v2-assets-preflight.md`](2026-10-06-osworld-v2-assets-preflight.md): Pinned Hugging Face access, size and hash evidence for V2.1 Task099/044 assets, Task044 setup/evaluator audit, and a Shotcut live environment preflight without task scoring.
 - [`2026-10-06-osworld-v2-task044-episode.md`](2026-10-06-osworld-v2-task044-episode.md): One bounded blind AUV-only Task044 Shotcut attempt, partial evaluator score, protocol limitations, artifact hashes, and cleanup evidence.
 

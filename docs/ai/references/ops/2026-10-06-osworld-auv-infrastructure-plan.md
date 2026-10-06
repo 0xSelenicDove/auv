@@ -682,6 +682,15 @@ score. The model's AUV-only tool restriction and pinned model identity remain
 open independently of the relay topology. See the [evidence note]
 (2026-10-05-osworld-kubernetes-x11-evidence.md).
 
+The next exploratory V1 Chrome→VLC Codex-agent cohort now has a
+[pre-boot declaration](2026-10-06-osworld-v1-codex-agent-cohort.md) fixing
+membership, order, shared prompt/budgets, denominator two, and evidence
+categories. This is a docs-only planning gate, not an executed cohort: the
+attended JSONL relay cannot be passed directly to `batch_runner.py`, which
+closes action stdin. Model build identity and AUV-only tool isolation remain
+unverified, so any eventual result must be labeled selected exploratory
+evidence rather than a formal benchmark score.
+
 ## Operating rules
 
 - Work through these items in order; each item may be delegated to one bounded
