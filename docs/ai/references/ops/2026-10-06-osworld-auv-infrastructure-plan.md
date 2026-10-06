@@ -262,10 +262,22 @@ An experimental V1 Chrome paired-remote adapter now fixes the six phase
 commands around a capture-only negative control. Its local tests cover pinned
 task/binary configuration, guest and overlay identity checks, AUV-only pixel
 observation, task-owned port-forward lifetimes, and UID-preconditioned reset.
-It has **not** run a Kubernetes episode. The V1 hot qcow2 digest and proxy
-image still require measured, audited inputs; a create-to-ownership-journal
-crash gap also requires manual recovery. A capture-only `0.0` is a scheduler
-negative control, not an agent attempt or AUV GUI-input capability result.
+The V1 hot qcow2 digest and proxy image were measured and audited for the
+first live gate, which stopped in boot before the AUV action phase; a
+create-to-ownership-journal crash gap still requires manual recovery. A
+capture-only `0.0` would be a scheduler negative control, not an agent attempt
+or AUV GUI-input capability result.
+
+The first live control stopped in `boot`: the pinned runtime launched QEMU
+with `-hda /boot.qcow2`, not the adapter's assumed `-snapshot /System.qcow2`.
+No installation, action, or evaluation occurred. Reset's 30-second Pod
+disappearance check also timed out; the task-owned proxy vanished shortly
+afterward, and the remaining Pod and Service were removed with UID
+preconditions. All task resources are absent and the hot PVC/PV remained
+Bound. The reset observation policy has since been widened with a regression
+test, but not yet rechecked live. Before retrying, verify the image's actual
+disposable-disk lifecycle. Retain the failed episode and denominator in the
+[evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires

@@ -822,6 +822,38 @@ probe used a cached Python slim image's stdlib TCP proxy. The guest needed
 `libtesseract4`, `liblept5`, and English Tesseract data installed before this
 path ran. These are infrastructure prerequisites, not hidden task actions.
 
+### Bounded runner's first V1 live gate: boot failure, no task attempt
+
+On 2026-10-06, the new local-tested batch runner and experimental Kubernetes
+adapter scheduled one Chrome capture-only negative control on `liet-gpu-1`.
+Before boot, a task-owned Pod read the V1 hot PVC read-only: `System.qcow2` was
+24,460,197,888 bytes with SHA256
+`6bf667a852b3c307f61d9f09c42559351f45e0607e428b4997becf534cf4d313`.
+That measurement Pod was UID-precondition deleted; the retained PVC/PV UIDs
+and Bound states were unchanged.
+
+The runner ledger fixed denominator `1` before execution. Boot created the
+task-owned runtime Pod, proxy Pod, and Service, then failed at its explicit
+overlay check: the live QEMU command included `-enable-kvm` but booted
+`-hda /boot.qcow2`, without `-snapshot` or `/System.qcow2`. The adapter had
+assumed a QEMU `-snapshot` overlay and correctly refused to infer a fresh
+guest from this different command. No install, setup, AUV action, evaluator,
+AUV Run, or score occurred. This is an infrastructure validation failure,
+**not** an agent result. The [ledger](/private/tmp/auv-osworld-v1-negative-config.pYIvsQ/live-20261006-0205/ledger.json)
+has SHA256 `6c2aaffe85cec6363230125a0abdd5beaef2898e3fcc10fe8cb8a50174078627`;
+its boot and reset stderr digests are `e631586c7c1a05b8827cd974402ef67e688a4b9bbdbcf09dc4db5893abc4ff9d`
+and `09c30d42c2ce6d6c1a4a0a451f08e06b3e1ff8af0ad83f487d65df783fe4fa`.
+
+Automatic reset sent a UID-preconditioned DELETE for the proxy Pod, but its
+30-second disappearance check timed out just before the proxy vanished.
+After checking ownership labels and UIDs against the task journal, the operator
+used the same UID-preconditioned API path to remove the remaining runtime Pod
+and Service. All three are now absent; the V1 hot PVC/PV UIDs remain Bound.
+The reset wait policy has since been widened with a regression test, but has
+not yet been rechecked in a live episode. The next slice must verify the
+image's actual backing-file overlay mechanism before another attempt. Do not
+reuse this failed episode or report it as a capture-only evaluator control.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve
