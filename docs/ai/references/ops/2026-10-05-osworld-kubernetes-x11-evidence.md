@@ -1060,6 +1060,23 @@ pilot, **not** evidence that AUV lacks a save-click capability or an agent
 completion-rate observation. No coordinates were changed or retried in this
 episode.
 
+A second independent Chrome replay kept the exact same action-array bytes
+(SHA256 `cd4e301159692edafeb5e535642ddc860b0413bea2d9c953191d410122c7ea4e`)
+and changed only the new plan field `final_settle_ms` to `2000`. The
+[ledger](/private/tmp/auv-osworld-v1-positive-settle.YmIGAE/output/ledger.json)
+has SHA256 `216a509bc4b17b7aaa5a98ff13e3b18945d9c2ae10c88f366ecf9e85065eefdc`.
+All six phases and UID-safe reset again succeeded. Run
+`b000a3f2d70588629345d54e84744628` recorded all five typed deliveries as
+successful system-event attempts with `verified=false`; its same-Runner
+[final PNG](/private/tmp/auv-osworld-v1-positive-settle.YmIGAE/output/chrome-positive-settle-l/final-screenshot.png)
+has SHA256 `51c3ef4b56390af6327cc0e00a9467612eedf86e4ce57a21605db94cd5210b3a`.
+After the two-second wait, the `New folder` dialog still displayed
+`Favorites` and Save; the pinned evaluator still returned `0.0`. A final
+delay alone is therefore insufficient. The missing evidence is the UI state
+*before* the Save click; do not infer whether the click raced dialog readiness
+or otherwise failed from these two terminal images. No coordinates or action
+order were changed within either episode.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

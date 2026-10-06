@@ -393,6 +393,15 @@ click. A narrowly bounded post-action settle/observation gate is the next
 diagnostic slice; do not label this discrepancy an X11 click failure or
 replay the same episode with changed coordinates.
 
+A fresh comparison repeated the byte-identical Chrome action array with
+`final_settle_ms=2000`. All delivery attempts and cleanup succeeded, but
+the dialog still showed Save after the delay and the evaluator still scored
+`0.0`. Waiting only after the full sequence is not enough. The next narrow
+capability should let the harness observe a screenshot **between** actions
+inside one persistent AUV Run, then decide when to send the next typed input.
+Do not infer that a fixed inter-action sleep will solve the race without
+observing the relevant dialog state first.
+
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
 approval.` After the owner approved access, read-only dry-runs at revision
