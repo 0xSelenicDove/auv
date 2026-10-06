@@ -207,7 +207,7 @@ V2.1 2.71 s). Exact test executable, binary, and result hashes are in the
 evidence note. This closes the guest-local adapter-delivery gate, not a full
 paired-remote episode or a task-evaluator gate.
 
-### 4. Batch scheduler and evaluator pilot — two-episode exploratory run complete; durable runner pending
+### 4. Batch scheduler and evaluator pilot — local durable runner implemented; Kubernetes adapter pending
 
 Only after action gates pass, run a small, reproducible official-task batch on
 fresh overlays. Each episode needs a known image revision, task assets and
@@ -245,6 +245,18 @@ but only a blinded agent attempt measures agent behavior. The old scratch
 `/tmp/auv-osworld-batch-20261005/harness.py` and `slot.py` are not a compliant
 implementation: they launch AUV GUI commands through OSWorld `/setup/execute`
 and use stale listener flags. Preserve them as historical scratch only.
+
+`evals/osworld/batch_runner.py` now supplies the benchmark-local process and
+ledger gate for an operator-audited, predeclared manifest. It records all
+scheduled episodes before execution, bounds each phase independently, stops
+the action process group at its deadline, records AUV Run IDs and final
+screenshot digest from an action sidecar, and keeps an absent score distinct
+from evaluator-returned zero. The local tests cover timeout, interruption,
+evaluator failure, cleanup layering, and both target identities. This is not
+yet a cluster batch: the runner does not verify that manifest commands use
+AUV-only GUI delivery, stop detached or remote processes, pin a Pod UID, or
+prove a fresh qcow2 overlay and task-owned reset. Those belong to the next
+audited Kubernetes phase adapter before any unattended batch claim.
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
