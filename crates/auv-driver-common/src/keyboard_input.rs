@@ -3,12 +3,17 @@
 //! A hold retains its original delivery route until every key is released.
 //! The controller owns one held combination per local driver process; other
 //! processes and physical keyboard input are outside this guarantee.
+use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use crate::{DriverError, DriverResult, InputActionResult, InputDeliveryPath};
 
 pub type KeyboardHoldId = u64;
+
+// NOTICE: Bound idempotence memory while retaining enough recent IDs for
+// delayed/retried Runner responses. Increase only with a measured retry need.
+const RELEASED_ID_HISTORY: usize = 64;
 
 /// A platform adapter with keys already validated and resolved to native codes.
 pub trait KeyboardBackend: Send + Sync + 'static {
@@ -28,7 +33,7 @@ struct Held {
 #[derive(Default)]
 struct State {
   next_id: KeyboardHoldId,
-  released_id: Option<KeyboardHoldId>,
+  released_ids: VecDeque<KeyboardHoldId>,
   held: Option<Held>,
   posting: bool,
   releasing: bool,
@@ -137,7 +142,7 @@ impl KeyboardHoldController {
       }
       let held = match state.held.as_ref() {
         Some(held) => held,
-        None if state.released_id == Some(id) => return Ok(InputActionResult::single_success(InputDeliveryPath::Noop)),
+        None if state.released_ids.contains(&id) => return Ok(InputActionResult::single_success(InputDeliveryPath::Noop)),
         None => return Err(invalid("unknown keyboard hold")),
       };
       if held.id != id {
@@ -157,7 +162,10 @@ impl KeyboardHoldController {
     state.releasing = false;
     if error.is_none() {
       state.held = None;
-      state.released_id = Some(id);
+      state.released_ids.push_back(id);
+      if state.released_ids.len() > RELEASED_ID_HISTORY {
+        state.released_ids.pop_front();
+      }
     } else if let Some(held) = state.held.as_mut() {
       held.uncertain = true;
     }
