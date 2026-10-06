@@ -709,6 +709,15 @@ round trips, change the Rust 570-second Run limit, isolate model tools, or
 authorize a replay of the frozen cohort. A direct model-I/O path and a new
 predeclared cohort remain separate next slices.
 
+The [model I/O design/TODO](2026-10-06-osworld-agent-model-io-design.md)
+proposes a no-environment Agents API session with only AUV functions, using
+the existing gateway and foreground Rust child. It fixes the required
+session/turn/call-to-Run evidence, image-result size bound, non-replay rule,
+offline tests, and fresh-guest validation gates. This is **not implemented**:
+the current workspace has no API credential, provider behavior has not been
+probed, separately billed API use awaits an owner decision, and the proposed
+path does not prove an immutable model build or a benchmark score.
+
 ## Operating rules
 
 - Work through these items in order; each item may be delegated to one bounded

@@ -2,7 +2,7 @@
 
 Setup, tooling, feature gates, cross-cutting notes
 
-Count: **31**
+Count: **34**
 
 - [`2026-05-12-setup.md`](2026-05-12-setup.md)
 - [`2026-05-13-airi-desktop-reuse.md`](2026-05-13-airi-desktop-reuse.md)
@@ -32,6 +32,7 @@ Count: **31**
 - [`2026-09-23-crates-io-publication-reference.md`](2026-09-23-crates-io-publication-reference.md)
 - [`2026-10-05-osworld-kubernetes-x11-evidence.md`](2026-10-05-osworld-kubernetes-x11-evidence.md): Live paired/shared-socket X11 evidence, QEMU Pod design, and pinned one- and two-task scripted V1 batch results and failures.
 - [`2026-10-05-osworld-kubernetes-runbook.md`](2026-10-05-osworld-kubernetes-runbook.md): Operator runbook for booting retained OSWorld V1/V2.1 qcow2 images on ihome, installing AUV, exercising both control topologies, and rerunning fixed V1 scripted tasks.
+- [`2026-10-06-osworld-agent-model-io-design.md`](2026-10-06-osworld-agent-model-io-design.md): Proposed AUV-only model function boundary, durable call/Run correlation, offline adapter tests, and credentialed validation gates; design only.
 - [`2026-10-06-osworld-auv-infrastructure-plan.md`](2026-10-06-osworld-auv-infrastructure-plan.md): Ordered TODO and acceptance gates for aligning the X11 PR, mapping OSWorld actions, revalidating official guests, batching tasks, and evaluating an agent.
 - [`2026-10-06-osworld-v1-codex-agent-cohort.md`](2026-10-06-osworld-v1-codex-agent-cohort.md): Frozen exploratory Chrome→VLC V1 Codex-agent membership, shared policy, denominator, and evidence/claim boundaries.
 - [`2026-10-06-osworld-v1-codex-agent-cohort-evidence.md`](2026-10-06-osworld-v1-codex-agent-cohort-evidence.md): Two incomplete prompt-restricted Codex-agent V1 Runs on fresh guests, their raw evaluator results, relay/protocol failure layers, and cleanup evidence.
