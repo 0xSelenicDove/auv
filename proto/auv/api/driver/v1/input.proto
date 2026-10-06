@@ -12,6 +12,14 @@ import "auv/api/image/v1/region.proto";
 import "google/protobuf/duration.proto";
 
 service InputService {
+  // Observes the OS pointer in logical screen coordinates. This does not
+  // create a logical mouse, reserve input, move the pointer, or deliver input.
+  // TODO(pointer-click-atomic): A later click may see a different position;
+  // add an atomic at-pointer action only if a caller needs that guarantee.
+  rpc GetMousePosition(GetMousePositionRequest) returns (GetMousePositionResponse) {
+    option (auv.api.annotations.v1.discoverable) = true;
+    option (auv.api.annotations.v1.effect) = METHOD_EFFECT_READ_ONLY;
+  }
   // NOTICE: Timed hold is a local driver convenience, not an RPC capability.
   // Remote convenience awaits an approved atomic sequence contract; client-side
   // sleep cannot preserve whole-gesture admission and cancellation cleanup.
@@ -76,10 +84,14 @@ service InputService {
     option (auv.api.annotations.v1.discoverable) = true;
     option (auv.api.annotations.v1.effect) = METHOD_EFFECT_INPUT;
   }
+  // Delivers foreground wheel scrolling at a screen point. Deltas use the
+  // shared logical-pixel Scroll contract; delivery does not prove viewport motion.
+  rpc ScrollScreenPoint(ScrollScreenPointRequest) returns (ScrollScreenPointResponse) {
+    option (auv.api.annotations.v1.discoverable) = true;
+    option (auv.api.annotations.v1.effect) = METHOD_EFFECT_INPUT;
+  }
   // Wheel-style scroll at a window-local point. Delivery evidence only: a
   // delivered wheel event does not prove the target viewport moved.
-  // TODO(screen-point-scroll): screen/display-relative scroll is deferred until
-  // a caller needs it; platform global scroll primitives do not share one API.
   rpc ScrollWindowPoint(ScrollWindowPointRequest) returns (ScrollWindowPointResponse) {
     option (auv.api.annotations.v1.discoverable) = true;
     option (auv.api.annotations.v1.effect) = METHOD_EFFECT_INPUT;
@@ -144,6 +156,13 @@ service InputService {
     option (auv.api.annotations.v1.discoverable) = true;
     option (auv.api.annotations.v1.effect) = METHOD_EFFECT_INPUT;
   }
+}
+
+message GetMousePositionRequest {}
+
+message GetMousePositionResponse {
+  // OS pointer position in the Device screen's logical coordinate space.
+  ScreenPoint point = 1;
 }
 
 enum InputPolicy {
@@ -299,7 +318,7 @@ enum ScrollDeliveryCandidate {
   SCROLL_DELIVERY_CANDIDATE_FOREGROUND_HID = 4;
 }
 
-// Scroll amount in logical pixels of the target window's coordinate space.
+// Scroll amount in logical pixels of the target point's coordinate space.
 // Positive delta_y moves the viewport toward later content (down) and positive
 // delta_x moves it right, matching DOM WheelEvent. Both values must be finite
 // and at least one must be non-zero. The Driver converts to native wheel units;
@@ -611,6 +630,17 @@ message ClickScreenPointRequest {
 }
 
 message ClickScreenPointResponse {
+  ScreenPoint point = 1;
+  InputActionResult action = 2;
+}
+
+message ScrollScreenPointRequest {
+  ScreenPoint point = 1;
+  Scroll scroll = 2;
+  google.protobuf.Duration settle = 3;
+}
+
+message ScrollScreenPointResponse {
   ScreenPoint point = 1;
   InputActionResult action = 2;
 }

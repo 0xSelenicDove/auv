@@ -842,6 +842,35 @@ fn scroll_rpc_accepts_only_finite_non_zero_deltas_before_delivery() {
   }
 }
 
+#[tokio::test]
+async fn screen_scroll_rpc_reuses_window_scroll_validation_before_delivery() {
+  let service = LocalInputService {
+    session: auv_driver::open_local().unwrap(),
+  };
+  let point = proto::ScreenPoint { x: 10.0, y: 20.0 };
+  for scroll in [
+    None,
+    Some(proto::Scroll {
+      delta_x: 0.0,
+      delta_y: 0.0,
+    }),
+    Some(proto::Scroll {
+      delta_x: 0.0,
+      delta_y: f64::NAN,
+    }),
+  ] {
+    let error = service
+      .scroll_screen_point(Request::new(proto::ScrollScreenPointRequest {
+        point: Some(point.clone()),
+        scroll,
+        settle: None,
+      }))
+      .await
+      .unwrap_err();
+    assert_eq!(error.code(), tonic::Code::InvalidArgument);
+  }
+}
+
 #[test]
 fn scroll_rpc_preserves_candidate_order_and_rejects_unknown_or_repeated_candidates() {
   assert_eq!(scroll_options_from_proto(None).unwrap(), auv_driver::ScrollOptions::default());

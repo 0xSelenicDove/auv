@@ -546,6 +546,16 @@ fn permission_status_to_proto(status: auv_driver::PermissionStatus) -> macos_pro
 
 #[tonic::async_trait]
 impl InputService for LocalInputService {
+  async fn get_mouse_position(
+    &self,
+    _: Request<proto::GetMousePositionRequest>,
+  ) -> Result<Response<proto::GetMousePositionResponse>, Status> {
+    let point = self.session.input().current_position().map_err(driver_status)?;
+    Ok(Response::new(proto::GetMousePositionResponse {
+      point: Some(raw_screen_point_to_proto(point)),
+    }))
+  }
+
   async fn create_mouse(&self, _: Request<proto::CreateMouseRequest>) -> Result<Response<proto::CreateMouseResponse>, Status> {
     Ok(Response::new(proto::CreateMouseResponse {
       mouse: self.session.input().create_mouse().map_err(driver_status)?,
@@ -856,6 +866,32 @@ impl InputService for LocalInputService {
       point: Some(screen_point_to_proto(point)),
       action: Some(input_action_to_proto(action)?),
     }))
+  }
+
+  async fn scroll_screen_point(
+    &self,
+    request: Request<proto::ScrollScreenPointRequest>,
+  ) -> Result<Response<proto::ScrollScreenPointResponse>, Status> {
+    let request = request.into_inner();
+    let point = screen_point_from_proto(request.point.ok_or_else(|| Status::invalid_argument("point is required"))?)?;
+    let settle = duration_from_proto(request.settle, std::time::Duration::ZERO, "settle")?;
+    let scroll = scroll_from_proto(request.scroll)?;
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    {
+      let session = self.session.clone();
+      let action = run_input_blocking(move || session.input().scroll_at(point.point(), scroll, settle)).await?;
+      Ok(Response::new(proto::ScrollScreenPointResponse {
+        point: Some(screen_point_to_proto(point)),
+        action: Some(input_action_to_proto(action)?),
+      }))
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    {
+      // TODO(macos-screen-scroll-point): expose this RPC when the macOS driver owns a
+      // typed screen-point scroll capability instead of only window scrolling.
+      let _ = (&self.session, point, scroll, settle);
+      Err(Status::unimplemented("screen-point scrolling is unavailable on this Runner platform"))
+    }
   }
 
   async fn move_mouse(&self, request: Request<proto::MoveMouseRequest>) -> Result<Response<Self::MoveMouseStream>, Status> {
