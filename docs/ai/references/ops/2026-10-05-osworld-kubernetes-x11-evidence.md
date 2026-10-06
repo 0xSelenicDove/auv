@@ -782,6 +782,46 @@ removed. The retained hot PVC remained Bound. A durable scheduler, retained
 per-episode raw evaluator JSON, and full upstream runner integration remain
 next gates.
 
+### Chrome evaluator-only method-body control pair
+
+A subsequent Chrome-only bridge in `evals/osworld/v1_evaluator.py` executes
+the **pinned original method bodies** for task binding, setup, postconfig,
+getter, and `DesktopEnv.evaluate()` against an externally managed QEMU guest.
+It avoids importing V1's entire provider/evaluator dependency tree by selecting
+only the audited methods from a clean V1 checkout. It does **not** instantiate
+the upstream Docker provider, call `DesktopEnv.reset()`/`step()`, or represent
+a full official runner. The bridge allowlists only Chrome task
+`2ad9387a-65d8-4e33-ad5b-7580065a27ca` at task SHA256
+`4ddb526e5f3b9efa72a01e3ccae86ee4d698f480e4a526f9dfde85fd9499559c`.
+VLC is deliberately not enabled in this method-body path yet.
+
+On `liet-gpu-1`, two **independent** fresh V1 read-only-base overlays used
+QEMU runtime image digest
+`sha256:0e6497a9295647cf05bf2b2af522fdd79bdeba2737595259cab310a3bcf6baa9`.
+Both phases ran with `PYTHONDONTWRITEBYTECODE=1` and a 180-second process
+timeout. No GUI input was sent in the negative control:
+
+| Control | UTC phase times, 2026-10-06 | Exact bridge score | AUV evidence |
+| --- | --- | --- | --- |
+| No-action negative, `osworld-v1-eval-probe-1006` | prepare 00:00:50–00:00:51; evaluate 00:00:55–00:00:59 | `0.0` | None; intentionally no GUI input |
+| AUV-only positive, `osworld-v1-eval-pos-1006` | prepare 00:06:09–00:06:10; AUV action to about 00:07:37 (under 10 minutes); evaluate 00:07:41–00:07:46 | `1.0` | Paired Mac AUV → guest installed AUV 0.0.28 (guest SHA256 `2a8e53eecfef1dcd8fa8368fa480d6df36e254527c7e60be3ac82802e7073427`); final capture Run `81a8847d-d382-0999-28b6-416a15e421a8`, PNG SHA256 `c252c8bd7659c13c02760d98504ba1b8baa74a67c2b13839ccf166aa954d2dda` visibly shows `Favorites` |
+
+The positive control used AUV for Ctrl+Shift+B, bookmark-bar context menu,
+folder creation, text entry, Save, and capture. Setup/evaluation used only
+their control-plane endpoints; neither OSWorld `/execute` nor PyAutoGUI sent
+AUV GUI input. The original bridge stdout reported `"score": 0.0` and
+`"score": 1.0` respectively. These are **evaluator-only method-body control
+results**, not full `DesktopEnv`/provider benchmark scores or a general
+completion rate. The bridge's local pinned-source contract tests passed 2/2.
+Its episode marker checks task hash and endpoint but cannot prove a reused
+port-forward still reaches the same guest; a durable scheduler must pin the
+Pod UID across phases. Both temporary VM/Service/proxy sets and Mac pairing
+profile were removed and verified absent; the V1 image/hot PVCs stayed Bound.
+An Alpine proxy initially failed to fetch `apk` from its mirror, so the live
+probe used a cached Python slim image's stdlib TCP proxy. The guest needed
+`libtesseract4`, `liblept5`, and English Tesseract data installed before this
+path ran. These are infrastructure prerequisites, not hidden task actions.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

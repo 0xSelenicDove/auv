@@ -295,6 +295,15 @@ See the [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md) for
 task hashes, AUV artifacts, timing, and cleanup. A durable batch scheduler,
 full-runner integration, and larger predeclared sample remain pending.
 
+A later Chrome-only evaluator boundary now runs selected pinned upstream
+`DesktopEnv.evaluate()`/setup/getter/metric **method bodies** against an
+externally managed VM, without constructing the Docker provider or calling
+`step()`. Fresh official V1 guest negative and AUV-only positive controls
+returned `0.0` and `1.0` respectively. This improves on metric-only
+extraction but still is **not** full upstream-module/provider execution or a
+general batch runner. The bridge is allowlisted to the Chrome task/hash; VLC
+and V2.1 need separate audits. See the evidence note and runbook.
+
 For V2.1, a static audit of all 108 hash-verified task classes selected
 `Task099` as the first strict AUV-only pilot. Its setup only downloads
 `task_099/my_image.png` to the guest Desktop; its evaluator only retrieves

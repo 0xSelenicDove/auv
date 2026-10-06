@@ -487,6 +487,42 @@ or other mocked sites also require a self-hosted
 `Task-Web/OSWorld-web@osworld-v2.1` deployment and a matching
 `WEBSITE_HOST_SUFFIX`. A booted VM alone cannot run all 108 tasks comparably.
 
+### Chrome-only V1 evaluator method-body pilot
+
+For the pinned Chrome bookmark-folder task, the repository's
+`evals/osworld/v1_evaluator.py` can run audited upstream setup and
+`DesktopEnv.evaluate()` **method bodies** against an already booted guest.
+It avoids the upstream Docker provider and the unrelated heavy Python import
+tree; the host Python environment needs `requests`. It is evaluator-only, not
+the complete official runner. Start from a fresh V1 overlay, retain the Pod
+UID, and use the section 4 guest API port-forward. Run from the AUV checkout:
+
+```bash
+export OSWORLD_V1_CHECKOUT=/absolute/path/to/pinned/OSWorld
+export OSWORLD_EPISODE_DIR="$(mktemp -d)"
+export OSWORLD_CHROME_TASK=2ad9387a-65d8-4e33-ad5b-7580065a27ca
+PYTHONDONTWRITEBYTECODE=1 timeout 180 python3 evals/osworld/v1_evaluator.py prepare \
+  --upstream "$OSWORLD_V1_CHECKOUT" --task-id "$OSWORLD_CHROME_TASK" \
+  --episode-dir "$OSWORLD_EPISODE_DIR" --endpoint http://127.0.0.1:5000
+# Only AUV may observe and change the desktop. Stop its action phase by 10 min.
+PYTHONDONTWRITEBYTECODE=1 timeout 180 python3 evals/osworld/v1_evaluator.py evaluate \
+  --upstream "$OSWORLD_V1_CHECKOUT" --task-id "$OSWORLD_CHROME_TASK" \
+  --episode-dir "$OSWORLD_EPISODE_DIR" --endpoint http://127.0.0.1:5000
+```
+
+The example uses GNU `timeout`; on macOS use `gtimeout` from coreutils or run
+the evaluator in a Linux tooling container. Do not reuse an episode directory
+or VM overlay for another attempt. The marker checks the task hash and API
+endpoint but cannot prove that a restarted port-forward still reaches the
+same Pod; verify the Pod UID across both phases. The bridge refuses a modified
+upstream checkout and tasks other than the one allowlisted Chrome JSON. It
+reports that the upstream setup loop returned true, not independent Chrome
+readiness: confirm the fresh desktop shows Chrome before starting AUV actions.
+It does not run AUV for you, retain AUV Run IDs, automate reset, or aggregate
+scores. The two 2026-10-06 fresh-guest controls returned `0.0` without input
+and `1.0` after AUV created `Favorites`; see the evidence note for the exact
+scope and hashes. VLC and V2.1 are not supported by this bridge.
+
 ## 10. What remains manual
 
 This runbook reproduces the infrastructure and both AUV control topologies. It
@@ -523,6 +559,7 @@ matrix is still separate from an OSWorld task evaluator result.
 | --- | --- |
 | Pod exits with code 88 | `/dev/kvm`, `liet-gpu-1`, and `privileged: true` |
 | PVC remains Pending | use `nodeSelector`, not `spec.nodeName`, for an unbound `WaitForFirstConsumer` PVC |
+| Proxy Pod cannot install `socat` | Check whether its Alpine `apk` mirror is reachable; the Chrome evaluator live probe used a cached Python slim image with a task-owned stdlib TCP proxy instead. Pin a prebuilt proxy image for unattended batches. |
 | `/screenshot` briefly succeeds then fails | wait for the startup probe across the guest reboot |
 | screenshot succeeds directly but Pod remains NotReady | `/screenshot` can take several seconds; set probe `timeoutSeconds` above the observed latency (15 seconds in this runbook) |
 | direct Pod port-forward refuses connections | use the Service-backed proxy in section 4 |
