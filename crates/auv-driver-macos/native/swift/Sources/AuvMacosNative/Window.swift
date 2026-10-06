@@ -597,6 +597,17 @@ func validate_input_target(pid: Int64, window_number: Int64, require_window_focu
   return nativeActionOk()
 }
 
+// A fresh AX read avoids repeating activation for timed wheel samples. Missing
+// AX state is false, so the caller uses its existing preparation/error path.
+func input_target_is_focused(pid: Int64, window_number: Int64) -> Bool {
+  guard inputProcessIsRunning(pid) else { return false }
+  let appElement = AXUIElementCreateApplication(pid_t(pid))
+  guard windowAxBoolAttribute(appElement, kAXFrontmostAttribute as String) else { return false }
+  if window_number == 0 { return true }
+  guard let focused = windowAxElementAttribute(appElement, kAXFocusedWindowAttribute as String) else { return false }
+  return windowAxCgWindowId(focused) == window_number
+}
+
 // Activation is owned by the existing Rust input preparation lifecycle. Raise
 // an exact window only when requested, then observe the required focus predicate.
 func confirm_input_focus(pid: Int64, window_number: Int64) -> NativeActionResponse {

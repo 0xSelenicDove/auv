@@ -70,10 +70,10 @@ No new permission or persistent application setting was granted.
 
 ## Limits and follow-up
 
-The shared motion/stream scheduler invokes scroll for each sample. Recipient
-preparation therefore repeats and costs time. Amortizing preparation requires a
-bounded lifecycle that still handles focus changes; it is marked at the call
-site as follow-up rather than skipping target validation using cached state.
+The shared motion/stream scheduler invokes scroll for each sample. The
+[subsequent focus fast path](2026-10-06-scroll-focus-fast-path.md) retains fresh
+recipient validation and skips activation/raise when exact focus already
+matches. It avoids cached preparation state and re-prepares after focus loss.
 
 This change removes the need for explicit activation in this receiver case. It
 is not an end-to-end token benchmark. Measure full sessions, including retries

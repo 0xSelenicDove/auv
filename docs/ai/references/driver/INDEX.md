@@ -91,3 +91,4 @@ Count: **63**
 - [`2026-09-17-click-buttons-contract.md`](2026-09-17-click-buttons-contract.md): BG-1 left/right/middle integration, API changes, and receiver validation.
 
 - [macOS foreground scroll preparation](2026-10-06-foreground-scroll-preparation.md): Reproduced inactive-window stall, shared preparation fix, before/after receiver test, background-only preservation, and timing limits.
+- [Foreground scroll focus fast path](2026-10-06-scroll-focus-fast-path.md): Fresh exact-focus checks skip repeated activation, with focus-change receiver coverage and limited CLI latency evidence.

@@ -1146,8 +1146,9 @@ fn foreground_scroll_prepares_window_and_moves_receiver() {
   let session = MacosDriverSession { _private: () };
   let target = session.window().resolve(SelectWindow::main_visible().owned_by(App::bundle("local.auv.CanvasFixture"))).unwrap();
   let cover = session.window().resolve(SelectWindow::main_visible().owned_by(App::bundle("local.auv.ScrollCover"))).unwrap();
-  activate_process(i64::from(cover.process_id.unwrap())).unwrap();
-  thread::sleep(Duration::from_millis(100));
+  let (cover_pid, cover_number) = resolve_input_target(&InputTarget::Window(cover)).unwrap();
+  activate_process(cover_pid).unwrap();
+  crate::native::window::confirm_input_focus(cover_pid, cover_number).unwrap();
   let position = || {
     session
       .accessibility()
@@ -1179,9 +1180,10 @@ fn foreground_scroll_prepares_window_and_moves_receiver() {
   assert_eq!(action.focus_disturbance, DisturbanceLevel::Foreground);
   assert!(!action.verified, "receiver assertion is independent of raw delivery evidence");
 
-  activate_process(i64::from(cover.process_id.unwrap())).unwrap();
-  let foreground = || crate::native::window::list_windows(ListWindowsOptions::all_visible(1)).unwrap().frontmost_app_bundle_id;
-  assert_eq!(foreground(), "local.auv.ScrollCover");
+  activate_process(cover_pid).unwrap();
+  crate::native::window::confirm_input_focus(cover_pid, cover_number).unwrap();
+  // NSWorkspace's worker-thread snapshot can lag activation; use fresh AX.
+  assert!(crate::native::window::input_target_is_focused(cover_pid, cover_number));
   let background = session
     .window()
     .scroll(
@@ -1195,5 +1197,87 @@ fn foreground_scroll_prepares_window_and_moves_receiver() {
     )
     .unwrap();
   assert_eq!(background.focus_disturbance, DisturbanceLevel::None);
-  assert_eq!(foreground(), "local.auv.ScrollCover");
+  assert!(crate::native::window::input_target_is_focused(cover_pid, cover_number));
+}
+
+// Re-reading exact focus must recover when another app takes it between timed
+// samples. A cached "prepared" bit would send later wheel input to the cover.
+#[test]
+#[ignore = "requires CanvasFixture, ScrollCover fixture, and macOS Accessibility"]
+fn timed_foreground_scroll_rechecks_focus_between_samples() {
+  use auv_driver_common::{MotionTiming, ScrollMotion, TimingFunction};
+  let session = MacosDriverSession { _private: () };
+  let target = session.window().resolve(SelectWindow::main_visible().owned_by(App::bundle("local.auv.CanvasFixture"))).unwrap();
+  let cover = session.window().resolve(SelectWindow::main_visible().owned_by(App::bundle("local.auv.ScrollCover"))).unwrap();
+  let (pid, number) = resolve_input_target(&InputTarget::Window(target.clone())).unwrap();
+  let (cover_pid, cover_number) = resolve_input_target(&InputTarget::Window(cover)).unwrap();
+  let position = |bundle| {
+    session
+      .accessibility()
+      .capture_app_tree(bundle, 12, 100)
+      .unwrap()
+      .nodes
+      .into_iter()
+      .find(|node| node.role == "AXScrollBar")
+      .unwrap()
+      .value
+      .parse::<f64>()
+      .unwrap()
+  };
+  let target_before = position("local.auv.CanvasFixture");
+  let cover_before = position("local.auv.ScrollCover");
+  activate_process(cover_pid).unwrap();
+  crate::native::window::confirm_input_focus(cover_pid, cover_number).unwrap();
+  assert!(!crate::native::window::input_target_is_focused(pid, number));
+  let mut interrupted = false;
+  let mut recovered = false;
+  let result = session
+    .window()
+    .scroll_motion(
+      &target,
+      WindowPoint::new(450.0, 400.0),
+      &ScrollMotion {
+        total: Scroll::new(0.0, 400.0),
+        timing: MotionTiming::FixedDuration {
+          duration: Duration::from_millis(800),
+          function: TimingFunction::Linear,
+        },
+        sample_rate_hz: 20,
+      },
+      ScrollOptions {
+        policy: InputPolicy::ForegroundPreferred,
+        settle: Duration::from_millis(150),
+        ..Default::default()
+      },
+      &mut |progress| {
+        if progress.delivered.delta_y == 0.0 {
+          return;
+        }
+        assert!(crate::native::window::input_target_is_focused(pid, number));
+        // Same application identity is insufficient: the exact window must match.
+        assert!(!crate::native::window::input_target_is_focused(pid, cover_number));
+        if interrupted {
+          recovered = true;
+        } else {
+          // HID posting is asynchronous. Change focus between consumed samples,
+          // rather than rerouting the first event while it is still queued.
+          let deadline = std::time::Instant::now() + Duration::from_millis(500);
+          while position("local.auv.CanvasFixture") == target_before {
+            assert!(std::time::Instant::now() < deadline, "first sample was not consumed");
+            thread::sleep(Duration::from_millis(10));
+          }
+          activate_process(cover_pid).unwrap();
+          crate::native::window::confirm_input_focus(cover_pid, cover_number).unwrap();
+          assert!(!crate::native::window::input_target_is_focused(pid, number));
+          interrupted = true;
+        }
+      },
+    )
+    .unwrap();
+  assert!(recovered, "a later sample must restore target focus");
+  assert!(position("local.auv.CanvasFixture") > target_before);
+  assert_eq!(position("local.auv.ScrollCover"), cover_before, "cover must not consume timed samples");
+  assert_eq!(result.delivered, Scroll::new(0.0, 400.0));
+  assert_eq!(result.action.focus_disturbance, DisturbanceLevel::Foreground);
+  assert!(!result.action.verified);
 }

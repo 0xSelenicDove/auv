@@ -462,6 +462,20 @@ pub fn validate_input_target(pid: i64, number: i64, require_window_focus: bool) 
   }
 }
 
+/// Observe current AX focus without raising or activating. Callers must still
+/// validate the recipient before using this to skip foreground preparation.
+pub fn input_target_is_focused(pid: i64, number: i64) -> bool {
+  #[cfg(target_os = "macos")]
+  {
+    super::binding::ffi::input_target_is_focused(pid, number)
+  }
+  #[cfg(not(target_os = "macos"))]
+  {
+    let _ = (pid, number);
+    false
+  }
+}
+
 pub fn confirm_input_focus(pid: i64, number: i64) -> AuvResult<()> {
   #[cfg(target_os = "macos")]
   {

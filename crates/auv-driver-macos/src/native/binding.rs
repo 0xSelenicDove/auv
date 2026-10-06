@@ -459,6 +459,7 @@ pub(crate) mod ffi {
     ) -> NativeActionResponse;
     fn running_application_pid(bundle_id: String) -> i64;
     fn validate_input_target(pid: i64, window_number: i64, require_window_focus: bool) -> NativeActionResponse;
+    fn input_target_is_focused(pid: i64, window_number: i64) -> bool;
     fn confirm_input_focus(pid: i64, window_number: i64) -> NativeActionResponse;
     fn type_text_foreground(text: String, inter_char_delay_ms: u64) -> NativeActionResponse;
     // NOTICE(device-entry-macos-host): Only an installed, signed graphical

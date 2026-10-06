@@ -457,12 +457,18 @@ impl WindowApi<'_> {
           // Global HID is hit-tested against the foreground desktop. Prepare the
           // exact recipient as clicks/drags do; posting alone can leave a covered
           // window unchanged. BackgroundOnly never reaches this branch.
-          // Focus confirmation already waits for the exact window; avoid an
-          // extra fixed delay on every timed-scroll sample.
-          // TODO: amortize preparation across timed motion/stream samples when
-          // that lifecycle can detect focus changes; each sample currently
-          // confirms its recipient, favoring correctness over throughput.
-          let lease = self.prepare_for_input(window, foreground_prepare_options(Duration::ZERO))?;
+          // Validate and observe exact-window focus on every sample, without
+          // caching it across motion/stream calls. Already-focused samples need
+          // no System Events activation or AX raise; focus loss re-prepares.
+          let (pid, number) = resolve_input_target(&InputTarget::Window(window.clone()))?;
+          // The focused AX window itself proves exact-window focus support;
+          // enumerate all AX windows only on the preparation path.
+          crate::native::window::validate_input_target(pid, number, false).map_err(backend)?;
+          let lease = if crate::native::window::input_target_is_focused(pid, number) {
+            InputPreparationLease::noop()
+          } else {
+            self.prepare_for_input(window, foreground_prepare_options(Duration::ZERO))?
+          };
           let scroll_result = self.session.input().scroll_global_hid(screen_point.point(), scroll, options.settle);
           let restore_result = self.restore_input(lease);
           let mut result = scroll_result?;
