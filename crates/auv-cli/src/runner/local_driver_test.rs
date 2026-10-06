@@ -741,7 +741,7 @@ mod linux_keyboard_tests {
     use auv_driver::Driver;
     let service = LocalInputService {
       session: auv_driver::LocalDriver::new().open_local().unwrap(),
-      captures: test_capture_store(),
+      captures: super::test_capture_store(),
     };
     let press = |key: &str| proto::KeyboardInput {
       action: Some(proto::keyboard_input::Action::Press(proto::KeyboardPress {
