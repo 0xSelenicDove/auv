@@ -531,7 +531,8 @@ scope and hashes. VLC and V2.1 are not supported by this bridge.
 ### Experimental single-episode phase adapter (one completed capture control)
 
 `evals/osworld/k8s_phase_adapter.py` now builds a six-phase manifest for
-`batch_runner.py` around the pinned V1 Chrome bookmark-folder task. Its fixed
+`batch_runner.py` around either pinned V1 Chrome bookmark-folder or VLC
+`play-and-exit` task. Its fixed
 action is **one paired-AUV `display.capture` negative control**. It sends no
 GUI input and does not measure agent ability or an AUV task-solving attempt;
 the expected evaluator value is `0.0`. This adapter has local boundary tests
@@ -557,7 +558,10 @@ The operator supplies a JSON configuration with exactly these fields:
 `batch_id`, `episode_id`, `namespace`, `kubeconfig`, `context`, `node`, `runtime_pod`,
 `runtime_service`, `proxy_pod`, `proxy_image`, `base_pvc`,
 `base_qcow_sha256`, `guest_auv_binary`, `host_auv_binary`,
-`upstream_checkout`, `setup_local_port`, and `auv_local_port`. The three
+`upstream_checkout`, `setup_local_port`, and `auv_local_port`, with an optional
+`task_id`. Omitting `task_id` selects the already live-checked Chrome task;
+the only other accepted ID is the pinned VLC `play-and-exit` task, which is
+locally tested but has **not** passed a live control. The three
 resource names must be distinct and task-owned; `proxy_image` must be an
 audited digest-pinned image containing `/bin/sh` and `socat`. A read-only,
 task-owned hash Pod measured the retained V1 hot `System.qcow2` at
@@ -568,7 +572,7 @@ hash or image is supplied. The binary paths must contain the
 specific validated guest and paired-Mac artifacts pinned in the adapter;
 this is not a current-PR-head build. Configuration or manifest generation
 fails when any of those checks is absent. The adapter also requires the
-pinned clean V1 source checkout and audited Chrome task bytes.
+pinned clean V1 source checkout and the selected task's audited bytes.
 
 After the operator has measured and reviewed those inputs, generate a
 manifest and run it into a **new** output directory:
@@ -597,7 +601,7 @@ runner's process group so its hard timeout also removes that route. The
 installer uses `/setup/upload` and a small allowlist of non-GUI
 `/setup/execute` calls; it never invokes AUV GUI operations through the setup
 server. AUV capture runs through the paired Device and its task-owned profile
-file. The evaluator uses the existing Chrome-only pinned method-body bridge,
+file. The evaluator uses the selected Chrome or VLC pinned method-body bridge,
 not the complete upstream provider. Reset checks ownership UIDs before
 deleting only recorded resources, verifies their absence and the hot PVC/PV
 identity, then removes the task-owned pairing profile. Deletion goes through a

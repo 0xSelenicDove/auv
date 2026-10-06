@@ -109,8 +109,10 @@ multi-task batch. The configured guest AUV binary is tied to a pinned older
 source commit; do not treat this as a current-PR-head guest binary test.
 
 The evaluator bridge also has a locally tested allowlist for the pinned V1
-VLC `play-and-exit` task. It has not yet passed a fresh live guest control;
-the completed Kubernetes episode above remains Chrome-only.
+VLC `play-and-exit` task. The K8s phase adapter accepts this fixed task ID
+for a capture-only control, with independent pinned task bytes and reset
+checks. VLC has not yet passed a fresh live guest control; the completed
+Kubernetes episode above remains Chrome-only.
 
 The repository [infrastructure plan](../../docs/ai/references/ops/2026-10-06-osworld-auv-infrastructure-plan.md)
 and [Kubernetes runbook](../../docs/ai/references/ops/2026-10-05-osworld-kubernetes-runbook.md)

@@ -346,9 +346,11 @@ The first of these slices now has a local pinned-source implementation:
 `v1_evaluator.py` allows the reviewed VLC setup/getter/metric chain and checks
 the guest config file's opposite initial value before scoring. Boundary tests
 reject unreviewed guest commands, misleading HTTP 200 responses, wrong file
-paths, and changed upstream/task bytes. The 49-test Python suite passed. No
-new VLC live guest or evaluator score has been produced by this slice; its
-live no-action gate remains the prerequisite for the two-task batch.
+paths, and changed upstream/task bytes. The K8s phase adapter now accepts
+either fixed task while keeping its action capture-only and UID-safe cleanup
+unchanged. The pinned Python suite passed locally; no new VLC live guest or
+evaluator score has been produced by this slice. The VLC live no-action gate
+remains a prerequisite for the two-task batch.
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires

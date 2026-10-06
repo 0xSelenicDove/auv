@@ -1,4 +1,4 @@
-"""Fail-closed Kubernetes phase adapter for one OSWorld V1 Chrome control.
+"""Fail-closed Kubernetes phase adapter for pinned OSWorld V1 controls.
 
 This is scheduler plumbing, not an agent. The action is a paired-AUV capture
 only, so a score of zero is a negative control, never an AUV solving attempt.
@@ -26,6 +26,12 @@ from urllib import request
 V1_REVISION = "b138d348256078fa634fc3b73567a7337c793e6b"
 CHROME_TASK = "2ad9387a-65d8-4e33-ad5b-7580065a27ca"
 CHROME_SHA256 = "4ddb526e5f3b9efa72a01e3ccae86ee4d698f480e4a526f9dfde85fd9499559c"
+VLC_TASK = "5ac2891a-eacd-4954-b339-98abba077adb"
+VLC_SHA256 = "4e038a7bb4c3770186209d68402e678ff723238cb31684fe452f0b0c6f4665da"
+# NOTICE: Keep these pins independent of v1_evaluator.TASKS: config and
+# manifest validation must fail closed before evaluator invocation. The local
+# contract test catches drift between the two allowlists and pinned revision.
+TASKS = {CHROME_TASK: ("chrome", CHROME_SHA256), VLC_TASK: ("vlc", VLC_SHA256)}
 RUNTIME_IMAGE = "happysixd/osworld-docker@sha256:0e6497a9295647cf05bf2b2af522fdd79bdeba2737595259cab310a3bcf6baa9"
 AUV_SOURCE = "25e2320570a72d3b9580451ea2917a9e03fa6b95"
 GUEST_AUV_SHA256 = "2a8e53eecfef1dcd8fa8368fa480d6df36e254527c7e60be3ac82802e7073427"
@@ -68,10 +74,20 @@ def write_json(path: Path, value: dict) -> None:
     os.replace(temp, path)
 
 
+def selected_task(config: dict) -> tuple[str, str, str]:
+    """Select only a pinned evaluator task; old Chrome configs remain valid."""
+    task_id = config.get("task_id", CHROME_TASK)
+    if not isinstance(task_id, str) or task_id not in TASKS:
+        raise ValueError("task_id must name a pinned Chrome or VLC control")
+    app, task_hash = TASKS[task_id]
+    return task_id, app, task_hash
+
+
 def load_config(path: Path) -> dict:
     config = json.loads(path.read_text())
-    if not isinstance(config, dict) or set(config) != set(CONFIG_FIELDS):
-        raise ValueError(f"config must contain exactly: {', '.join(CONFIG_FIELDS)}")
+    if not isinstance(config, dict) or set(config) not in (set(CONFIG_FIELDS), set(CONFIG_FIELDS) | {"task_id"}):
+        raise ValueError(f"config must contain exactly: {', '.join(CONFIG_FIELDS)}; optional task_id")
+    task_id, app, task_hash = selected_task(config)
     for name in CONFIG_FIELDS:
         if name not in ("setup_local_port", "auv_local_port") and (not isinstance(config[name], str) or not config[name].strip()):
             raise ValueError(f"{name} must be a nonempty string")
@@ -100,19 +116,20 @@ def load_config(path: Path) -> dict:
         raise ValueError("upstream V1 checkout revision differs from the pinned evaluator")
     if subprocess.run(["git", "-C", config["upstream_checkout"], "status", "--porcelain"], capture_output=True, text=True, check=True).stdout.strip():
         raise ValueError("upstream V1 checkout must be clean")
-    task = Path(config["upstream_checkout"]) / "evaluation_examples/examples/chrome" / f"{CHROME_TASK}.json"
-    if sha256(task) != CHROME_SHA256:
-        raise ValueError("Chrome task JSON differs from the pinned task")
+    task = Path(config["upstream_checkout"]) / "evaluation_examples/examples" / app / f"{task_id}.json"
+    if sha256(task) != task_hash:
+        raise ValueError(f"{app} task JSON differs from the pinned task")
     return config
 
 
 def manifest(config_path: Path) -> dict:
     config_path = config_path.resolve(strict=True)
     config = load_config(config_path)
+    task_id, _, task_hash = selected_task(config)
     script = Path(__file__).resolve()
     identity = {
-        "benchmark": "OSWorld-V1", "benchmark_revision": V1_REVISION, "task_id": CHROME_TASK,
-        "task_sha256": CHROME_SHA256, "topology": "paired-remote-capture-only-negative-control",
+        "benchmark": "OSWorld-V1", "benchmark_revision": V1_REVISION, "task_id": task_id,
+        "task_sha256": task_hash, "topology": "paired-remote-capture-only-negative-control",
         "runtime_image": RUNTIME_IMAGE, "qcow2": f"sha256:{config['base_qcow_sha256']}",
         "auv_source": AUV_SOURCE, "auv_binary_sha256": GUEST_AUV_SHA256,
         "auv_target": "paired Device ID acquired at install", "runner_identity": "k8s_phase_adapter.py capture-only",
@@ -527,16 +544,19 @@ class Episode:
         self.assert_identity()
         if not (self.directory / "paired-device.json").exists():
             raise ValueError("install evidence missing")
+        task_id, _, _ = selected_task(self.config)
         with self.forward(setup=True):
             output = _run([sys.executable, str(Path(__file__).with_name("v1_evaluator.py")),
                            "prepare" if phase == "setup" else "evaluate", "--upstream", self.config["upstream_checkout"],
-                           "--task-id", CHROME_TASK, "--episode-dir", str(self.directory),
+                           "--task-id", task_id, "--episode-dir", str(self.directory),
                            "--endpoint", f"http://127.0.0.1:{self.config['setup_local_port']}"],
                           env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
         print(output.rstrip())
 
     def action(self) -> None:
         """One AUV screenshot; no GUI input, no agent, no task-solving claim."""
+        # NOTICE: Typed AUV GUI actions are deferred until an owner-approved
+        # task driver exists; this capture-only control must not relay OSWorld input.
         self.assert_identity()
         sidecar = Path(os.environ["AUV_OSWORLD_ACTION_EVIDENCE"])
         if sidecar != self.directory / "action_evidence.json":

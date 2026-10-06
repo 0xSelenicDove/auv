@@ -16,6 +16,10 @@ ADAPTER_PATH = Path(__file__).resolve().parents[1] / "k8s_phase_adapter.py"
 spec = importlib.util.spec_from_file_location("k8s_phase_adapter", ADAPTER_PATH)
 adapter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(adapter)
+EVALUATOR_PATH = ADAPTER_PATH.with_name("v1_evaluator.py")
+evaluator_spec = importlib.util.spec_from_file_location("v1_evaluator", EVALUATOR_PATH)
+evaluator = importlib.util.module_from_spec(evaluator_spec)
+evaluator_spec.loader.exec_module(evaluator)
 
 
 # Frozen from the 2026-10-06 V1 live boot that the old -snapshot assertion rejected.
@@ -36,8 +40,8 @@ LIVE_V1_QEMU_ARGV = (
 )
 
 
-def config() -> dict:
-    return {
+def config(task_id: str | None = None) -> dict:
+    value = {
         "batch_id": "control-1", "episode_id": "chrome-1", "namespace": "bench",
         "kubeconfig": "/fake/kubeconfig", "context": "test-context", "node": "liet-gpu-1",
         "runtime_pod": "chrome-vm", "runtime_service": "chrome-svc", "proxy_pod": "chrome-proxy",
@@ -46,6 +50,9 @@ def config() -> dict:
         "guest_auv_binary": "/fake/guest-auv", "host_auv_binary": "/fake/host-auv",
         "upstream_checkout": "/fake/osworld", "setup_local_port": 25000, "auv_local_port": 28080,
     }
+    if task_id is not None:
+        value["task_id"] = task_id
+    return value
 
 
 class AdapterTest(unittest.TestCase):
@@ -55,6 +62,10 @@ class AdapterTest(unittest.TestCase):
         self.directory = Path(temporary.name) / "chrome-1"
         self.directory.mkdir()
         self.episode = adapter.Episode(config(), self.directory)
+
+    def test_adapter_and_evaluator_task_pins_are_identical(self):
+        self.assertEqual(adapter.V1_REVISION, evaluator.UPSTREAM_REV)
+        self.assertEqual(adapter.TASKS, evaluator.TASKS)
 
     def test_manifest_has_no_configurable_action_argv_and_is_capture_only(self):
         with patch.object(adapter, "load_config", return_value=config()):
@@ -66,6 +77,39 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(episode["phases"]["action"]["argv"][2:4], ["phase", "action"])
         self.assertEqual(episode["phases"]["action"]["timeout_seconds"], 600)
         self.assertNotIn("action_argv", config())
+
+    def test_manifest_selects_pinned_vlc_identity_without_exposing_action_argv(self):
+        selected = config("5ac2891a-eacd-4954-b339-98abba077adb")
+        with patch.object(adapter, "load_config", return_value=selected), \
+                patch.object(Path, "resolve", return_value=Path("/fake/config.json")):
+            episode = adapter.manifest(Path("/fake/config.json"))["episodes"][0]
+        self.assertEqual(episode["identity"]["task_id"], selected["task_id"])
+        self.assertEqual(episode["identity"]["task_sha256"], "4e038a7bb4c3770186209d68402e678ff723238cb31684fe452f0b0c6f4665da")
+        self.assertEqual(episode["identity"]["topology"], "paired-remote-capture-only-negative-control")
+        self.assertEqual(episode["phases"]["action"]["argv"][2:4], ["phase", "action"])
+        self.assertNotIn("action_argv", selected)
+
+    def test_config_rejects_unlisted_task_without_reaching_guest_or_cluster(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.json"
+            path.write_text(json.dumps(config("unreviewed-task")))
+            with patch.object(adapter, "sha256") as digest, patch.object(adapter.subprocess, "run") as run:
+                with self.assertRaisesRegex(ValueError, "task_id"):
+                    adapter.load_config(path)
+            digest.assert_not_called()
+            run.assert_not_called()
+
+    def test_vlc_evaluator_routes_both_phases_to_pinned_task(self):
+        selected = config("5ac2891a-eacd-4954-b339-98abba077adb")
+        episode = adapter.Episode(selected, self.directory)
+        adapter.write_json(self.directory / "paired-device.json", {"device_id": "device"})
+        with patch.object(episode, "assert_identity"), patch.object(episode, "forward", return_value=nullcontext()), \
+                patch.object(adapter, "_run", return_value='{"score": 0.0}') as run:
+            episode.evaluator("setup")
+            episode.evaluator("evaluate")
+        self.assertEqual([call.args[0][2] for call in run.call_args_list], ["prepare", "evaluate"])
+        self.assertEqual([call.args[0][call.args[0].index("--task-id") + 1] for call in run.call_args_list],
+                         [selected["task_id"], selected["task_id"]])
 
     def test_config_rejects_missing_measured_qcow_and_any_action_argv(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -107,6 +151,35 @@ class AdapterTest(unittest.TestCase):
             path.write_text(json.dumps(value))
             with self.assertRaisesRegex(ValueError, "exactly"):
                 adapter.load_config(path)
+
+    def test_vlc_config_checks_pinned_task_path_and_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            value = config(adapter.VLC_TASK)
+            for field in ("kubeconfig", "guest_auv_binary", "host_auv_binary"):
+                target = root / field
+                target.write_bytes(field.encode())
+                value[field] = str(target)
+            upstream = root / "OSWorld"
+            task = upstream / "evaluation_examples/examples/vlc" / f"{adapter.VLC_TASK}.json"
+            task.parent.mkdir(parents=True)
+            task.write_text("{}")
+            value["upstream_checkout"] = str(upstream)
+            path = root / "config.json"
+            path.write_text(json.dumps(value))
+            hashes = {
+                value["guest_auv_binary"]: adapter.GUEST_AUV_SHA256,
+                value["host_auv_binary"]: adapter.HOST_AUV_SHA256,
+                str(task): adapter.VLC_SHA256,
+            }
+            with patch.object(adapter, "sha256", side_effect=lambda candidate: hashes[str(candidate)]), \
+                    patch.object(adapter.subprocess, "run") as run:
+                run.side_effect = [MagicMock(stdout=adapter.V1_REVISION), MagicMock(stdout="")]
+                self.assertEqual(adapter.load_config(path), value)
+                hashes[str(task)] = "0" * 64
+                run.side_effect = [MagicMock(stdout=adapter.V1_REVISION), MagicMock(stdout="")]
+                with self.assertRaisesRegex(ValueError, "vlc task JSON"):
+                    adapter.load_config(path)
 
     def test_guest_control_rejects_osworld_relay_of_auv_gui_input(self):
         with patch.object(self.episode, "_post", return_value={
@@ -318,6 +391,23 @@ class AdapterTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "has not opened"):
                 self.episode._overlay()
 
+    def test_vlc_keeps_uid_and_read_only_overlay_checks(self):
+        episode = adapter.Episode(config(adapter.VLC_TASK), self.directory)
+        adapter.write_json(episode.identity_path, {"runtime": {"uid": "same", "container_id": "old", "restart_count": 0},
+                                                  "proxy": {"uid": "proxy"}, "service_uid": "svc"})
+        with patch.object(episode, "_pod_snapshot", side_effect=[
+            {"uid": "same", "container_id": "new", "restart_count": 1}, {"uid": "proxy"}]):
+            with self.assertRaisesRegex(ValueError, "identity changed"):
+                episode.assert_identity()
+        pod = {"spec": {"containers": [{"name": "qemu", "volumeMounts": [
+            {"name": "image", "mountPath": "/System.qcow2", "subPath": "System.qcow2", "readOnly": False}]}],
+            "volumes": [{"name": "image", "persistentVolumeClaim": {"claimName": "osworld-v1-hot", "readOnly": True}}]}}
+        with patch.object(episode, "_pod_snapshot", return_value={"uid": "same"}), \
+                patch.object(episode, "get", return_value=pod), patch.object(episode, "kubectl") as kubectl:
+            with self.assertRaisesRegex(ValueError, "read-only"):
+                episode._overlay()
+            kubectl.assert_not_called()
+
     def test_identity_fails_if_container_restarted_under_same_pod_uid(self):
         adapter.write_json(self.episode.identity_path, {"runtime": {"uid": "same", "container_id": "old", "restart_count": 0},
                                                         "proxy": {"uid": "proxy"}, "service_uid": "svc"})
@@ -397,6 +487,26 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(evidence["run_ids"], ["run-123"])
         self.assertEqual(evidence["final_artifact"]["sha256"], hashlib.sha256(b"auv-captured-pixels").hexdigest())
 
+    def test_vlc_action_still_uses_only_paired_auv_display_capture(self):
+        episode = adapter.Episode(config(adapter.VLC_TASK), self.directory)
+        image = self.directory / "produced.png"
+        image.write_bytes(b"auv-captured-pixels")
+        (self.directory / "paired-profiles.json").write_text("paired-secret")
+        adapter.write_json(self.directory / "paired-device.json", {"device_id": "canonical-device"})
+        sidecar = self.directory / "action_evidence.json"
+        capture = {"run_id": "vlc-control", "artifacts": [{"purpose": "auv.driver.display_capture", "file_path": str(image)}]}
+        with patch.dict(os.environ, {"AUV_OSWORLD_ACTION_EVIDENCE": str(sidecar)}), \
+             patch.object(episode, "assert_identity"), \
+             patch.object(episode, "forward", return_value=nullcontext()), \
+             patch.object(episode, "_post") as post, \
+             patch.object(adapter, "_run", return_value=json.dumps(capture)) as run:
+            episode.action()
+        argv = run.call_args.args[0]
+        self.assertEqual(argv[1:6], ["--device-id", "canonical-device", "invoke", "display.capture", "--json"])
+        self.assertFalse(any("input." in part or "xdotool" in part or "pyautogui" in part for part in argv))
+        post.assert_not_called()
+        self.assertEqual(json.loads(sidecar.read_text())["run_ids"], ["vlc-control"])
+
     def test_reset_refuses_replaced_uid_before_deletion(self):
         adapter.write_json(self.episode.owned_path, [{"kind": "pod", "name": "chrome-vm", "uid": "old"}])
         secret = self.directory / "paired-profiles.json"
@@ -407,6 +517,19 @@ class AdapterTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "replaced"):
                 self.episode.reset()
         kubectl.assert_not_called()
+        self.assertFalse(secret.exists())
+
+    def test_vlc_reset_still_refuses_replaced_uid_and_revokes_pairing(self):
+        episode = adapter.Episode(config(adapter.VLC_TASK), self.directory)
+        adapter.write_json(episode.owned_path, [{"kind": "pod", "name": "chrome-vm", "uid": "old"}])
+        secret = self.directory / "paired-profiles.json"
+        secret.write_text("task-owned bearer")
+        with patch.object(episode, "api_proxy", return_value=nullcontext("http://127.0.0.1:12345")), \
+             patch.object(episode, "get", return_value={"metadata": {"uid": "new", "labels": episode._labels("qemu")}}), \
+             patch.object(episode, "request_deletion") as deletion:
+            with self.assertRaisesRegex(ValueError, "replaced"):
+                episode.reset()
+        deletion.assert_not_called()
         self.assertFalse(secret.exists())
 
     def test_delete_uses_kubernetes_uid_precondition_in_atomic_delete_body(self):
