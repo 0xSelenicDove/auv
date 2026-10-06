@@ -22,8 +22,8 @@ ACTION_SHA256 = "48eedb94c99f7296060aa88d55a9da0a41e2bac36b6c02bad307aa5d54bcd9e
 # NOTICE: These fixed byte hashes identify infrastructure-only typed moves,
 # not task-solving scripts. New actions require an operator-audited slice.
 TEMPLATES = {
-    capture.CHROME_TASK: ("chrome-infrastructure-v1.json", "f08e691ac78e8ddec9f1562a0d5401a57a129d75d49797c75a73b5ee171ad015"),
-    capture.VLC_TASK: ("vlc-infrastructure-v1.json", "61e30c96b3936ba279fa2b290a86211108bab51a3eb5bb6b39e198d919b46b54"),
+    capture.CHROME_TASK: ("chrome-infrastructure-v1.json", "a3e3d6042eab72c64ce01ce960aafcfeb2f7089883b42306438f21fd34fd5e53"),
+    capture.VLC_TASK: ("vlc-infrastructure-v1.json", "ef06daed0d5c5479413d4f5217a4dc95e4dba45c30f228348d7609ca287d0ed0"),
 }
 TOPOLOGY = "paired-remote-typed-action-infrastructure-trial"
 

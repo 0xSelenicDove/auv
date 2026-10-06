@@ -994,6 +994,41 @@ the pairing profile, and preserved the hot PVC/PV UIDs and Bound state. This
 is one paired-remote typed-action delivery gate, **not** a multi-task batch,
 semantic success claim, or agent completion rate.
 
+### Frozen two-episode paired typed-action infrastructure batch
+
+Batch `osw-v1-typed-batch-1006j` fixed its denominator at two before boot:
+the pinned Chrome and VLC tasks, each with a separate fresh V1 qcow2
+backing-file overlay, its own Pod/Service/proxy and 600-second action budget.
+The [frozen manifest](/private/tmp/auv-osworld-v1-typed-batch.ojy4vd/manifest.json)
+has SHA256 `8793ff9bc44fc6d1fa3002bb6cb6228a835dd0db43174e8776f19b1b1a78c384`.
+It used the original infrastructure template byte hashes
+`f08e691ac78e8ddec9f1562a0d5401a57a129d75d49797c75a73b5ee171ad015`
+and `61e30c96b3936ba279fa2b290a86211108bab51a3eb5bb6b39e198d919b46b54`.
+Both templates contain only `MOVE_TO → DONE`; they are not solution scripts.
+After the run, JSON whitespace was reformatted for repository lint, changing
+the checked-in template byte hashes without changing parsed actions. Use the
+frozen manifest and its original hashes when interpreting this episode.
+
+The [ledger](/private/tmp/auv-osworld-v1-typed-batch.ojy4vd/output/ledger.json)
+has independently checked SHA256
+`0896da2eac575f20f25a511b8dc2172831d71adc0b0729cee78947e6c4863842`.
+Both episodes were `completed`, every boot/install/setup/action/evaluate/reset
+phase was `ok`, and neither had a failure layer. Chrome AUV Run
+`631e759bd609be0c0770a23366345fc1` produced a [PNG](/private/tmp/auv-osworld-v1-typed-batch.ojy4vd/output/chrome-move-j/final-screenshot.png)
+with SHA256 `24255611ab54b9ec9dd07c91e6e30419845947c9443b53b50b6d3fa5620804d2`;
+VLC Run `648ee0e9eb9c385558b10c292b641207` produced a [PNG](/private/tmp/auv-osworld-v1-typed-batch.ojy4vd/output/vlc-move-j/final-screenshot.png)
+with SHA256 `8a3926c73a785da2991993d7e0d8eb0d247b61dcb040a3395912dfc1eeab5cc0`.
+Each original `InputActionResult` contains one successful
+`foreground_system_events` move attempt with `verified=false`, then `DONE`
+with no delivery. The sidecars and screenshot bytes passed ledger validation.
+The pinned evaluator returned raw `0.0` for Chrome and `0.0` for VLC, as
+expected for non-solving moves. These are **not** two agent failures, a
+computer-use completion rate, or evidence that the task-solving actions are
+missing from AUV. Both UID-safe resets removed their three task-owned
+resources, and independent checks found no remaining batch resources; the
+V1 hot PVC/PV remained Bound with unchanged UIDs. This normal-completion
+trial did not verify hard-timeout cancellation or held-input release.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

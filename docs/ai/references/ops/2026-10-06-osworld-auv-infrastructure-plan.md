@@ -372,6 +372,17 @@ PVC/PV. This closes one paired typed-action delivery gate, not guest-local
 entry coverage or a multi-task batch. The next gate is to freeze the two-task
 batch scripts and denominator before execution.
 
+A separate fail-closed paired-remote adapter then froze a two-episode
+Chrome/VLC batch with SHA-pinned `MOVE_TO → DONE` templates. Both fresh
+guests completed all six phases, produced verified AUV Run/PNG/typed delivery
+records, and reset without changing the hot PVC/PV. Each raw evaluator score
+was `0.0`, deliberately expected from a non-solving pointer move. This
+closes the **two-task infrastructure transport** gate only. The remaining
+baseline work is to validate real task-directed action scripts and guest-local
+entry/cancellation, then evaluate a frozen agent policy on a predeclared
+denominator. Do not divide successful infra phases by task count and call it
+an OSWorld completion rate.
+
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
 approval.` After the owner approved access, read-only dry-runs at revision
