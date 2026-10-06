@@ -460,6 +460,24 @@ Advanced appeared in the title but Simple content persisted for more than
 seven seconds. It produced no evaluator score or checked-target sample.
 Before another automation attempt, diagnose or bound that redraw state with
 right-pane evidence; a title-only gate is demonstrably insufficient.
+A read-only spatial OCR classifier then distinguished Simple, three archived
+stale Advanced frames, full Advanced, and target Playlist frames (6/6) in
+about 1.8 seconds. A fresh single-guest AUV loop reproduced two stale cycles
+followed by one full Advanced cycle, each about 12 seconds; Escape returned
+to VLC main every time. This is a live red/green symptom signal, not a
+root-cause diagnosis or proof that retrying will always recover. It can
+support a bounded fail-closed policy only after the target checkbox-state
+predicate and fresh replay are validated.
+An exact-source audit of three alternate V1 task candidates did not yield a
+drop-in second AUV-only baseline: terminal
+`13584542-872b-42d8-b299-866967b5c3ef` uses PyAutoGUI in setup and
+evaluator; VS Code `0512bb38-d531-4acf-9e7e-0add90816068` uses `wmctrl`
+window activation, needs an external VSIX, and has an evaluator command-line
+shape that must be verified; Writer
+`0810415c-bde4-4443-9047-d5f70165a697` uses `wmctrl`/PyAutoGUI and
+external document assets. This is a three-task sample, not a claim that no
+other V1 task is eligible. Do not silently adapt upstream setup/evaluator
+behavior or count an adapted task as unmodified official execution.
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires

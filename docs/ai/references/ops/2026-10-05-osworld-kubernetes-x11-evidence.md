@@ -1299,6 +1299,32 @@ intermittent stale-pane boundary and leaves the checked-target pixel
 control uncollected; do not freeze an unattended VLC policy from the single
 positive episode.
 
+A bounded live repro then exercised the exact redraw path repeatedly in
+one more fresh V1 guest without saving or evaluating. The task-owned
+[diagnostic script](/private/tmp/auv-osworld-vlc-loop-1006c/live_repro.py)
+(SHA256 `46e07877eab32233c6970b2ce4c9c41e122b1dd78f2b1035858b234b84e4aecf`)
+used only paired AUV actions/captures and pinned Tesseract 5.5.2. Each
+cycle opened Preferences with Ctrl+P, verified Simple content, clicked All,
+classified both title and right pane, pressed Escape, and verified the
+return to VLC main. In one persistent Run
+`aeec82015d4aad6628b09e6bcbb3b51e`, cycles 1 and 2 were `RED_STALE`
+(same PNG SHA256
+`f42125b07bda2b962daff7a0a47fd3239ea73a065e203d2a4fed1706affd5585`)
+and cycle 3 was `GREEN_ADVANCED` (PNG SHA256
+`0644caa212430957fd104ffb5c835dd44d993bac0f32f4713e3fc8d0dcf5dc4c`).
+Cycle times were 11.633, 12.444, and 12.776 seconds. The
+[per-cycle signal record](/private/tmp/auv-osworld-vlc-loop-1006c/loop-results.json)
+SHA256 was `d847a94025b0eb08449909ea14f0c041cf15a976be22a022a39d5d6e8cbe6926`;
+the [checkpoint index](/private/tmp/auv-osworld-vlc-loop-1006c/vlc-loop-c/checkpoints.json)
+SHA256 was `a4ba961c3599c6020061765f475cd5e60b6b52d6f0e53f807d5e58c8ff66dc6c`.
+The Run was intentionally aborted with no final artifact and **no
+evaluator score**. UID-safe reset removed runtime Pod
+`15bfa184-a2b2-475c-a939-a89b85f7186d`, Service
+`2478ad49-8b15-4d1c-b42b-a80e5ce05bc2`, and proxy Pod
+`985c94f8-9c93-4a79-84e4-ddd88d9afcb3`; the hot PVC/PV UIDs remained
+unchanged. This gives a reproducible red/green symptom signal within one
+guest, not a root-cause diagnosis or a validated recovery policy.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

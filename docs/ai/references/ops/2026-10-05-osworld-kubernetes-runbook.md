@@ -757,6 +757,11 @@ before target interaction and has **no evaluator score**. A title or All
 radio alone is therefore not an adequate gate. Require visible right-pane
 Playlist and the target label before considering the checkbox, and stop
 without Save when they do not appear; see the [failure evidence](2026-10-05-osworld-kubernetes-x11-evidence.md).
+A subsequent diagnostic loop in one fresh guest observed two such stale
+cycles and one complete Advanced cycle, each returning to VLC main via AUV
+Escape in about 12 seconds. This is useful to reproduce the symptom; it is
+not a guarantee that retries recover or permission to omit the target-page
+and checkbox-state checks.
 
 ### Guest-local current-head gate through an owner Unix socket
 
