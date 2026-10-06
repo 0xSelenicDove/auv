@@ -258,6 +258,13 @@ The 1084-file gated asset snapshot has **not** been downloaded or verified
 locally; required assets and task setup/evaluator behavior must still be
 checked before official V2.1 task evaluation. See the
 [official V2.1 guide](https://github.com/xlang-ai/OSWorld-V2/blob/osworld-v2.1/docs/PUBLIC_EVALUATION_GUIDELINE_v2.1.md#21-download-v2-task-classes-and-assets).
+The pinned gated inventory is 1,084 files / 4,920,057,674 bytes; a narrow
+follow-up downloaded and hash-verified only Task099's image and Task044's
+5,789,382-byte Shotcut video. Task044's reachable setup/evaluator code has
+no PyAutoGUI GUI input, CDP, or mocked-site dependency, but Shotcut/codec
+behavior in the guest is not live-validated. See the
+[asset preflight](2026-10-06-osworld-v2-assets-preflight.md). Broader batch
+coverage is the trigger to sync and verify the full pinned asset snapshot.
 
 Task setup and evaluator code need their own input audit before batch execution.
 At the pinned V1 revision, the known
