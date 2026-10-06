@@ -600,6 +600,18 @@ package/version than the pinned project. See the
 two independently selected V2.1 attempts do not form a predeclared batch or
 completion-rate denominator. Full upstream runner integration remains pending.
 
+A benchmark-local `v2_task099_evaluator.py` now makes the Task099 file-only
+setup/evaluation boundary repeatable in source. It pins the V2.1 Git revision,
+Task099 class, upstream `get_vm_file` body, and gated image bytes; calls the
+original task methods; and rejects upload/readback, file transport, or answer
+cache failures instead of treating those failures as a legitimate `0.0`.
+Focused offline tests include the expected no-answer zero and exact-coordinate
+full score. The bridge does not boot or identify a Pod, enforce AUV-only action
+execution, run Task044, or schedule a V2.1 batch. Its next acceptance gate is
+a fresh Task099 guest with UID-pinned port-forward, AUV Run evidence, exact
+upstream raw result, and UID-safe reset. Until then its evidence level is
+offline boundary tests, not live V2.1 task execution.
+
 ### 5. Agent/harness evaluation — two selected V2.1 attempts, no rate
 
 Once the infrastructure and batch pilot are repeatable, connect an agent that

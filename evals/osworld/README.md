@@ -466,3 +466,41 @@ Homebrew Python 3.14 interpreter does not. For example:
 The repository [infrastructure plan](../../docs/ai/references/ops/2026-10-06-osworld-auv-infrastructure-plan.md)
 and [Kubernetes runbook](../../docs/ai/references/ops/2026-10-05-osworld-kubernetes-runbook.md)
 describe the separate live-environment prerequisites and evidence limits.
+
+## V2.1 Task099 file-only evaluator pilot
+
+`v2_task099_evaluator.py` is an evaluator-only bridge for the pinned V2.1
+Task099 class and its single gated image. It verifies the upstream Git revision,
+task/getter source hashes, and image bytes before opening the guest connection.
+`prepare` calls the pinned task's `setup()` and confirms the uploaded image by
+reading its SHA256 back. Run all agent observation and GUI input through AUV
+between `prepare` and `evaluate`; this script exposes only `/setup/upload` and
+`/file`, never `/execute` or a GUI-action endpoint.
+
+For a freshly booted, task-owned guest with a local port-forward to its control
+server, use the same episode directory and endpoint for both commands:
+
+```bash
+python3 evals/osworld/v2_task099_evaluator.py prepare \
+  --upstream /absolute/clean/OSWorld-V2 \
+  --task-source /absolute/pinned/task_099.py \
+  --asset /absolute/pinned/task_099/my_image.png \
+  --episode-dir /absolute/new/episode \
+  --endpoint http://127.0.0.1:5000
+
+# Perform the Task099 action phase through AUV only, then:
+python3 evals/osworld/v2_task099_evaluator.py evaluate \
+  --upstream /absolute/clean/OSWorld-V2 \
+  --task-source /absolute/pinned/task_099.py \
+  --asset /absolute/pinned/task_099/my_image.png \
+  --episode-dir /absolute/new/episode \
+  --endpoint http://127.0.0.1:5000
+```
+
+A missing `position.txt` is an upstream `0.0` result; a transport or evaluator
+cache failure exits without a score. The marker checks the same local endpoint
+string, but cannot prove a restarted port-forward still targets the original
+Pod. An operator must verify Pod UID, fresh qcow2 overlay, AUV evidence, and
+task-owned cleanup separately. Offline boundary tests have passed; this new
+entry has not yet been accepted against a fresh live V2.1 guest and is not a
+Kubernetes batch adapter or agent performance result.
