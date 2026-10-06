@@ -958,6 +958,22 @@ PVC/PV retained their original UIDs and Bound state. This is one
 capture-only infrastructure control, not a scripted AUV solution, a blinded
 agent attempt, or a two-task completion rate.
 
+### First current-head typed-action gate stopped before action
+
+The first paired-remote trial of the new foreground `auv-osworld-action`
+entry used a fresh V1 Chrome overlay and a frozen `CLICK` then `DONE` plan.
+Its [ledger](/private/tmp/auv-osworld-v1-typed-live.4XQ8sS/output/ledger.json)
+records boot and guest AUV pairing as `ok`, but setup as `exit_failed`:
+the manifest's `/opt/homebrew/opt/python@3.14/bin/python3.14` lacked the
+`requests` package imported by the pinned evaluator bridge. The
+[setup stderr](/private/tmp/auv-osworld-v1-typed-live.4XQ8sS/output/chrome-typed-click-h/setup.stderr)
+contains `ModuleNotFoundError: No module named 'requests'`. Action and
+evaluation did not run; there is no typed input result, AUV Run, PNG, or
+score. This is a host harness dependency failure, **not** a failed AUV GUI
+delivery. Reset succeeded and independently confirmed absence of the three
+UID-matched task resources and paired profile; the V1 hot PVC/PV remained
+Bound with unchanged UIDs. Do not use this trial as action-capability evidence.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

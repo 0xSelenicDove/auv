@@ -1,8 +1,9 @@
 """Kubernetes adapter contract tests. Every cluster/process boundary is mocked."""
 
 import importlib.util
-from contextlib import nullcontext
+from contextlib import nullcontext, redirect_stdout
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -68,19 +69,39 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(adapter.TASKS, evaluator.TASKS)
 
     def test_manifest_has_no_configurable_action_argv_and_is_capture_only(self):
-        with patch.object(adapter, "load_config", return_value=config()):
-            with patch.object(Path, "resolve", return_value=Path("/fake/config.json")):
-                built = adapter.manifest(Path("/fake/config.json"))
+        with patch.object(adapter, "load_config", return_value=config()), \
+                patch.object(adapter.subprocess, "run", return_value=MagicMock(returncode=0)) as run, \
+                patch.object(Path, "resolve", return_value=Path("/fake/config.json")):
+            built = adapter.manifest(Path("/fake/config.json"))
         episode = built["episodes"][0]
         self.assertEqual(episode["identity"]["topology"], "paired-remote-capture-only-negative-control")
         self.assertEqual(set(episode["phases"]), set(adapter.PHASES))
         self.assertEqual(episode["phases"]["action"]["argv"][2:4], ["phase", "action"])
         self.assertEqual(episode["phases"]["action"]["timeout_seconds"], 600)
         self.assertNotIn("action_argv", config())
+        self.assertTrue(all(phase["argv"][0] == run.call_args.args[0][0] for phase in episode["phases"].values()))
+
+    def test_manifest_fails_before_output_if_phase_python_lacks_requests(self):
+        # ROOT CAUSE:
+        # The manifest pinned sys.executable into every phase, but did not
+        # verify that this exact interpreter could import requests. A live
+        # episode then booted and installed before setup failed.
+        output = io.StringIO()
+        with patch.object(adapter, "load_config", return_value=config()), \
+                patch.object(Path, "resolve", return_value=Path("/fake/config.json")), \
+                patch.object(adapter.subprocess, "run", return_value=MagicMock(returncode=1)) as run, \
+                patch.object(adapter.sys, "argv", ["k8s_phase_adapter.py", "manifest", "--config", "/fake/config.json"]), \
+                redirect_stdout(output):
+            with self.assertRaisesRegex(RuntimeError, "requests"):
+                adapter.main()
+        self.assertEqual(output.getvalue(), "")
+        run.assert_called_once_with([adapter.sys.executable, "-c", "import requests"],
+                                    capture_output=True, text=True, check=False)
 
     def test_manifest_selects_pinned_vlc_identity_without_exposing_action_argv(self):
         selected = config("5ac2891a-eacd-4954-b339-98abba077adb")
         with patch.object(adapter, "load_config", return_value=selected), \
+                patch.object(adapter.subprocess, "run", return_value=MagicMock(returncode=0)), \
                 patch.object(Path, "resolve", return_value=Path("/fake/config.json")):
             episode = adapter.manifest(Path("/fake/config.json"))["episodes"][0]
         self.assertEqual(episode["identity"]["task_id"], selected["task_id"])

@@ -168,6 +168,18 @@ checks. A separate fresh VLC guest completed its six-phase capture-only
 control with AUV Run/PNG evidence and expected raw evaluator `0.0`. Neither
 control sent task-solving GUI input.
 
+The K8s manifest pins the Python interpreter used to invoke
+`k8s_phase_adapter.py` into every phase command. Generate the manifest with
+an interpreter that can import `requests`; generation now fails before boot if
+that exact interpreter cannot import it. On the current operator host,
+`/Users/neko/.pixi/envs/pip/bin/python` has `requests` 2.34.2, while the
+Homebrew Python 3.14 interpreter does not. For example:
+
+```bash
+/Users/neko/.pixi/envs/pip/bin/python evals/osworld/k8s_phase_adapter.py manifest \
+  --config /absolute/episode-config.json > /absolute/manifest.json
+```
+
 The repository [infrastructure plan](../../docs/ai/references/ops/2026-10-06-osworld-auv-infrastructure-plan.md)
 and [Kubernetes runbook](../../docs/ai/references/ops/2026-10-05-osworld-kubernetes-runbook.md)
 describe the separate live-environment prerequisites and evidence limits.

@@ -125,6 +125,11 @@ def load_config(path: Path) -> dict:
 def manifest(config_path: Path) -> dict:
     config_path = config_path.resolve(strict=True)
     config = load_config(config_path)
+    # The manifest pins this interpreter into every phase argv. Probe that
+    # exact executable before a runner can create any cluster resource.
+    probe = subprocess.run([sys.executable, "-c", "import requests"], capture_output=True, text=True, check=False)
+    if probe.returncode != 0:
+        raise RuntimeError(f"phase Python {sys.executable} cannot import requests")
     task_id, _, task_hash = selected_task(config)
     script = Path(__file__).resolve()
     identity = {
