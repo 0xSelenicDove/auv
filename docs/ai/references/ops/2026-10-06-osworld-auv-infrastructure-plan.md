@@ -623,10 +623,13 @@ An offline `agent_action_gateway.py` now covers the first part of that slice:
 it binds each proposed GUI action to a hash-verified screenshot in the same
 Run, cross-checks Rust checkpoint/action/terminal sidecars, enforces
 caller-declared action and capture budgets, and records sequential decisions.
-Its 11 offline regression tests pass. It is not yet wired to a model or the
-foreground Rust process, and it cannot enforce what other tools a Codex
-sub-agent may call. Model identity, transport, tool isolation, and a live
-gateway-driven episode therefore remain open.
+`agent_action_transport.py` now starts and supervises one foreground Rust
+interactive process; fake-child tests cover the complete receipt sequence,
+explicit abort's expected nonzero exit, cancellation, timeout, and process
+reaping. The full 104-test Python OSWorld suite passes with 10 existing
+skips. Neither component is wired to a model or a Kubernetes episode, and
+neither can restrict other tools available to a Codex sub-agent. Model
+identity, tool isolation, and a live gateway-driven episode remain open.
 
 ## Operating rules
 

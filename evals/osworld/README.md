@@ -85,10 +85,11 @@ its bytes against the digest and compares terminal stdout with the sidecar.
 
 ## Offline agent decision gate
 
-`agent_action_gateway.py` is a benchmark-local protocol component for an
-already-running `auv-osworld-action --interactive` process. A caller supplies
-the Rust entry's `ready` receipt and a one-request/one-response foreground
-exchange function. The gateway does not start the child or call a model.
+`agent_action_gateway.py` is a benchmark-local protocol component for
+`auv-osworld-action --interactive`. `agent_action_transport.py` starts that
+binary once in the runner's process group, supplies its `ready` receipt and a
+one-request/one-response foreground exchange, and reaps it on completion,
+timeout, malformed output, or cancellation. Neither module calls a model.
 It accepts only ordered `capture`, typed `action`, `finish`, and `abort`
 proposals. Each action must cite the latest screenshot's Run ID, filename,
 and SHA256; the gateway checks the PNG bytes and `checkpoints.json` before
@@ -101,10 +102,15 @@ response closes the gate without retrying the possible GUI input.
 Caller-selected action and capture budgets cannot exceed the Rust entry's
 advertised limits. Rust remains responsible for typed action parameter
 validation, actual AUV delivery, the Run lifecycle, and its own deadline.
-The gateway has 11 offline tests, including stale/tampered screenshot,
+The gateway has 11 focused offline tests, including stale/tampered screenshot,
 replayed sequence, forbidden operation, budget, sidecar mismatch, and terminal
-receipt cases. It has **not** been connected to a model, foreground child
-transport, or Kubernetes episode, and does not prevent an agent with separate
+receipt cases. The transport's offline fake-child tests cover a complete
+capture → action → capture → finish session in one Run, explicit abort,
+stdin-EOF cancellation, child exit, timeout, and malformed/oversized output.
+Rust exits 1 after a deliberate abort; the transport permits that exit only
+for the explicit abort response, which the gateway then verifies against the
+same Run's durable null-artifact sidecar. It has **not** been connected to a
+model or Kubernetes episode, and does not prevent an agent with separate
 shell/browser tools from bypassing it. It is not evidence of a live benchmark
 score or an enforced agent tool sandbox.
 

@@ -172,6 +172,6 @@ class AgentActionGateway:
             raise
 
 
-# TODO: This slice omits model and foreground child transport because their
-# policy/batch identity is not yet approved. Add them only when an owner names
-# that contract; this gate alone does not provide a tool sandbox.
+# TODO: A model policy and tool sandbox remain out of this transport slice;
+# add them only with an owner-approved agent/batch identity. The gateway and
+# foreground child transport alone do not isolate a model's other tools.
