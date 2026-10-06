@@ -1471,6 +1471,44 @@ Services. The retained V1 hot PVC/PV UIDs were still
 deterministic task-specific scripts, **not** an autonomous-agent benchmark
 rate or full upstream provider run.
 
+### Two exploratory blinded Codex sub-agent V1 canaries
+
+On 2026-10-06, the operator ran two **separate, sequential, selected** V1
+canaries on fresh `liet-gpu-1` QEMU overlays. Each had a pre-written
+single-task [Chrome protocol](/private/tmp/auv-osworld-blind-codex-chrome-1006.eAc2gG/protocol.json)
+(SHA256 `987ba41a9af403961e8b08bd1e0c5629c762f98991b8bfebae6dd7b273190648`)
+or [VLC protocol](/private/tmp/auv-osworld-blind-codex-vlc-1006.ojj3ob/protocol.json)
+(SHA256 `889ffeab695e8920e6757d8d4cb7ce8ef9acf8bef12a0c13f32c855d318aad53`),
+not a predeclared two-task batch. The operator booted, installed and paired
+guest AUV, and ran official task setup before spawning a new Codex sub-agent
+with `fork_turns=none` for each task. The sub-agent was given only the official
+natural-language instruction, the paired AUV CLI endpoint, and limits of
+600 seconds, 32 AUV actions, and 32 AUV screenshots. It was instructed to
+avoid task/evaluator files and every non-AUV GUI path. The operator alone ran
+the pinned evaluator after the sub-agent stopped. This is prompt-level
+blindness, not a separately enforced tool sandbox or pinned-model inference
+service; the Run store proves AUV operations, not the absence of all other
+possible reads.
+
+| Selected task | Agent AUV evidence | Pinned raw score | Interpretation |
+| --- | --- | ---: | --- |
+| Chrome `2ad9387a-65d8-4e33-ad5b-7580065a27ca` | 5 `auv.driver.input_action_result` artifacts and 5 `auv.driver.display_capture` artifacts; [final PNG](/private/tmp/auv-osworld-blind-codex-chrome-1006.eAc2gG/chrome-blind-1006/agent-runs/artifacts/fd62abb7-a717-03ff-5ff8-293b3a06ad84/01a110cc-707f-71dd-9edd-81b4c9b24113.png), SHA256 `8f898311c478ead4e9174661289214752f86355c058c5711be1228919511edb3` | `1.0` | The final AUV screenshot visibly shows `Favorites` on Chrome's bookmarks bar. |
+| VLC `5ac2891a-eacd-4954-b339-98abba077adb` | 12 input-result artifacts and 12 capture artifacts; [final PNG](/private/tmp/auv-osworld-blind-codex-vlc-1006.ojj3ob/vlc-blind-1006/agent-runs/artifacts/3b7ee525-24ee-3f1a-3ed6-27c968e872c1/01a110d7-bb95-73fc-a9ee-b430617d0b05.png), SHA256 `a32faa8772564aebc7f48615acdbe471ae2ab971d66e4ac32e895bc6c3ed86ea` | `1.0` | The agent reported that `Play and exit` already appeared off, enabled `Pause on the last frame of a video`, saved, and reopened Preferences. The evaluator verifies the final `play-and-exit=0` state, not the agent's causal diagnosis. Saving another option may have rewritten that setting; do not claim it identified the intended control. |
+
+The Chrome Run [records](/private/tmp/auv-osworld-blind-codex-chrome-1006.eAc2gG/chrome-blind-1006/agent-runs/records.jsonl)
+and VLC Run [records](/private/tmp/auv-osworld-blind-codex-vlc-1006.ojj3ob/vlc-blind-1006/agent-runs/records.jsonl)
+contain one completed Run per CLI invocation, not one shared agent Run.
+Both evaluator calls used V1 upstream revision
+`b138d348256078fa634fc3b73567a7337c793e6b` and the audited selected
+task hashes. Both UID-preconditioned resets removed only the respective
+task-owned runtime Pod, Service, and proxy Pod; no matching batch-labelled
+resources remain. The hot PVC UID
+`34143535-4ac2-42f2-a443-08db3f6b49ff` and PV UID
+`8e8e46f1-0670-4a55-b06a-8caebb4d5a73` were unchanged. These are two
+successful **selected, exploratory Codex-agent canaries**, not an official
+OSWorld completion rate, reproducible model benchmark, proof of general VLC
+reasoning, or evidence about guest-local/V2.1 topology.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

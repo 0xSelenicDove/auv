@@ -608,6 +608,17 @@ official evaluator on a pinned task set. Keep agent policy results separate
 from driver capability evidence. Full-suite or comparative claims require the
 matching task assets, mocked sites, reset image, and recorded denominator.
 
+Two later selected V1 canaries used fresh, no-history Codex sub-agents with
+prompt-limited AUV-only access. Chrome and VLC each returned pinned raw
+evaluator `1.0` on separate fresh overlays, then passed UID-safe cleanup.
+This establishes an exploratory agent-path pilot, not a reproducible model
+adapter or cohort score: the model/tool sandbox was not pinned or enforced,
+and the VLC agent's stated control choice did not itself explain the final
+evaluator state. See the [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
+The next approved slice should freeze an actual agent action protocol and
+model identity, enforce the allowed tool surface, record one correlated Run,
+and predeclare a larger denominator before booting any task VM.
+
 ## Operating rules
 
 - Work through these items in order; each item may be delegated to one bounded
