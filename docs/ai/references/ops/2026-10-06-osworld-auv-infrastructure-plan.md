@@ -19,9 +19,10 @@ use CUA/CUA REPL, VNC input, PyAutoGUI, `xdotool`, or OSWorld `/execute` for GUI
 input.
 
 The current [evidence](2026-10-05-osworld-kubernetes-x11-evidence.md) includes
-an evaluated GIMP task on both official images, separate action-level baselines,
-and one completed V1 capture-only Kubernetes episode. It does not prove an
-OSWorld completion rate. The
+an evaluated GIMP task on both official images, action-level baselines,
+capture-only controls, and a predeclared two-task V1 fixed-script batch on
+Kubernetes. It does not prove an autonomous-agent or benchmark-wide OSWorld
+completion rate. The
 [runbook](2026-10-05-osworld-kubernetes-runbook.md) records the existing KVM Pod
 and guest installation route.
 
@@ -208,7 +209,7 @@ V2.1 2.71 s). Exact test executable, binary, and result hashes are in the
 evidence note. This closes the guest-local adapter-delivery gate, not a full
 paired-remote episode or a task-evaluator gate.
 
-### 4. Batch scheduler and evaluator pilot — two-task transport batch passed; task-solving batch pending
+### 4. Batch scheduler and evaluator pilot — selected two-task scripted baseline passed
 
 Only after action gates pass, run a small, reproducible official-task batch on
 fresh overlays. Each episode needs a known image revision, task assets and
@@ -468,6 +469,23 @@ to VLC main every time. This is a live red/green symptom signal, not a
 root-cause diagnosis or proof that retrying will always recover. It can
 support a bounded fail-closed policy only after the target checkbox-state
 predicate and fresh replay are validated.
+
+The later attended VLC OFF→ON→OFF-control work validated the screenshot
+predicate; a separate first scripted policy that toggled the checkbox
+failed closed on a fresh guest when the post-click frame remained unchecked.
+The task-solving policy was narrowed to verify the observed unchecked state
+and Save it. A fresh one-task VLC batch then completed all six phases with
+raw evaluator `1.0`, including one bounded Advanced redraw recovery.
+Finally, a **predeclared two-task Chrome→VLC scripted V1 batch** completed
+on separate fresh overlays: denominator 2, raw scores `1.0` and `1.0`,
+all phases and UID-safe resets successful, no failure layers, and verified
+AUV Run/PNG/controller evidence. The [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md)
+records the exact manifests, Run IDs, hashes, failed first VLC attempt,
+and cleanup identities. This closes the selected fixed-script batch gate;
+it does not measure a blinded or autonomous agent, the full upstream
+provider, or V2.1 batch performance. The next task is to choose and pin a
+blinded agent/harness sample and verify its task-specific setup/assets and
+action budgets before reporting an agent denominator.
 An exact-source audit of three alternate V1 task candidates did not yield a
 drop-in second AUV-only baseline: terminal
 `13584542-872b-42d8-b299-866967b5c3ef` uses PyAutoGUI in setup and

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "task_id": "5ac2891a-eacd-4954-b339-98abba077adb",
+  "name": "vlc-play-and-exit-visual-v1",
+  "actions": {
+    "open_preferences": {
+      "action_type": "HOTKEY",
+      "keys": ["ctrl", "p"]
+    },
+    "show_all": {
+      "action_type": "CLICK",
+      "x": 638,
+      "y": 898
+    },
+    "close_preferences": {
+      "action_type": "PRESS",
+      "key": "escape"
+    },
+    "focus_search": {
+      "action_type": "CLICK",
+      "x": 696,
+      "y": 253
+    },
+    "search": {
+      "action_type": "TYPING",
+      "text": "play and exit"
+    },
+    "select_playlist": {
+      "action_type": "CLICK",
+      "x": 642,
+      "y": 310
+    },
+    "save": {
+      "action_type": "CLICK",
+      "x": 1211,
+      "y": 901
+    }
+  },
+  "max_preference_opens": 3,
+  "max_ambiguous_recaptures": 3,
+  "max_captures": 32,
+  "max_interactive_seconds": 570
+}

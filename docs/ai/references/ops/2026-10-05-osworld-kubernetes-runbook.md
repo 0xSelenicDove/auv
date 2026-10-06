@@ -726,7 +726,7 @@ manual deletion. Preserve the hot PVC/PV. The old attended sequence remains
 useful to debug a changed Chrome layout, but its exact coordinates should
 not be extended to VLC or V2.1 without a separately audited policy.
 
-### Attended VLC V1 observation — not a batch policy
+### VLC V1: attended diagnosis and fixed scripted policy
 
 A fresh VLC V1 guest later passed one attended AUV-only gate with raw pinned
 evaluator score `1.0`; the [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md)
@@ -742,13 +742,18 @@ at `(1211,901)` wrote the desired state. The setup wrote
 `play-and-exit=1` to disk *after* VLC started; the GUI showed its in-memory
 unchecked default. Never blindly toggle the checkbox from that observation.
 
-This path is not yet a deterministic controller. A different guest may show
-a stale page, a checked box, or different geometry. OCR of one full-frame
-capture missed the Advanced title, and OCR text does not establish the
-checkbox state. Freeze an image-based checked/unchecked predicate with both
-positive and negative controls before any automated Save. Keep using the
-pinned evaluator to verify disk semantics, and keep reset in a `finally`
-boundary with UID-preconditioned deletion.
+A different guest can show a stale page, a checked box, or changed geometry.
+The fixed `k8s_vlc_task_controller.py` now requires the Advanced title **and**
+new right pane, spatial search and Playlist signals, and a same-frame pixel
+comparison of the target with known checked/unchecked controls. On a stale
+or ambiguous redraw it takes at most three further captures, then returns
+to VLC main and reopens Preferences within a three-opening bound. It never
+clicks the target or Save without an observed unchecked target. The
+task-solving policy deliberately leaves that observed unchecked state alone
+and clicks Save: the pinned setup writes `play-and-exit=1` to disk after VLC
+has already launched. The attended OFF→ON→OFF AUV captures validate the
+checkbox predicate separately; the first scripted policy that repeated the
+toggle failed closed on a fresh guest. See the [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
 
 A second fresh V1 guest reproduced an important stop condition: after All,
 the title changed to Advanced while the right pane still showed Simple
@@ -762,6 +767,42 @@ cycles and one complete Advanced cycle, each returning to VLC main via AUV
 Escape in about 12 seconds. This is useful to reproduce the symptom; it is
 not a guarantee that retries recover or permission to omit the target-page
 and checkbox-state checks.
+
+For a fresh scripted VLC episode, copy the `k8s_phase_adapter.py` config
+shape described above, select the pinned VLC task ID explicitly, and allocate
+new DNS-label-safe Pod/Service names and two unused local ports. The VLC
+batch input differs from Chrome's by one pinned crop tool:
+
+```json
+{
+  "batch_id": "unique-vlc-batch",
+  "episode": "/absolute/path/to/new-vlc-episode.json",
+  "action_binary": "/absolute/path/to/pinned/auv-osworld-action",
+  "tesseract_binary": "/absolute/path/to/pinned/tesseract",
+  "eng_traineddata": "/absolute/path/to/pinned/eng.traineddata",
+  "ffmpeg_binary": "/absolute/path/to/pinned/ffmpeg"
+}
+```
+
+Run `k8s_vlc_task_controller.py manifest --batch /absolute/path/to/vlc-batch.json`
+with the same Python-with-`requests` environment as the Chrome example,
+inspect the exact task/policy/tool hashes and six phase argv entries, then
+run `batch_runner.py` into a new output directory. The pinned display is
+1920×1080. Changed OCR, ffmpeg, binary, screenshot layout, checkbox controls,
+or policy bytes stop before or during action. Review the controller decisions,
+Run sidecar, evaluator output, and UID-safe reset report. A successful fresh
+VLC one-task batch and a later two-task Chrome→VLC batch are recorded in the
+evidence note; neither is an autonomous-agent score.
+
+For a predeclared two-task run, give the Chrome and VLC configs the **same**
+new `batch_id`, distinct task/episode IDs, resource names and local ports.
+Generate each controller's one-episode manifest, verify both identities and
+policy hashes, then place the Chrome and VLC episode objects in one manifest
+with `trust: "operator-audited"` and the shared `batch_id`. Inspect that the
+combined `episodes` array has exactly two entries **before** invoking the
+runner. The runner records both as scheduled before boot and executes them
+serially, resetting each fresh overlay before the next episode. Preserve
+the ledger even if either task fails; the denominator remains two.
 
 ### Guest-local current-head gate through an owner Unix socket
 

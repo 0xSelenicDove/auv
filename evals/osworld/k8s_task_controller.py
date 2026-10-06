@@ -23,7 +23,9 @@ import k8s_phase_adapter as capture
 
 
 ACTION_ENTRY_SOURCE = "bf5c6c048ddabdf9592bce06ef641ae0adc4b41a"
-ACTION_SHA256 = "441acdbb3c06b9f916f5b090eb4c94c257643d2105d2a36cdfe758af847b4bf8"
+# NOTICE: This is the measured local build used by the fixed two-task replay;
+# the source commit identifies reviewed code, not a reproducible-build proof.
+ACTION_SHA256 = "ee84942d59239f274b2b35d6a56707e621e29fff3680552d29ebaa2082f30bb0"
 OCR_VERSION = "tesseract 5.5.2"
 OCR_SHA256 = "6855d30ee1e9e97de11a58624973d2c7eb115a050df64fc3ba88b4077e153997"
 ENG_SHA256 = "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2"

@@ -1224,7 +1224,9 @@ or an official full-provider benchmark result. Its OCR gates were checked
 against archived positive and failed-static screenshots before this run;
 their robustness across other Chrome layouts is unproven. A successful
 foreground action still reports input delivery, not independent X11 receiver
-verification. Scripted VLC task solving and V2.1 task evaluation remain open.
+verification. At the time of this Chrome-only run, scripted VLC task solving
+remained open; its later result is recorded below. V2.1 batch evaluation
+remains open.
 
 ### Attended VLC V1 task-directed gate
 
@@ -1324,6 +1326,150 @@ evaluator score**. UID-safe reset removed runtime Pod
 `985c94f8-9c93-4a79-84e4-ddd88d9afcb3`; the hot PVC/PV UIDs remained
 unchanged. This gives a reproducible red/green symptom signal within one
 guest, not a root-cause diagnosis or a validated recovery policy.
+
+A later fresh attempt also stopped at an ambiguous transition frame. The
+[gate record](/private/tmp/auv-osworld-vlc-toggle-1006d/gate-results.json)
+(SHA256 `5a23f4db62caae26f57453774afef2ecb5a05814afe1a4beba3a75e16f01f6fb`)
+records AUV Run `9452e6648ac2461fd315a40b02777c6a`: the window title
+said Advanced after clicking All, but the right-pane signals did not yet
+establish the advanced page. It aborted without targeting the checkbox,
+saving, or evaluating. This attempt therefore has no task score. The
+transition PNG SHA256 was
+`4032054ccd6be8b2b87d114af4539e9ceabf6bc0a1a31befc1975427cffe47e8`.
+
+The next fresh guest produced a complete **attended** same-control state
+sequence. In AUV Run `73b98f4195e825b1bf1e45698501e8cd`, the first
+Ctrl+P / All attempt showed both the Advanced title and new right pane.
+After searching `play and exit` and selecting Playlist, the target checkbox
+was observed unchecked, then clicked to checked, then clicked back to
+unchecked. All three AUV checkpoints retained the Advanced/Playlist/Play
+and exit spatial OCR signals. In the fixed 11×11 target region
+`x=901..911, y=390..400`, the count of pixels darker than 100 changed
+`0 → 20 → 0`; same-frame checked and unchecked controls counted 20 and 0.
+The [unchecked](/private/tmp/auv-osworld-vlc-toggle-1006e/vlc-toggle-e/checkpoint-0005.png),
+[checked](/private/tmp/auv-osworld-vlc-toggle-1006e/vlc-toggle-e/checkpoint-0006.png),
+and [unchecked again](/private/tmp/auv-osworld-vlc-toggle-1006e/vlc-toggle-e/checkpoint-0007.png)
+PNGs have SHA256 values
+`ed353ea25eb640af81af251e9cf8ce9cc57310f0e6faf8db1de6d032db758f7b`,
+`102acabb798d281d9c6dc36bc998c27d4d049224b83672946db85726c20ede7c`,
+and `0c27c2e8c3507ad06991b9ab612af8a605f78237a694983e44e9c614bd35a025`.
+After Save, AUV observed the VLC main window. The pinned V1 evaluator
+returned raw `1.0` for task
+`5ac2891a-eacd-4954-b339-98abba077adb` (task JSON SHA256
+`4e038a7bb4c3770186209d68402e678ff723238cb31684fe452f0b0c6f4665da`,
+upstream revision `b138d348256078fa634fc3b73567a7337c793e6b`). The
+[gate record](/private/tmp/auv-osworld-vlc-toggle-1006e/gate-results.json)
+SHA256 was `6c4b9a7c7581b05e1877d7233951c7a6366d8307f0dcc800a4aaec116cefd0c1`.
+UID-safe reset removed only this attempt's runtime Pod
+`5ce206f8-ddcc-4166-b1b4-2e415e00634e`, proxy Pod
+`38f0f1e3-9fe4-4b03-b6b4-daebae7e1d01`, and Service
+`dc59e675-ae9d-4d9e-ac21-5d98da03b1ec`; the hot PVC/PV UIDs stayed
+unchanged. A pre-boot local journal initialization error was recovered by
+adopting only the observed task-owned Pod after verifying its UID, labels,
+node, image, and read-only image mount. This episode validates the image
+predicate within one attended Run; a fresh scripted-controller replay is
+still required before calling it an automated baseline.
+
+The first fresh **scripted** VLC six-phase replay did not solve the task.
+The predeclared [manifest](/private/tmp/auv-osworld-vlc-scripted-1006f.KHtQ2v/manifest.json)
+(SHA256 `c601f1f8fd839ce1cd964f9ae2811b6ab71f3f9d77d2dea8bc57f0aef89b7dfa`)
+selected one pinned V1 VLC episode. Boot, install, and setup passed on a new
+read-only-base qcow2 overlay. AUV Run `8e4d8c3aba38a256e534546c0e7a8dcc`
+reached MAIN, SIMPLE, GREEN_ADVANCED, verified search, and GREEN_TARGET
+in sequence. The initial target was unchecked with same-frame checked and
+unchecked controls at 20 and 0 dark pixels. After the fixed AUV click at
+`(906,395)` and a one-second wait, the next AUV image still measured the
+target at 0 dark pixels; the visible checkbox appeared gray. The
+[before](/private/tmp/auv-osworld-vlc-scripted-1006f.KHtQ2v/output/vlc-scripted-f/checkpoint-0005.png)
+and [after](/private/tmp/auv-osworld-vlc-scripted-1006f.KHtQ2v/output/vlc-scripted-f/checkpoint-0006.png)
+PNGs have SHA256
+`7be375f22be9b689250074a118df6c337f09b6dd3faa316fa48d8bee3d812296`
+and `43f0fe3551cf2acb6cdf51f19367db3c2b02bf4600959db54fbbea0c2c079c5b`.
+This observation does not identify whether input delivery, UI focus, or
+redraw timing caused the unchanged state. The fail-closed controller did
+not click Save; its [decision trace](/private/tmp/auv-osworld-vlc-scripted-1006f.KHtQ2v/output/vlc-scripted-f/controller_decisions.json)
+SHA256 was `f91fb9fb83dfd15815c5adddd1170f83270791c93fff64ca10c079e509dbb8a5`.
+The exact pinned evaluator returned raw `0.0`; the
+[ledger](/private/tmp/auv-osworld-vlc-scripted-1006f.KHtQ2v/output/ledger.json)
+(SHA256 `fc14b7d834ab53c8ab3ba94624d9208ca058f74db5784261a2496993aee625f9`)
+records `exit_failed` at action, evaluator completion, and successful
+UID-preconditioned reset. Reset removed only this episode's proxy Pod
+`a824199f-5cf4-45d8-89aa-d58dcfdf981b`, Service
+`13254ca9-830d-4902-a453-8b7a31439f79`, and runtime Pod
+`a2d60127-b826-4d4d-9759-bd01ba7163cd`. The V1 hot PVC/PV UIDs
+remained `34143535-4ac2-42f2-a443-08db3f6b49ff` and
+`8e8e46f1-0670-4a55-b06a-8caebb4d5a73`. This is a scored failed
+scripted attempt, not evidence that the checkbox is generally inaccessible:
+the attended 1006e sequence above did reach both states.
+
+A revised fixed policy removed the unnecessary ON/OFF exercise from the
+task-solving path. It still requires MAIN, SIMPLE, a fully rendered Advanced
+right pane, the search query and Playlist target, and an initially unchecked
+checkbox calibrated against checked/unchecked controls in the same AUV
+frame. Only then does it click Save. The next fresh six-phase
+[manifest](/private/tmp/auv-osworld-vlc-scripted-1006g.oP66D0/manifest.json)
+(SHA256 `f3631b0f3931ba466c82294daf4618ea2499aa7c9042a693549bb780633f77da`)
+predeclared one pinned VLC task and policy SHA256
+`94c64900027c6ac4488178d578a824eb24e864dbce913662e76a1bfc80cc09cb`.
+In AUV Run `a36de3adabdf8132819ca23b7fcc5e09`, the first Advanced
+transition remained `AMBIGUOUS` through four captures. The controller
+returned to MAIN and reopened Preferences; the second opening reached
+`GREEN_ADVANCED`. It then observed target `unchecked` with pixel counts
+0/20/0 (target/checked control/unchecked control), clicked Save, and
+observed MAIN. The [decision trace](/private/tmp/auv-osworld-vlc-scripted-1006g.oP66D0/output/vlc-scripted-g/controller_decisions.json)
+SHA256 was `c9894b2b38647ec562c532c61fa8122e17caced93dbdc1090dc695e9adceb4f6`;
+the [AUV sidecar](/private/tmp/auv-osworld-vlc-scripted-1006g.oP66D0/output/vlc-scripted-g/action_evidence.json)
+SHA256 was `22a86d417229749c0668f7bd0bdbda829bce66752ac436faaa39945428160b6e`.
+The final AUV PNG SHA256 was
+`6f2bb3bd4763943f5c3ffaceb0ac5c0d5a9c45e736e1d5a3f2dc62cb08398ae2`.
+The exact pinned V1 evaluator returned raw `1.0`; the
+[ledger](/private/tmp/auv-osworld-vlc-scripted-1006g.oP66D0/output/ledger.json)
+(SHA256 `e1f39bbf0bdf6d29a5c05c6410e07f043b6fafe739722eda39ceae076825ebea`)
+records all six phases completed, no failure layers, denominator one, and
+verified AUV evidence. UID-safe reset removed only proxy Pod
+`79864834-1f95-4dcb-9410-9196817c0508`, Service
+`e1ecf678-9cb1-4e8c-a2d2-ae1abc14de50`, and runtime Pod
+`0f30dbf6-7fdb-494c-a6a2-a502fe694840`; the retained V1 hot PVC/PV
+UIDs were unchanged. This is a deterministic scripted VLC baseline,
+not a general autonomous-agent score or benchmark-wide rate.
+
+### Predeclared two-task scripted V1 batch
+
+The next [fixed manifest](/private/tmp/auv-osworld-v1-two-scripted-1006h.OaGEBO/manifest.json)
+(file SHA256 `b5b20c55a972dd6831ab7ccd844a2d3532bbd9b2d5d92053a1c3035fc593cba7`)
+predeclared Chrome `2ad9387a-65d8-4e33-ad5b-7580065a27ca` and VLC
+`5ac2891a-eacd-4954-b339-98abba077adb` before starting either VM;
+denominator **2**. The two controllers shared the measured host action
+binary SHA256 `ee84942d59239f274b2b35d6a56707e621e29fff3680552d29ebaa2082f30bb0`
+but had separate fixed policy hashes. The runner executed them serially on
+distinct disposable V1 qcow2 overlays with separate task-owned Kubernetes
+names and local ports. All task GUI observation/input went through AUV;
+setup/evaluator remained confined to their audited non-GUI method bodies.
+
+The [final ledger](/private/tmp/auv-osworld-v1-two-scripted-1006h.OaGEBO/output/ledger.json)
+SHA256 was `2376326fddf0944bd82405d010a2ed0b9a0cf51fa0a767c241a1d98512304f07`.
+Both episodes completed all six phases with no failure layers and raw pinned
+evaluator scores `1.0` (Chrome) and `1.0` (VLC). The arithmetic mean is
+`1.0` over this **selected scripted denominator of two** only. Chrome AUV
+Run `4f07fbbd24148cbfc219fb70d15d6647` needed one observation retry
+at each of its four spatial gates; its
+[controller trace](/private/tmp/auv-osworld-v1-two-scripted-1006h.OaGEBO/output/chrome-scripted-h/controller_decisions.json)
+SHA256 was `7f81766c5e5b485e3a44d1e1685c7ed4d15b2131db3327fc8b85889a9036974e`,
+and its final AUV PNG SHA256 was
+`f4c4bda0d9e1fd791140f5233ceb2dad383d70ee62b296e25407278072798dbb`.
+VLC AUV Run `dbe6323a900916c27130092fe61566f0` reached the target
+unchecked with same-frame pixel controls 0/20/0, saved, and returned to
+MAIN; its [controller trace](/private/tmp/auv-osworld-v1-two-scripted-1006h.OaGEBO/output/vlc-scripted-h/controller_decisions.json)
+SHA256 was `08f82dfde40821c04411ebbd6001802a80fb1f82b52ee68dbb3e1ca24a708267`,
+and its final AUV PNG SHA256 was
+`01b326813ca392f37a02ccfea0cce8523b19353e50f5f6590b71f0d7ad75070f`.
+The runner verified each controller trace, Run sidecar, and final PNG hash.
+Both UID-safe resets completed; a batch-label query returned no Pods or
+Services. The retained V1 hot PVC/PV UIDs were still
+`34143535-4ac2-42f2-a443-08db3f6b49ff` and
+`8e8e46f1-0670-4a55-b06a-8caebb4d5a73`. This is infrastructure plus
+deterministic task-specific scripts, **not** an autonomous-agent benchmark
+rate or full upstream provider run.
 
 ## Operational checklist
 

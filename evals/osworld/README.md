@@ -150,8 +150,7 @@ marks a forced kill as an unverified input-release failure layer. A graceful
 process-group exit still does not independently prove the remote Run outcome.
 
 The infrastructure templates must not silently be repurposed as benchmark
-attempts. A separate scripted Chrome pilot is described below; VLC task
-solving still needs its own audited visual policy.
+attempts. Separate fixed Chrome and VLC scripted pilots are described below.
 
 ## Local typed-action entry
 
@@ -265,7 +264,7 @@ readiness were tested in a later attended gate. The interactive entry remains
 a transport, not an agent policy. The separate scripted Chrome controller
 below supplies a fixed observation policy.
 
-### Scripted Chrome V1 controller — local implementation, no batch result yet
+### Scripted Chrome V1 controller
 
 `k8s_task_controller.py` accepts one operator-audited Chrome V1 episode and a
 SHA-pinned `auv-osworld-action --interactive` host binary. The manifest
@@ -300,6 +299,32 @@ checkpoint observations, no failure layers, and UID-safe reset. That is a
 single scripted task result, not an agent rate or a multi-task benchmark.
 See the [evidence note](../../docs/ai/references/ops/2026-10-05-osworld-kubernetes-x11-evidence.md)
 for Run and artifact hashes.
+
+### Scripted VLC V1 controller and selected two-task batch
+
+`k8s_vlc_task_controller.py` accepts only the pinned VLC `play-and-exit`
+task. Its batch input has the same fields as Chrome's plus
+`"ffmpeg_binary": "/absolute/path/to/pinned/ffmpeg"` for the 11×11
+checkbox crops. The controller verifies the action/OCR/ffmpeg/policy bytes
+before manifest generation. Within one paired AUV Run, its bounded state
+machine requires MAIN, SIMPLE, a fully redrawn Advanced right pane, the
+search query and Playlist result, and the target label plus same-frame
+checked/unchecked pixel controls. A stale or ambiguous redraw can cause a
+bounded close/reopen; persistent ambiguity, unexpected checkedness, and
+changed 1920×1080 geometry fail closed. For this exact task, setup writes
+`play-and-exit=1` after VLC launches while the UI shows unchecked; the
+script verifies unchecked and clicks Save. It does not toggle the target.
+Only the pinned evaluator supplies semantic score.
+
+One fresh VLC six-phase scripted replay passed with raw `1.0` after a
+bounded redraw recovery. A later predeclared Chrome→VLC manifest with two
+distinct fresh episode configs completed both tasks with raw `1.0` each,
+no failure layers, and UID-safe cleanup. That denominator of two measures
+selected deterministic scripts and batch plumbing, **not** an autonomous
+agent or benchmark-wide completion rate. A prior scripted VLC toggle
+attempt failed closed with raw `0.0`; retain it when interpreting the
+positive result. See the [evidence note](../../docs/ai/references/ops/2026-10-05-osworld-kubernetes-x11-evidence.md)
+for exact manifests, task hashes, Runs, and artifacts.
 
 ### Batch runner outcome
 
