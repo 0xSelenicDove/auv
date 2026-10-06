@@ -292,6 +292,19 @@ resources without changing the hot PVC/PV. All three failed episodes remain
 in the evidence note; none contributes a benchmark score. The revised
 pairing diagnostics still need a fresh live gate.
 
+The fourth live gate used those diagnostics and stopped at the installed
+binary's `--version`, before daemon launch or token generation: child exit
+127 despite HTTP 200/`status=success`. The stderr SHA256 and byte count
+exactly match the missing-`libtesseract.so.4` dynamic-loader message for the
+measured ELF. It again passed boot and UID-safe reset, leaving no AUV Run or
+score. Next, make this guest library prerequisite explicit and verify it in a
+fresh episode before claiming installation or evaluator success.
+
+The adapter now installs only the three packages previously validated in the
+runbook, using the public V1 image sudo password, before `auv --version`.
+That bounded install call and its ordering have local regression coverage;
+the changed path has not yet passed a live guest.
+
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
 approval.` After the owner approved access, read-only dry-runs at revision

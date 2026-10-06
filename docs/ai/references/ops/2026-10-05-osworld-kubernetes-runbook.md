@@ -535,13 +535,17 @@ scope and hashes. VLC and V2.1 are not supported by this bridge.
 action is **one paired-AUV `display.capture` negative control**. It sends no
 GUI input and does not measure agent ability or an AUV task-solving attempt;
 the expected evaluator value is `0.0`. This adapter has local boundary tests
-and passed a live boot with a measured backing-file overlay. Three live gates
+and passed a live boot with a measured backing-file overlay. Four live gates
 stopped before AUV action/evaluation: first on the old overlay check, second
-on the pinned launch response format, and third on pairing-token output shape.
+on the pinned launch response format, third on pairing-token output shape,
+and fourth on `auv --version` exiting 127. The fourth gate's stderr length
+and SHA256 exactly match the dynamic loader's missing `libtesseract.so.4`
+message. The third gate's symptom was obscured by the ignored child exit code.
 Each task-owned VM was cleaned up; none produced an AUV Run or batch score.
-The third gate's cause is unresolved because the adapter previously ignored
-the guest command's exit code. The revised, token-safe diagnostics have not
-yet been rechecked live. Do not use these gates to claim a benchmark score.
+The adapter now checks the guest exit code and installs the runbook-validated
+Tesseract packages in the disposable guest before its AUV version check. That
+new prerequisite path has passed local tests but has not been rechecked live.
+Do not use these gates to claim a benchmark score.
 
 The operator supplies a JSON configuration with exactly these fields:
 `batch_id`, `episode_id`, `namespace`, `kubeconfig`, `context`, `node`, `runtime_pod`,

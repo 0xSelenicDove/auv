@@ -30,6 +30,13 @@ RUNTIME_IMAGE = "happysixd/osworld-docker@sha256:0e6497a9295647cf05bf2b2af522fdd
 AUV_SOURCE = "25e2320570a72d3b9580451ea2917a9e03fa6b95"
 GUEST_AUV_SHA256 = "2a8e53eecfef1dcd8fa8368fa480d6df36e254527c7e60be3ac82802e7073427"
 HOST_AUV_SHA256 = "cf9485c4a2ec0fbf14c0fa6f874ef77decba00f8c61ae704ec67b77915a3c08a"
+# NOTICE: The pinned Ubuntu guest lacks libtesseract.so.4, which the pinned
+# Jammy AUV ELF needs even for --version. Install only the runbook-validated
+# packages in this disposable guest; remove this step when the guest image or
+# AUV distribution provides those runtime libraries. The V1 sudo password is
+# public benchmark image metadata, not an AUV pairing credential.
+GUEST_APT_UPDATE = ["bash", "-lc", "printf '%s\\n' password | sudo -S -p '' env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=30 update"]
+GUEST_APT_INSTALL = ["bash", "-lc", "printf '%s\\n' password | sudo -S -p '' env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=30 install -y --no-install-recommends libtesseract4 liblept5 tesseract-ocr-eng"]
 PHASES = ("boot", "install", "setup", "action", "evaluate", "reset")
 TIMEOUTS = {"boot": 900, "install": 300, "setup": 180, "action": 600, "evaluate": 180, "reset": 180}
 CONFIG_FIELDS = (
@@ -412,6 +419,8 @@ class Episode:
             ["sha256sum", "/home/user/auv"],
             ["/home/user/auv", "--version"],
             ["env", "AUV_ENDPOINT=unix:///home/user/auv.sock", "/home/user/auv", "devices", "pair", "create-token"],
+            GUEST_APT_UPDATE,
+            GUEST_APT_INSTALL,
         )
         if command not in allowed:
             raise ValueError("unreviewed guest command or AUV GUI invoke is forbidden")
@@ -486,6 +495,8 @@ class Episode:
             measured = self.guest_control(["sha256sum", "/home/user/auv"]).get("output", "").split()[0]
             if measured != GUEST_AUV_SHA256:
                 raise ValueError("guest-installed AUV bytes differ")
+            self.guest_control(GUEST_APT_UPDATE)
+            self.guest_control(GUEST_APT_INSTALL)
             version = self.guest_control(["/home/user/auv", "--version"])
             daemon = ["env", "DISPLAY=:0", "XDG_SESSION_TYPE=x11", "/home/user/auv", "serve",
                       "--listen", "unix:///home/user/auv.sock", "--listen", "http://0.0.0.0:8080",

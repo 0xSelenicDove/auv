@@ -887,6 +887,22 @@ task-owned VM Pod, proxy Pod, and Service by UID preconditions; the V1 hot
 PVC/PV remained Bound and the pairing profile was absent. The revised
 pairing diagnostics have not yet been rechecked live.
 
+A fourth independent episode, `osw-v1-neg-1006d`, used the exit-code-aware
+adapter at 02:53:46–02:56:20 UTC. Boot and the overlay audit passed in 113.1
+seconds. Installation failed in 6.0 seconds at `/home/user/auv --version`,
+before daemon launch or pairing: the pinned setup endpoint reported HTTP 200
+and `status=success`, but the child exited 127. The safe stderr evidence was
+131 bytes with SHA256
+`1b61c7ad3b5ebbe53a025ca9f504692994779dabb87fbe8fe2747b8d4681f877`.
+The local ELF requires `libtesseract.so.4`; the exact dynamic-loader message
+for that missing library has the same length and SHA256. This identifies the
+guest prerequisite without exposing any token or raw command output. The
+[fourth ledger](/private/tmp/auv-osworld-v1-negative-live4.K6cjrg/run/ledger.json)
+has no AUV Run or evaluator score. Reset completed in 34.9 seconds, all three
+task-owned resources were absent on an independent check, and the hot PVC/PV
+UIDs and Bound status were unchanged. This does not revalidate installation
+after adding the missing guest library.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

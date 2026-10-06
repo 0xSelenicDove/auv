@@ -139,13 +139,37 @@ class AdapterTest(unittest.TestCase):
              patch.object(self.episode, "forward", return_value=nullcontext()), \
              patch.object(adapter, "_run", return_value=""), \
              patch.object(self.episode, "guest_control", side_effect=[
-                 good(""), good(adapter.GUEST_AUV_SHA256 + "  /home/user/auv"), good("auv 0.0.28"), reply,
+                 good(""), good(adapter.GUEST_AUV_SHA256 + "  /home/user/auv"),
+                 good(""), good(""), good("auv 0.0.28"), reply,
              ]), \
              patch.object(self.episode, "_post", return_value="launched successfully"):
             with self.assertRaisesRegex(ValueError, "stdout_lines=2") as caught:
                 self.episode.install()
         self.assertNotIn(secret, str(caught.exception))
         self.assertIn("stdout_sha256=", str(caught.exception))
+
+    def test_install_prepares_guest_libraries_before_auv_version(self):
+        calls = []
+        def control(command):
+            calls.append(command)
+            if command == ["sha256sum", "/home/user/auv"]:
+                return {"output": adapter.GUEST_AUV_SHA256 + "  /home/user/auv"}
+            if command == ["/home/user/auv", "--version"]:
+                raise RuntimeError("stop after library preparation")
+            return {"output": ""}
+        with patch.object(self.episode, "assert_identity"), \
+             patch.object(self.episode, "forward", return_value=nullcontext()), \
+             patch.object(adapter, "_run", return_value=""), \
+             patch.object(self.episode, "guest_control", side_effect=control):
+            with self.assertRaisesRegex(RuntimeError, "stop after library preparation"):
+                self.episode.install()
+        self.assertEqual(calls, [
+            ["chmod", "0700", "/home/user/auv"],
+            ["sha256sum", "/home/user/auv"],
+            adapter.GUEST_APT_UPDATE,
+            adapter.GUEST_APT_INSTALL,
+            ["/home/user/auv", "--version"],
+        ])
 
     def test_launch_accepts_pinned_upstream_plain_text_success(self):
         # ROOT CAUSE:
