@@ -675,6 +675,58 @@ failed. The observed raw Chrome score was `1.0`; the [evidence note](2026-10-05-
 records hashes and the exact boundary. This is one attended method-body
 evaluator result, not an unattended batch or OSWorld completion rate.
 
+### Guest-local current-head gate through an owner Unix socket
+
+The 2026-10-06 V1 guest-local gate followed the Ubuntu 22.04 build recipe in
+section 5 for exact source commits and SHA-verified `auv`,
+`auv-osworld-action`, and the `action_entry` integration-test ELF. Build
+dependencies, target, and temporary files lived on a **task-owned** build PVC.
+The existing phase adapter's `install` cannot install a current-head binary:
+it pins the older `25e23205` build. Reuse only its UID-audited `boot`/`reset`
+for a fresh V1 overlay. A config containing the historical binary paths is
+accepted for those phases solely because `load_config` requires their hashes;
+it does **not** prove the newly compiled guest binaries.
+
+Provision a temporary key-only SSH server as non-GUI infrastructure before
+task execution. The OSWorld setup plane may upload inert ELF bytes/public key
+and configure sshd, but **must not launch** `auv serve`, the action entry, or
+an action test. Verify the guest's actual port 22 and ED25519 host fingerprint,
+pin it in a task-owned `known_hosts`, and SSH through the task-owned proxy Pod
+to the observed runtime Pod IP. Do not publish an Ingress or bypass host-key
+checking. After SSH works, launch both the AUV daemon and harness **over SSH**;
+keep all GUI input and capture on the guest owner Unix socket. For example,
+with episode-specific paths/UID-checked names substituted:
+
+```sh
+ssh -i /absolute/ephemeral-key \
+  -o UserKnownHostsFile=/absolute/known_hosts \
+  -o StrictHostKeyChecking=yes -o HostKeyAlias=osworld-episode \
+  -o 'ProxyCommand=kubectl --kubeconfig /absolute/ihome.conf --context CONTEXT -n NAMESPACE exec -i PROXY_POD -- socat STDIO TCP:RUNTIME_POD_IP:22' \
+  user@osworld-episode
+```
+
+Inside that SSH session, set `DISPLAY=:0` and `XDG_SESSION_TYPE=x11`, start
+the installed current-head `auv serve --listen unix:///home/user/auv.sock
+--store-root /home/user/.local/share/auv-osworld --no-register`, and get the
+online canonical Device ID with `auv devices list --endpoint
+unix:///home/user/auv.sock --json`. Use `kind: guest-local`, that Device ID,
+and `daemon_endpoint: unix:///home/user/auv.sock` in the interactive context.
+Upload the release test ELF and action binary to the same guest absolute paths
+embedded at test compilation; verify SHA256, `ldd`, and glibc requirements
+inside the guest. Then run the ignored `action_entry` same-Runner capture,
+EOF cancellation, and SIGTERM/reacquisition tests through SSH. For an attended
+protocol sample, use `capture → typed MOVE_TO → capture → finish` and inspect
+the atomic Run sidecar, checkpoints, original `InputActionResult`, and final
+PNG SHA256. The [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md)
+records the exact passing gate and a test-only 1001-action boundary fix.
+
+Finally stop the SSH-launched daemon, revoke the temporary key, close
+forwards, run the adapter's UID-precondition `reset`, and remove only the
+task-owned build Pod/PVC/PV after verifying artifact copies and UIDs. The
+retained hot image PVC/PV must stay Bound. This gate proves guest-local AUV
+action/Run lifecycle, **not** an OSWorld evaluator score; a same-test second
+Run does not replace an independent X11 `ButtonRelease` receiver trace.
+
 This runbook reproduces the infrastructure and both AUV control topologies. It
 does not yet provide:
 

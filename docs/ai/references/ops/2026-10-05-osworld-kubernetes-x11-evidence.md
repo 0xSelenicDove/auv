@@ -1124,6 +1124,65 @@ task-owned Pod/Service/proxy; an independent label query found none, and the
 V1 hot PVC/PV UIDs stayed `34143535-4ac2-42f2-a443-08db3f6b49ff` and
 `8e8e46f1-0670-4a55-b06a-8caebb4d5a73`.
 
+### Guest-local Unix-socket interactive and cancellation gate
+
+A fresh official V1 qcow2 overlay on `liet-gpu-1` tested the no-pairing path on
+2026-10-06. This was an infrastructure/action gate, not an OSWorld task or
+evaluator score. The runtime image was pinned to
+`happysixd/osworld-docker@sha256:0e6497a9295647cf05bf2b2af522fdd79bdeba2737595259cab310a3bcf6baa9`;
+the V1 hot qcow2 SHA256 was
+`6bf667a852b3c307f61d9f09c42559351f45e0607e428b4997becf534cf4d313`.
+Ubuntu 22.04 amd64 binaries were built from source commit `49745a5a` (the
+`auv` SHA256 was `327afaf09f11dd5d8926ee5a16f58ac03e96818afe62e165971c046e45f6bd8e`
+and `auv-osworld-action` SHA256 was
+`6253f8f0a4b567532f27c17dc67f233617e1ff2813543e7b881644f9f113e4ea`).
+The cancellation integration-test ELF was rebuilt from test-only fix
+`980c1ec9` (SHA256
+`53050bbae1643c7876eb3c8f2680d7297940a5a739bad289c4cba97af435c314`).
+All three SHA256 values and Ubuntu/glibc linkage were checked inside the guest.
+
+OSWorld's setup plane was used only for inert binary upload and temporary SSH
+provisioning. `auv serve`, the action entry, and integration tests were launched
+through pinned-host-key SSH inside the guest; all GUI input and captures used
+the guest-local AUV owner Unix socket. No CUA, VNC input, xdotool, PyAutoGUI,
+or OSWorld `/execute`/`/setup/execute`/`/setup/launch` GUI relay was used.
+The guest AUV Device ID was `e18efaf99865095bf9b7f6781bb4ded819a70dccacc5c24ec09a8ad718424964`.
+
+The ignored same-Runner tests `interactive_capture_before_and_after_typed_action_keeps_one_run`
+and `interactive_eof_keeps_run_id_and_cancels_without_final_png` passed. The
+first cancellation test attempt used 1001 plan actions against a 1000-action
+limit, so it failed before creating a Run or holding input; the test-only fix
+changed it to `MOUSE_DOWN` plus 999 moves. The corrected
+`foreground_runner_cancellation_preserves_run_and_releases_input` passed
+1/1 in 0.37 s (exit 0), including a second Run that reacquired input after
+termination. This is a release/reacquisition assertion by the same test, not
+an independent X11 event-receiver trace.
+
+A separate persistent interactive process sent capture, typed `MOVE_TO`
+`(300,300)`, capture, then finish through one Runner. Run
+`72fba5ca8f75389c0f92269f22b87d72` completed (exit 0) with two checkpoint
+PNGs and a final PNG; the [checkpoint index](/private/tmp/auv-osworld-v1-guestlocal-1006g/evidence/interactive-1/checkpoints.json)
+SHA256 was `a49475cb0629691e1ccab4a7fec7af3d5df0d38b758b957a28e49edbef73c2a8`.
+The [final PNG](/private/tmp/auv-osworld-v1-guestlocal-1006g/evidence/interactive-1/final-screenshot.png)
+SHA256 was `20615a2d38a06210225c3fdf94320f513054b2387a3b8f11acc81aa5f52a38de`;
+the [atomic sidecar](/private/tmp/auv-osworld-v1-guestlocal-1006g/evidence/interactive-1/action_evidence.json)
+SHA256 was `39289b8559d9476c59c8837c0874fda8cbaa20a2a6080af24366f20e2a2ee7c1`.
+The move's `InputActionResult` reported successful foreground system-event
+delivery with `verified=false`; an unchanged screenshot does not prove pointer
+motion. A held `MOUSE_DOWN` followed by stdin EOF produced expected exit 1,
+Run `5435a94d72a1d64deebcb6b78a1427f7`, terminal sidecar
+`final_artifact=null`, and no final PNG. The [EOF sidecar](/private/tmp/auv-osworld-v1-guestlocal-1006g/evidence/eof-1/action_evidence.json)
+SHA256 was `83bb87415d18aeede68d2afd060a9dacac86e3aa1dbfb9b946c7f90d5b8db11f`.
+
+The task-owned guest Pod, proxy Pod, and Service were removed with UID
+preconditions. The task-owned build PVC `auv-osworld-build-1006g` was deleted
+with UID precondition, and its `Delete`-reclaim PV disappeared; temporary SSH
+credentials and local forwards were removed. The retained V1 hot PVC/PV stayed
+Bound with UIDs `34143535-4ac2-42f2-a443-08db3f6b49ff` and
+`8e8e46f1-0670-4a55-b06a-8caebb4d5a73`. The local
+[cleanup journal](/private/tmp/auv-osworld-v1-guestlocal-1006g/cleanup-journal.json)
+records exact task-owned UIDs.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

@@ -411,10 +411,23 @@ and UID-safe reset completed. This closes one same-Runner **attended**
 task-directed gate. It does not prove why the static replays failed: adding
 observations also added time between actions. The entry is not wired into
 `batch_runner.py`, whose action stdin remains closed; no unattended agent
-policy or predeclared task-solving denominator has been evaluated. The next
-slice is an audited interactive controller/batch boundary, followed by a
-guest-local current-head build and held-input cancellation gate. See the
+policy or predeclared task-solving denominator has been evaluated. At that
+point, guest-local current-head entry/cancellation remained untested. See the
 [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
+
+The guest-local current-head V1 gate has now passed on a separate fresh
+overlay. Exact Ubuntu 22.04 ELF hashes were verified in the guest; ephemeral
+key-only SSH, not the OSWorld setup API, launched the AUV owner-socket daemon
+and action tests. A same-Runner action/capture test, EOF cancellation, and
+SIGTERM followed by a second Run's input reacquisition passed. A persistent
+guest-local Run retained checkpoint/PNG/typed-result sidecars. One initial
+SIGTERM test failure was test-only: its 1001-action plan exceeded the 1000
+limit and created no Run; `980c1ec9` corrected it before the passing rerun.
+All task-owned resources were cleaned without changing retained PVC/PV UIDs.
+This closes the current-head **guest-local transport/lifecycle** gate, not a
+task evaluator or independent X11 ButtonRelease receiver gate. The next
+unclosed boundary is an audited controller for a frozen task-solving batch;
+V2.1 asset/setup/evaluator coverage remains separate.
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
