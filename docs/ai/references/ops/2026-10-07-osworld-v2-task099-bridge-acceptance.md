@@ -1,10 +1,12 @@
-# OSWorld-V2.1 Task099 bridge: live negative-control acceptance
+# OSWorld-V2.1 Task099 bridge: live infrastructure acceptance
 
 Date: 2026-10-07. The first run checked the repository's pinned, file-only
 `evals/osworld/v2_task099_evaluator.py` on a fresh official V2.1 QEMU/KVM
 guest. A second fresh run added a source-pinned installed AUV capture before
-the same no-answer evaluation. Neither run delivered GUI input, asked an agent
-to solve the task, or contributed to a benchmark completion-rate denominator.
+the same no-answer evaluation. A third fresh run used a fixed AUV double-click
+to open the image and completed the six-phase Kubernetes lifecycle. None asked
+an agent to solve the task or contributed to a benchmark completion-rate
+denominator.
 
 ## Identity and guest isolation
 
@@ -130,3 +132,37 @@ their original PV identities. The next gate is a task-directed AUV action
 episode using this pinned V2.1 setup/evaluator bridge, followed by a
 predeclared multi-task V2.1 cohort; this capture-only `0.0` is not part of
 either denominator.
+
+## Third fresh guest: fixed AUV input and six-phase lifecycle
+
+The new `k8s_v2_task099_adapter.py` completed one predeclared, paired-remote
+infrastructure episode (`v2t099-fixed-20261007-c1`) on a fresh V2.1 overlay.
+The source-pinned Ubuntu guest AUV was the same SHA256
+`327afaf09f11dd5d8926ee5a16f58ac03e96818afe62e165971c046e45f6bd8e4`.
+The locally rebuilt Mac `auv` and foreground `auv-osworld-action` measured
+`7d2ffc8545dfe1eb6f12ed0f623a94f34e7246ede8328f54999f43e1ca0c496a`
+and `1b8e338380f6d79fd6b7840aff6b154f4810671c9c8e41141f5d7562d193e19e`.
+The latter's source commit is an operator declaration (`ea69a10b`), not a
+binary-to-source proof. The sealed episode config SHA256 was
+`61f8f15089f1f0fa20dd963c5adef5284c776c7c9ea053376ac5f3280a6eb45c`.
+All six phases returned `ok`: boot, install, setup, action, evaluate, reset.
+
+The fixed action was one AUV `DOUBLE_CLICK` at `(1850, 880)` on the uploaded
+Desktop image. Its typed driver-delivery result succeeded; the final AUV
+Run ID was `afb5cc4c433f45cdf2e5cefab7c5f229`. The PNG SHA256 was
+`505f4e9b5fe9fa34d8511ff4e6a69464da8113c6aab013a7e5ddd52aa33ebbee`.
+Independent inspection of that PNG showed Image Viewer displaying
+`my_image.png`. This verifies an image-opening GUI action and capture, not
+geolocation or semantic task completion. The unchanged pinned Task099 method
+returned raw `0.0` with no `position.txt`; the batch ledger's top-level
+`score: 0.0` only projects that raw value for the runner.
+
+The runtime Pod UID was `964bfe84-9096-445e-9b1c-0e82b5990595`, proxy UID
+`38b3e1b6-5888-4c42-87a0-fe508f28f84b`, and Service UID
+`e000a720-ddab-4119-a15f-79a409af9be7`. Reset removed only those
+UID-preconditioned objects. A subsequent read-only listing found no Pods or
+Services in the namespace; the five retained PVCs remained Bound, including
+`osworld-v2-hot` UID `540bbdd1-794f-46b5-ad72-2ee553f21ad8`. The complete
+local ledger, final PNG, and action sidecar remain under
+`/tmp/auv-v2t099-fixed-20261007-c1/run/`. This was a fixed infrastructure
+control, not an agent attempt or an OSWorld-V2.1 completion-rate denominator.

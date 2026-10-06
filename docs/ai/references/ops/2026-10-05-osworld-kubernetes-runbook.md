@@ -1009,6 +1009,59 @@ Run this only on a disposable Xorg desktop: the test moves the pointer, sends
 clicks/keys/text, and creates/cleans held input through AUV. A passing action
 matrix is still separate from an OSWorld task evaluator result.
 
+### V2.1 Task099: six-phase fixed control and attended agent handoff
+
+The scoped `evals/osworld/k8s_v2_task099_adapter.py` uses the same
+UID-audited Pod/Service/overlay/forward/reset lifecycle as the V1 adapter,
+but pins the V2.1 hot qcow2, source-built Ubuntu 22.04 guest AUV, Task099
+class/getter, and gated image. It is not a general V2.1 task runner. Its
+fixed action double-clicks the uploaded image through paired AUV and captures
+the result; it does not create `position.txt`. The first six-phase live run
+returned raw evaluator `0.0` with an Image Viewer screenshot and completed
+UID-safe reset. See the [acceptance record](2026-10-07-osworld-v2-task099-bridge-acceptance.md).
+
+Before boot, use a new DNS-label episode ID and unique Pod, Service, proxy,
+and local port names. Copy the V1 lifecycle config fields into an episode
+config, set `base_pvc` to `osworld-v2-hot` and `base_qcow_sha256` to the
+measured V2 hot image, then add absolute `task_source`, `asset`, and
+`action_binary` paths; measured `host_auv_sha256` and
+`action_binary_sha256`; and the exact `action_source_commit`. The source
+commit is operator-declared provenance: the adapter verifies binary bytes,
+but cannot prove which checkout produced them. It rejects source/asset drift
+and mismatched binaries before emitting a six-phase manifest. Use one Python
+interpreter with `requests` for manifest and phases. For example, substitute
+new absolute paths and inspect the manifest before running:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 /absolute/python-with-requests \
+  evals/osworld/k8s_v2_task099_adapter.py manifest \
+  --config /absolute/new-episode/config.json > /absolute/new-episode/manifest.json
+PYTHONDONTWRITEBYTECODE=1 /absolute/python-with-requests \
+  evals/osworld/batch_runner.py \
+  --manifest /absolute/new-episode/manifest.json \
+  --output-dir /absolute/new-run-directory
+```
+
+Inspect `ledger.json` for all six phase statuses, `auv.run_ids`, the
+byte-verified final PNG, raw `evaluator_output.result.score`, and
+`cleanup.report` with Pod/Service UIDs. Recheck the namespace read-only for
+no task Pods or Services and retained V1/V2 PVCs Bound. A fixed-control
+`0.0` is expected and is not an agent failure rate.
+
+For a *separate fresh* attended agent attempt, run the adapter's `boot`,
+`install`, and `setup` phases with the same sealed config SHA256 and
+`AUV_OSWORLD_EPISODE_DIR`; do not run its fixed `action` phase. Use
+`agent_action_relay.py --adapter v2-task099` with that config, episode
+directory, the exact action ELF path/SHA, and bounded action/capture counts.
+The config must be inside the episode directory so the relay can bind its
+paired profile to that guest. Pass the task instruction and relay's `ready`
+limits/rules to the agent, but do not expose the evaluator source or answer.
+After the relay's terminal receipt, run the adapter's `evaluate` and `reset`
+phases separately. Run reset even after a relay error; preserve the relay
+trace and evaluator stdout. This attended relay does not enforce an AUV-only
+model tool boundary, so such a run is exploratory, not an official benchmark
+completion rate.
+
 ## Failure guide
 
 | Symptom | Check |

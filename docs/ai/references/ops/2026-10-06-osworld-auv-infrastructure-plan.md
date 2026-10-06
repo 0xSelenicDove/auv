@@ -618,10 +618,23 @@ answer; all task-owned Pod, Service, and build resources were UID-safely
 removed while retained PVCs stayed Bound. This closes a **current-head AUV
 observation plus evaluator negative control**, not task-directed input or an
 agent result. The bridge still does not boot or identify a Pod, enforce
-AUV-only action execution, run Task044, or schedule a V2.1 batch. The next
-gate is a fresh UID-pinned Task099 action episode, then a predeclared V2.1
-multi-task cohort. See the
-[live acceptance record](2026-10-07-osworld-v2-task099-bridge-acceptance.md).
+AUV-only action execution, run Task044, or schedule a V2.1 batch. A scoped
+`k8s_v2_task099_adapter.py` now adds the six-phase K8s lifecycle for this one
+task. Its first fresh guest completed boot, install, pinned setup, one fixed
+AUV image-opening double-click, pinned evaluation, and UID-safe reset. AUV
+Run/PNG evidence verified that Image Viewer displayed the image; raw upstream
+score was the expected `0.0` without an answer. This closes task-directed
+input delivery and lifecycle for a fixed infrastructure control, not agent
+performance. A separate fresh Task099 guest then hosted a selected Codex
+sub-agent via the V2-capable AUV relay. It completed 13 actions and 14
+captures, reached Google Maps Street View, but timed out before writing the
+answer or a terminal receipt; unchanged upstream evaluation returned `0.0`.
+The relay does not enforce isolation from the agent's other tools, and this
+one-task attempt is not a cohort or completion rate. The next gate is a
+predeclared V2.1 multi-task cohort with a verifiable model/tool boundary and
+audited per-task assets and evaluators. See the
+[fixed-control acceptance](2026-10-07-osworld-v2-task099-bridge-acceptance.md)
+and [agent attempt](2026-10-07-osworld-v2-task099-codex-agent-attempt.md).
 
 ### 5. Agent/harness evaluation — two selected V2.1 attempts, no rate
 

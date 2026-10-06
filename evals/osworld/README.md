@@ -505,5 +505,40 @@ task-owned cleanup separately. Offline boundary tests and two fresh live V2.1
 no-answer controls have passed; the second used a source-pinned installed AUV
 to capture the desktop before evaluation. See the
 [acceptance record](../../docs/ai/references/ops/2026-10-07-osworld-v2-task099-bridge-acceptance.md).
-Neither control sent task-directed GUI input. This is not a Kubernetes batch
-adapter or agent performance result.
+Neither control sent task-directed GUI input.
+
+`k8s_v2_task099_adapter.py` now supplies a separate six-phase, UID-audited
+Kubernetes adapter for this one pinned task. Its config has the same lifecycle
+fields as `k8s_phase_adapter.py`, with `base_pvc=osworld-v2-hot`, the pinned
+V2 qcow2 SHA256, absolute `task_source`/`asset` paths, and measured
+`host_auv_sha256`/`action_binary_sha256` plus an operator-declared
+`action_source_commit`. It rejects mismatched local ELF and source/asset
+bytes before manifest generation. Generate the manifest with a Python
+interpreter that can import `requests`, inspect its one episode and all six
+phase argv entries, then run:
+
+```sh
+python3 evals/osworld/k8s_v2_task099_adapter.py manifest \
+  --config /absolute/fresh/config.json > /absolute/fresh/manifest.json
+python3 evals/osworld/batch_runner.py \
+  --manifest /absolute/fresh/manifest.json \
+  --output-dir /absolute/new/run
+```
+
+The adapter's fixed action is one paired-AUV double-click of the supplied
+Desktop image plus a final capture. The first live run completed all six
+phases and showed Image Viewer in the byte-verified AUV PNG; the unchanged
+Task099 evaluator returned raw `0.0` because no answer was written. This
+closes an input-delivery/lifecycle gate, not an agent task or multi-task
+completion rate. The local ledger and cleanup identities are in the
+[acceptance record](../../docs/ai/references/ops/2026-10-07-osworld-v2-task099-bridge-acceptance.md).
+
+For an attended, separate agent action phase after a fresh adapter
+`boot`/`install`/`setup`, `agent_action_relay.py --adapter v2-task099` uses
+the V2 config and installed guest AUV pin. Its default `--adapter v1`
+behavior is unchanged. The relay still cannot enforce isolation from the
+agent's other tools; record such attempts as exploratory unless that boundary
+is independently enforced. One selected Task099 Codex sub-agent attempt
+completed 13 AUV actions and 14 captures before the relay's session deadline,
+but did not save `position.txt`; pinned raw evaluation was `0.0`. See the
+[attempt record](../../docs/ai/references/ops/2026-10-07-osworld-v2-task099-codex-agent-attempt.md).

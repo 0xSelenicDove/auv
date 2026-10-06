@@ -83,11 +83,8 @@ def selected_task(config: dict) -> tuple[str, str, str]:
     return task_id, app, task_hash
 
 
-def load_config(path: Path) -> dict:
-    config = json.loads(path.read_text())
-    if not isinstance(config, dict) or set(config) not in (set(CONFIG_FIELDS), set(CONFIG_FIELDS) | {"task_id"}):
-        raise ValueError(f"config must contain exactly: {', '.join(CONFIG_FIELDS)}; optional task_id")
-    task_id, app, task_hash = selected_task(config)
+def validate_common_config(config: dict, *, require_source_files: bool = True) -> None:
+    """Validate fields used by the shared Kubernetes lifecycle, without a benchmark pin."""
     for name in CONFIG_FIELDS:
         if name not in ("setup_local_port", "auv_local_port") and (not isinstance(config[name], str) or not config[name].strip()):
             raise ValueError(f"{name} must be a nonempty string")
@@ -105,8 +102,16 @@ def load_config(path: Path) -> dict:
         raise ValueError("distinct unprivileged integer local ports are required")
     for name in ("kubeconfig", "guest_auv_binary", "host_auv_binary", "upstream_checkout"):
         value = Path(config[name])
-        if not value.is_absolute() or not value.exists():
+        if not value.is_absolute() or (not value.exists() and (require_source_files or name == "kubeconfig")):
             raise ValueError(f"{name} must be an existing absolute path")
+
+
+def load_config(path: Path) -> dict:
+    config = json.loads(path.read_text())
+    if not isinstance(config, dict) or set(config) not in (set(CONFIG_FIELDS), set(CONFIG_FIELDS) | {"task_id"}):
+        raise ValueError(f"config must contain exactly: {', '.join(CONFIG_FIELDS)}; optional task_id")
+    task_id, app, task_hash = selected_task(config)
+    validate_common_config(config)
     if sha256(Path(config["guest_auv_binary"])) != GUEST_AUV_SHA256:
         raise ValueError("guest AUV binary differs from the pinned validated Ubuntu 22.04 build")
     if sha256(Path(config["host_auv_binary"])) != HOST_AUV_SHA256:
@@ -153,6 +158,10 @@ def _run(argv: list[str], *, env: dict | None = None, input_text: str | None = N
 
 
 class Episode:
+    guest_auv_sha256 = GUEST_AUV_SHA256
+    apt_update = GUEST_APT_UPDATE
+    apt_install = GUEST_APT_INSTALL
+
     def __init__(self, config: dict, directory: Path):
         self.config = config
         self.directory = directory
@@ -255,7 +264,7 @@ class Episode:
             raise ValueError("live QEMU process has not opened the audited boot overlay")
         guest_hash = self.kubectl(*exec_args, "sha256sum", "/System.qcow2").split()[0]
         if guest_hash != self.config["base_qcow_sha256"]:
-            raise ValueError("mounted V1 base qcow2 SHA256 mismatch")
+            raise ValueError("mounted base qcow2 SHA256 mismatch")
         if self._pod_snapshot(self.config["runtime_pod"], "qemu", RUNTIME_IMAGE) != runtime_identity:
             raise ValueError("runtime Pod UID/container identity changed during overlay audit")
         return {"qemu_pid": int(pid), "qemu_argv": command, "base_qcow_sha256": guest_hash,
@@ -441,8 +450,8 @@ class Episode:
             ["sha256sum", "/home/user/auv"],
             ["/home/user/auv", "--version"],
             ["env", "AUV_ENDPOINT=unix:///home/user/auv.sock", "/home/user/auv", "devices", "pair", "create-token"],
-            GUEST_APT_UPDATE,
-            GUEST_APT_INSTALL,
+            self.apt_update,
+            self.apt_install,
         )
         if command not in allowed:
             raise ValueError("unreviewed guest command or AUV GUI invoke is forbidden")
@@ -515,10 +524,10 @@ class Episode:
                   "-F", f"file_data=@{c['guest_auv_binary']}", f"http://127.0.0.1:{c['setup_local_port']}/setup/upload"])
             self.guest_control(["chmod", "0700", "/home/user/auv"])
             measured = self.guest_control(["sha256sum", "/home/user/auv"]).get("output", "").split()[0]
-            if measured != GUEST_AUV_SHA256:
+            if measured != self.guest_auv_sha256:
                 raise ValueError("guest-installed AUV bytes differ")
-            self.guest_control(GUEST_APT_UPDATE)
-            self.guest_control(GUEST_APT_INSTALL)
+            self.guest_control(self.apt_update)
+            self.guest_control(self.apt_install)
             version = self.guest_control(["/home/user/auv", "--version"])
             daemon = ["env", "DISPLAY=:0", "XDG_SESSION_TYPE=x11", "/home/user/auv", "serve",
                       "--listen", "unix:///home/user/auv.sock", "--listen", "http://0.0.0.0:8080",

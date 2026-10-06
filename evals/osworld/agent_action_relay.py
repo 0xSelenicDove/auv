@@ -53,14 +53,22 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def paired_context(config: dict, directory: Path) -> dict:
-    """Check install evidence without printing the paired bearer credential."""
-    from k8s_phase_adapter import GUEST_AUV_SHA256
+def adapter_module(adapter: str):
+    if adapter == "v1":
+        import k8s_phase_adapter
+        return k8s_phase_adapter
+    if adapter == "v2-task099":
+        import k8s_v2_task099_adapter
+        return k8s_v2_task099_adapter
+    raise ValueError("unreviewed Kubernetes episode adapter")
 
+
+def paired_context(config: dict, directory: Path, guest_auv_sha256: str) -> dict:
+    """Check install evidence without printing the paired bearer credential."""
     paired = json.loads((directory / "paired-device.json").read_text(encoding="utf-8"))
     if not isinstance(paired, dict) or not isinstance(paired.get("device_id"), str) or not paired["device_id"]:
         raise ValueError("paired Device ID evidence is missing")
-    if paired.get("guest_auv_sha256") != GUEST_AUV_SHA256:
+    if paired.get("guest_auv_sha256") != guest_auv_sha256:
         raise ValueError("paired install evidence has a different guest AUV binary")
     profiles_path = (directory / "paired-profiles.json").resolve(strict=True)
     if not profiles_path.is_file() or profiles_path.parent != directory:
@@ -77,9 +85,9 @@ def paired_context(config: dict, directory: Path) -> dict:
             "config_profile": config["episode_id"], "profiles_file": str(profiles_path)}}
 
 
-def prepare(config_path: Path, directory_path: Path, binary_path: Path, binary_sha256: str) -> tuple[dict, Path, Path, dict]:
-    from k8s_phase_adapter import load_config
-
+def prepare(config_path: Path, directory_path: Path, binary_path: Path, binary_sha256: str,
+            *, adapter: str = "v1") -> tuple[dict, Path, Path, dict]:
+    selected = adapter_module(adapter)
     config_path = absolute_file(config_path, "config")
     if not directory_path.is_absolute():
         raise ValueError("episode directory must be an absolute path")
@@ -88,7 +96,7 @@ def prepare(config_path: Path, directory_path: Path, binary_path: Path, binary_s
         raise ValueError("episode directory must be a directory")
     if config_path.parent != directory:
         raise ValueError("config must belong to the selected episode directory")
-    config = load_config(config_path)
+    config = selected.load_config(config_path)
     if directory.name != config["episode_id"]:
         raise ValueError("episode directory does not match config episode ID")
     binary = absolute_file(binary_path, "action binary")
@@ -100,7 +108,7 @@ def prepare(config_path: Path, directory_path: Path, binary_path: Path, binary_s
     # prior Run whose first checkpoint was removed.
     if any(directory.glob("checkpoint-*.png")):
         raise FileExistsError("refusing to reuse existing checkpoint artifacts")
-    return config, directory, binary, paired_context(config, directory)
+    return config, directory, binary, paired_context(config, directory, selected.GUEST_AUV_SHA256)
 
 
 def write_context(directory: Path, context: dict) -> Path:
@@ -154,10 +162,8 @@ def proposal_lines(input_fd: int, child: ForegroundActionTransport, *, deadline:
 
 
 def relay(config: dict, directory: Path, binary: Path, context: dict, *, max_actions: int,
-          max_captures: int, input_fd: int, output) -> int:
-    from k8s_phase_adapter import Episode
-
-    episode = Episode(config, directory)
+          max_captures: int, input_fd: int, output, adapter: str = "v1") -> int:
+    episode = adapter_module(adapter).Episode(config, directory)
     with episode.forward(auv=True):
         return run_session(directory, binary, context, max_actions=max_actions,
                            max_captures=max_captures, input_fd=input_fd, output=output)
@@ -213,6 +219,8 @@ def main() -> int:
     parser.add_argument("--episode-dir", type=Path, required=True, help="absolute fresh episode directory")
     parser.add_argument("--action-binary", type=Path, required=True, help="absolute auv-osworld-action binary")
     parser.add_argument("--action-sha256", required=True, help="operator-measured SHA256 of action binary")
+    parser.add_argument("--adapter", choices=("v1", "v2-task099"), default="v1",
+                        help="reviewed Kubernetes episode adapter (default: v1)")
     parser.add_argument("--max-actions", type=int, default=32)
     parser.add_argument("--max-captures", type=int, default=32)
     args = parser.parse_args()
@@ -220,9 +228,10 @@ def main() -> int:
         if not 1 <= args.max_actions <= 32 or not 1 <= args.max_captures <= 32:
             raise ValueError("relay action and capture budgets must each be 1..32")
         config, directory, binary, context = prepare(args.config, args.episode_dir,
-                                                      args.action_binary, args.action_sha256)
+                                                      args.action_binary, args.action_sha256, adapter=args.adapter)
         return relay(config, directory, binary, context, max_actions=args.max_actions,
-                     max_captures=args.max_captures, input_fd=sys.stdin.fileno(), output=sys.stdout)
+                     max_captures=args.max_captures, input_fd=sys.stdin.fileno(), output=sys.stdout,
+                     adapter=args.adapter)
     except BaseException as error:
         emit({"op": "session_end", "status": "error", "error": f"{type(error).__name__}: {error}"}, sys.stdout)
         return 1

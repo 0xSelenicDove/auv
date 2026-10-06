@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import agent_action_relay as relay  # noqa: E402
 import k8s_phase_adapter as phase  # noqa: E402
+import k8s_v2_task099_adapter as v2_phase  # noqa: E402
 from test_agent_action_transport import FAKE_CHILD  # noqa: E402
 
 
@@ -92,6 +93,34 @@ class AgentActionRelayTest(unittest.TestCase):
             "device_credential": "test-secret"}}}))
         with self.assertRaisesRegex(ValueError, "does not match"):
             self.prepare()
+
+    def test_v2_preflight_uses_v2_config_guest_pin_and_episode_forward(self):
+        paired_path = self.directory / "paired-device.json"
+        paired = json.loads(paired_path.read_text())
+        paired["guest_auv_sha256"] = v2_phase.GUEST_AUV_SHA256
+        paired_path.write_text(json.dumps(paired))
+        with self.assertRaisesRegex(ValueError, "different guest AUV"):
+            self.prepare()
+        with patch.object(v2_phase, "load_config", return_value=self.config), \
+             patch.object(v2_phase, "Episode", FakeEpisode):
+            config, directory, binary, context = relay.prepare(
+                self.config_path, self.directory, self.binary, self.binary_hash,
+                adapter="v2-task099")
+            self.assertEqual(context["context"]["device_id"], "device-1")
+            read_fd, write_fd = os.pipe()
+            os.write(write_fd, b'{"op":"abort","seq":1}\n')
+            os.close(write_fd)
+            try:
+                output = io.StringIO()
+                FakeEpisode.forwards.clear()
+                code = relay.relay(config, directory, binary, {**context, "mode": "happy"},
+                                   max_actions=2, max_captures=2, input_fd=read_fd,
+                                   output=output, adapter="v2-task099")
+            finally:
+                os.close(read_fd)
+            self.assertEqual(code, 1)
+            self.assertEqual(FakeEpisode.forwards, [(False, True)])
+            self.assertEqual(json.loads(output.getvalue().splitlines()[0])["op"], "ready")
 
     def test_help_describes_single_use_checkpoint_and_total_deadline(self):
         output = io.StringIO()
