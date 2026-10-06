@@ -101,3 +101,35 @@ Task044 agent reached project-save/export configuration but needed a terminal
 receipt and completed export; more time or different GUI policy may change
 its outcome, but this run cannot establish that. Tool-isolated model I/O,
 full upstream provider integration, and benchmark-wide claims remain open.
+
+## Post-cohort Task099 installation diagnostic (not a cohort replay)
+
+The Task099 install path now probes whether `/home/user/auv` exists before
+uploading. If it exists, install reads its SHA256 and proceeds only when it
+matches the pinned guest binary. This prevents a retry from blindly writing
+over a possibly running AUV ELF. A regression test reproduced the observed
+sequence—first token creation fails, then a duplicate upload returns HTTP
+500—and passed after the change. The offline OSWorld suite passed 155 tests
+with 10 skips. This test models the observed HTTP failure; it does not prove
+the guest server's precise exception.
+
+The source available locally for `osworld-server` revision
+`0919a09a48786a34b1d957f776c3f06551941b55`,
+`src/http_routes.py` `/setup/upload`, calls `file.save(file_path)` without
+checking whether the target already exists. Its exception handler returns
+HTTP 500 and attempts to remove the target. Writing a running ELF could
+therefore explain the retry failure, but the exact V2.1 guest server revision
+and HTTP response body were not captured. The original owner-socket token
+failure also has no confirmed root cause.
+
+A separate diagnostic episode, `v2diag099-a1`, used config SHA256
+`77c83e2d1bd3aae7e56f952c27c16108360914afd7b5fa697634ec0048c6cf6c`
+and a fresh KVM overlay on runtime Pod UID
+`2d1dc929-5276-4371-b379-fe2b5489d2fd`. Its first install and AUV pairing
+both succeeded. This establishes one fresh-guest success with the changed
+install path, not live coverage of the retry branch or a stability rate.
+No GUI task setup, action, or evaluator ran. Reset removed the diagnostic
+Pod, proxy, and Service with recorded UID preconditions; `osworld-v2-hot`
+remained Bound, no episode Pods or Services remained, and the local paired
+credential file was removed. These results do not change either cohort member
+or its denominator.

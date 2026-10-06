@@ -126,6 +126,90 @@ class Task099AdapterTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "forbidden"):
                 self.episode.guest_control(cluster.GUEST_APT_UPDATE)
 
+    def test_install_retry_after_owner_token_failure_reaches_pairing(self):
+        # ROOT CAUSE:
+        # If owner-socket token creation fails after a successful upload and
+        # launch, install retries upload to the same guest path. In the live
+        # episode that retry returned HTTP 500 before pairing. The fix must
+        # verify the installed bytes and avoid a second upload.
+        uploads = 0
+        token_calls = 0
+        launched = False
+
+        def run(command, **_kwargs):
+            nonlocal uploads
+            if command[0] == "curl":
+                self.assertIn("file_path=/home/user/auv", command)
+                self.assertIn(f"file_data=@{self.config['guest_auv_binary']}", command)
+                uploads += 1
+                if uploads > 1:
+                    raise RuntimeError("curl exited 22: HTTP 500 /setup/upload")
+                return ""
+            self.assertEqual(command[0], self.config["host_auv_binary"])
+            return json.dumps({"device_id": "paired-device"})
+
+        def post(route, value):
+            nonlocal token_calls, launched
+            if route == "/setup/launch":
+                launched = True
+                self.assertIn("serve", value["command"])
+                return "/home/user/auv serve launched successfully"
+            self.assertEqual(route, "/setup/execute")
+            command = value["command"]
+            output = ""
+            if command == ["test", "-e", "/home/user/auv"]:
+                return {"status": "success", "output": "", "error": "", "returncode": 0 if uploads else 1}
+            if command == ["sha256sum", "/home/user/auv"]:
+                output = adapter.GUEST_AUV_SHA256 + "  /home/user/auv\n"
+            elif command == ["/home/user/auv", "--version"]:
+                output = "auv 0.0.28\n"
+            elif command[-3:] == ["devices", "pair", "create-token"]:
+                self.assertTrue(launched)
+                token_calls += 1
+                if token_calls == 1:
+                    return {"status": "success", "output": "", "error": "owner socket unavailable",
+                            "returncode": 1}
+                output = "fixture-token\n"
+            return {"status": "success", "output": output, "error": "", "returncode": 0}
+
+        with patch.object(self.episode, "assert_identity"), \
+             patch.object(self.episode, "forward", return_value=nullcontext()), \
+             patch.object(cluster, "_run", side_effect=run), \
+             patch.object(self.episode, "_post", side_effect=post), \
+             redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(RuntimeError, "returncode=1"):
+                self.episode.install()
+            self.assertEqual(uploads, 1)
+            self.assertEqual(token_calls, 1)
+            self.assertFalse((self.directory / "paired-profiles.json").exists())
+            self.episode.install()
+
+        self.assertEqual(token_calls, 2)
+        self.assertEqual(uploads, 1)
+        self.assertEqual(json.loads((self.directory / "paired-device.json").read_text())["device_id"], "paired-device")
+
+    def test_install_rejects_existing_guest_binary_with_wrong_hash_before_chmod_or_upload(self):
+        commands = []
+
+        def post(route, value):
+            self.assertEqual(route, "/setup/execute")
+            commands.append(value["command"])
+            if value["command"] == ["test", "-e", "/home/user/auv"]:
+                return {"status": "success", "output": "", "error": "", "returncode": 0}
+            if value["command"] == ["sha256sum", "/home/user/auv"]:
+                return {"status": "success", "output": "0" * 64 + "  /home/user/auv\n",
+                        "error": "", "returncode": 0}
+            self.fail("unexpected guest mutation before hash validation")
+
+        with patch.object(self.episode, "assert_identity"), \
+             patch.object(self.episode, "forward", return_value=nullcontext()), \
+             patch.object(cluster, "_run") as upload, \
+             patch.object(self.episode, "_post", side_effect=post):
+            with self.assertRaisesRegex(ValueError, "guest-installed AUV bytes differ"):
+                self.episode.install()
+        upload.assert_not_called()
+        self.assertEqual(commands, [["test", "-e", "/home/user/auv"], ["sha256sum", "/home/user/auv"]])
+
     def test_evaluator_projects_raw_zero_without_masking_failure(self):
         cluster.write_json(self.directory / "paired-device.json", {"guest_auv_sha256": adapter.GUEST_AUV_SHA256})
         raw = {"phase": "evaluate", "task_sha256": adapter.task099.TASK_SHA256,

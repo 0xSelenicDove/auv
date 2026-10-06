@@ -447,6 +447,7 @@ class Episode:
         """Only installation/control-plane calls are permitted, never AUV GUI."""
         allowed = (
             ["chmod", "0700", "/home/user/auv"],
+            ["test", "-e", "/home/user/auv"],
             ["sha256sum", "/home/user/auv"],
             ["/home/user/auv", "--version"],
             ["env", "AUV_ENDPOINT=unix:///home/user/auv.sock", "/home/user/auv", "devices", "pair", "create-token"],
@@ -460,6 +461,10 @@ class Episode:
            not isinstance(result.get("error"), str) or isinstance(result.get("returncode"), bool) or \
            not isinstance(result.get("returncode"), int):
             raise ValueError("pinned /setup/execute returned an invalid command result")
+        if command == ["test", "-e", "/home/user/auv"] and result == {
+            "status": "success", "output": "", "error": "", "returncode": 1,
+        }:
+            return result
         if result.get("status") != "success" or result["returncode"] != 0:
             # The pinned endpoint reports HTTP 200 and status=success even
             # when subprocess.run returned nonzero. Never expose stdout here:
@@ -520,16 +525,18 @@ class Episode:
         if profile_path.exists():
             raise FileExistsError("refusing to reuse existing paired profile")
         with self.forward(setup=True, auv=True):
-            # TODO(osworld-install-retry): An interrupted install can leave
-            # /home/user/auv present; the pinned upload endpoint then rejects
-            # a rerun. Add a verified idempotent install path only after the
-            # guest-side failure and ownership boundary are diagnosed.
-            _run(["curl", "--fail-with-body", "--silent", "--show-error", "-F", "file_path=/home/user/auv",
-                  "-F", f"file_data=@{c['guest_auv_binary']}", f"http://127.0.0.1:{c['setup_local_port']}/setup/upload"])
-            self.guest_control(["chmod", "0700", "/home/user/auv"])
+            present = self.guest_control(["test", "-e", "/home/user/auv"])["returncode"] == 0
+            if not present:
+                _run(["curl", "--fail-with-body", "--silent", "--show-error", "-F", "file_path=/home/user/auv",
+                      "-F", f"file_data=@{c['guest_auv_binary']}", f"http://127.0.0.1:{c['setup_local_port']}/setup/upload"])
+            # NOTICE: The pinned upload endpoint writes directly to the target.
+            # A repeat upload may fail while this ELF is running, and its error
+            # handler may unlink the target. Reuse only byte-identical guest
+            # binaries; a different existing file is never overwritten.
             measured = self.guest_control(["sha256sum", "/home/user/auv"]).get("output", "").split()[0]
             if measured != self.guest_auv_sha256:
                 raise ValueError("guest-installed AUV bytes differ")
+            self.guest_control(["chmod", "0700", "/home/user/auv"])
             self.guest_control(self.apt_update)
             self.guest_control(self.apt_install)
             version = self.guest_control(["/home/user/auv", "--version"])

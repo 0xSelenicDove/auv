@@ -225,6 +225,17 @@ class AdapterTest(unittest.TestCase):
         self.assertNotIn(secret, str(caught.exception))
         self.assertIn("stderr_sha256=", str(caught.exception))
 
+    def test_guest_binary_presence_probe_accepts_only_clean_absence(self):
+        absent = {"status": "success", "output": "", "error": "", "returncode": 1}
+        with patch.object(self.episode, "_post", return_value=absent):
+            self.assertEqual(self.episode.guest_control(["test", "-e", "/home/user/auv"]), absent)
+        with patch.object(self.episode, "_post", return_value={**absent, "error": "permission denied"}):
+            with self.assertRaisesRegex(RuntimeError, "returncode=1"):
+                self.episode.guest_control(["test", "-e", "/home/user/auv"])
+        with patch.object(self.episode, "_post", return_value={**absent, "returncode": 2}):
+            with self.assertRaisesRegex(RuntimeError, "returncode=2"):
+                self.episode.guest_control(["test", "-e", "/home/user/auv"])
+
     def test_pair_token_shape_failure_reports_metadata_not_bearer(self):
         secret = "do-not-log-this-pairing-value"
         reply = {"status": "success", "output": f"warning\n{secret}\n", "error": "", "returncode": 0}
@@ -233,7 +244,7 @@ class AdapterTest(unittest.TestCase):
              patch.object(self.episode, "forward", return_value=nullcontext()), \
              patch.object(adapter, "_run", return_value=""), \
              patch.object(self.episode, "guest_control", side_effect=[
-                 good(""), good(adapter.GUEST_AUV_SHA256 + "  /home/user/auv"),
+                 {"returncode": 1}, good(adapter.GUEST_AUV_SHA256 + "  /home/user/auv"), good(""),
                  good(""), good(""), good("auv 0.0.28"), reply,
              ]), \
              patch.object(self.episode, "_post", return_value="launched successfully"):
@@ -246,6 +257,8 @@ class AdapterTest(unittest.TestCase):
         calls = []
         def control(command):
             calls.append(command)
+            if command == ["test", "-e", "/home/user/auv"]:
+                return {"returncode": 1}
             if command == ["sha256sum", "/home/user/auv"]:
                 return {"output": adapter.GUEST_AUV_SHA256 + "  /home/user/auv"}
             if command == ["/home/user/auv", "--version"]:
@@ -258,8 +271,9 @@ class AdapterTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "stop after library preparation"):
                 self.episode.install()
         self.assertEqual(calls, [
-            ["chmod", "0700", "/home/user/auv"],
+            ["test", "-e", "/home/user/auv"],
             ["sha256sum", "/home/user/auv"],
+            ["chmod", "0700", "/home/user/auv"],
             adapter.GUEST_APT_UPDATE,
             adapter.GUEST_APT_INSTALL,
             ["/home/user/auv", "--version"],
