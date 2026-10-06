@@ -520,6 +520,10 @@ class Episode:
         if profile_path.exists():
             raise FileExistsError("refusing to reuse existing paired profile")
         with self.forward(setup=True, auv=True):
+            # TODO(osworld-install-retry): An interrupted install can leave
+            # /home/user/auv present; the pinned upload endpoint then rejects
+            # a rerun. Add a verified idempotent install path only after the
+            # guest-side failure and ownership boundary are diagnosed.
             _run(["curl", "--fail-with-body", "--silent", "--show-error", "-F", "file_path=/home/user/auv",
                   "-F", f"file_data=@{c['guest_auv_binary']}", f"http://127.0.0.1:{c['setup_local_port']}/setup/upload"])
             self.guest_control(["chmod", "0700", "/home/user/auv"])
@@ -534,6 +538,10 @@ class Episode:
                       "--pairing-store", "/home/user/.local/share/auv-osworld/pairings.json",
                       "--store-root", "/home/user/.local/share/auv-osworld", "--no-register"]
             self._post("/setup/launch", {"command": daemon, "shell": False})
+            # TODO(osworld-owner-socket-readiness): The launch receipt only
+            # proves Popen accepted the daemon. A live V2.1 install returned
+            # create-token exit 1 before pairing; diagnose its redacted
+            # stderr and add bounded owner-socket readiness before retrying.
             token_output = self.guest_control(["env", "AUV_ENDPOINT=unix:///home/user/auv.sock", "/home/user/auv", "devices", "pair", "create-token"])["output"]
             token = token_output.strip()
             if not token or "\n" in token:

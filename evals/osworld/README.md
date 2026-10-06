@@ -578,8 +578,8 @@ both in the six-phase Kubernetes scheduler before using this bridge for a
 batch. A missing export or project is the upstream `0.0`; transport, cache,
 source-integrity, or pinned-decoder failures produce no score. The
 [Task044 bridge audit](../../docs/ai/references/ops/2026-10-07-osworld-v2-task044-bridge-audit.md)
-records the offline checks. No new Kubernetes episode or agent result follows
-from those checks.
+records the offline checks. Those checks alone do not establish Kubernetes
+or agent behavior; later live results are listed below.
 
 `k8s_v2_task044_adapter.py` binds this bridge to the existing six-phase,
 UID-audited V2.1 Pod lifecycle. Its `action` phase is one paired-AUV capture
@@ -595,4 +595,12 @@ One fresh live Task044 control completed all six phases with raw missing-export
 An attended blind-agent action phase can instead use
 `agent_action_relay.py --adapter v2-task044` after successful `boot`,
 `install`, and `setup`; the relay does not enforce tool isolation beyond its
-own AUV route. That blind agent path has not yet run for the predeclared pilot.
+own AUV route.
+
+The first predeclared Task099→Task044 Codex-agent pilot did run afterward.
+Task099 was blocked before agent action by install/pairing failure and has
+no evaluator score. Task044 used the relay for 22 AUV actions and 23 captures,
+then ended without a terminal receipt or export; the pinned raw evaluator
+returned `0.0`. See the
+[cohort evidence](../../docs/ai/references/ops/2026-10-07-osworld-v2-codex-agent-cohort-evidence.md).
+Do not combine those layers into an AUV completion-rate claim.

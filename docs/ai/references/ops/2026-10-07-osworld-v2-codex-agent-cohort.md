@@ -6,6 +6,11 @@ sub-agent pilot, not a representative V2.1 score or an official upstream
 agent run. Earlier Task099 and Task044 episodes are excluded from this
 denominator, including Task044's partial 0.6 and Task099's exploratory zero.
 
+Post-run pointer (policy above unchanged): the
+[cohort evidence](2026-10-07-osworld-v2-codex-agent-cohort-evidence.md)
+records Task099 as infrastructure-blocked with no score and Task044 as an
+incomplete agent Run with raw `0.0`.
+
 ## Membership and identity
 
 The denominator is exactly **2**, in this order: Task099 (Google Maps

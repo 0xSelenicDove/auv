@@ -43,6 +43,7 @@ Count: **35**
 - [`2026-10-07-osworld-v2-task044-bridge-audit.md`](2026-10-07-osworld-v2-task044-bridge-audit.md): Offline pinned Task044 setup/evaluator bridge audit, original scoring boundaries, dependency pin, and explicit live-evidence limits.
 - [`2026-10-07-osworld-v2-codex-agent-cohort.md`](2026-10-07-osworld-v2-codex-agent-cohort.md): Frozen two-task V2.1 Codex sub-agent pilot membership, AUV-only action policy, 540-second relay budget, denominator, scoring layers, and cleanup gate; no results yet.
 - [`2026-10-07-osworld-v2-task044-control-acceptance.md`](2026-10-07-osworld-v2-task044-control-acceptance.md): Fresh V2.1 Task044 six-phase capture-only control, pinned raw zero, Shotcut splash-screen boundary, and UID-safe cleanup; no agent score.
+- [`2026-10-07-osworld-v2-codex-agent-cohort-evidence.md`](2026-10-07-osworld-v2-codex-agent-cohort-evidence.md): Predeclared two-task V2.1 Codex pilot outcome: Task099 blocked before agent/no score, Task044 incomplete Run/raw zero, artifact hashes, and UID-safe cleanup.
 
 ## Related
 

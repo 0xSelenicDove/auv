@@ -637,10 +637,14 @@ boundary tests. A six-phase capture-only Task044 adapter and an attended
 passed one fresh six-phase capture-only control: original raw Task044 score
 `0.0`, AUV PNG showing Shotcut's loading splash, and UID-safe cleanup.
 The agent relay remains untested live for Task044. A two-task V2.1 Codex-agent
-pilot has been [predeclared](2026-10-07-osworld-v2-codex-agent-cohort.md)
-before either cohort guest boots. It remains exploratory because Codex tool
-isolation is prompt-only; a verifiable model/tool boundary is still a later
-gate. See the
+pilot was [predeclared](2026-10-07-osworld-v2-codex-agent-cohort.md)
+before either cohort guest booted. It then ran with denominator 2:
+Task099 stopped during install/pairing before agent action and has **no
+score**; Task044 ran one Codex AUV Run with 22 actions/23 captures, ended
+without `finish` or an export, and received pinned raw `0.0`. This is not a
+0/2 AUV ability estimate; the first member was infrastructure-blocked and
+Codex tool isolation remained prompt-only. See the
+[cohort evidence](2026-10-07-osworld-v2-codex-agent-cohort-evidence.md),
 [fixed-control acceptance](2026-10-07-osworld-v2-task099-bridge-acceptance.md)
 and [agent attempt](2026-10-07-osworld-v2-task099-codex-agent-attempt.md),
 and the [Task044 bridge audit](2026-10-07-osworld-v2-task044-bridge-audit.md).
