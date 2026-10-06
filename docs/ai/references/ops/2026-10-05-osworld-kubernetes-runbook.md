@@ -688,9 +688,26 @@ out-of-order proposals. Capture and action budgets are caller-declared. The
 agent selects actions; the relay must not silently substitute task-specific
 ones. Use a fresh episode directory and resource names for every retry.
 
-Run the `boot → install → setup` phases above, then keep `Episode.forward(auv=True)`
-open around the foreground child and agent proposal loop. Launch that
-operator-side relay in a PTY or another transport proven to keep stdin open:
+The checked-in paired-remote entry now owns that connection. After measuring
+the host action binary SHA256 independently, run:
+
+```bash
+python3 evals/osworld/agent_action_relay.py \
+  --config /absolute/fresh-episode/config.json \
+  --episode-dir /absolute/fresh-episode \
+  --action-binary /absolute/auv-osworld-action \
+  --action-sha256 64-lowercase-hex-digits \
+  --max-actions 32 --max-captures 32
+```
+
+It validates the episode's installed guest-binary evidence and paired
+profile, refuses old action traces, opens only the existing AUV forward,
+and emits a `ready` JSONL line with the Run ID. It does not run setup or
+evaluation, choose an action, or create/delete Kubernetes resources.
+
+Run the `boot → install → setup` phases above; the checked-in relay keeps
+`Episode.forward(auv=True)` open around the foreground child and proposal
+loop. Launch it in a PTY or another transport proven to keep stdin open:
 a non-PTY `exec_command` launch closed stdin immediately in one live attempt.
 Wait for `ready`, request the first `capture`, and show only its AUV PNG to the
 blind agent. Relay one typed action proposal, wait for its receipt, request a
@@ -708,8 +725,9 @@ After terminal receipt, compare `agent_decisions.json` with
 `evaluate` phase and UID-safe `reset` phase. Record the raw score separately
 from driver delivery (`succeeded` is not semantic verification). The first
 successful one-Run Codex canary is documented in the
-[evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md); its temporary
-relay is not a committed general-purpose model connector. Guest-local
+[evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md); the new
+checked-in relay separately passed a non-solving live negative control on a
+fresh Chrome VM. It is not a general-purpose model connector. Guest-local
 gateway, enforced tool isolation, model pinning, and a predeclared cohort
 still require separate work.
 

@@ -109,10 +109,61 @@ capture → action → capture → finish session in one Run, explicit abort,
 stdin-EOF cancellation, child exit, timeout, and malformed/oversized output.
 Rust exits 1 after a deliberate abort; the transport permits that exit only
 for the explicit abort response, which the gateway then verifies against the
-same Run's durable null-artifact sidecar. It has **not** been connected to a
-model or Kubernetes episode, and does not prevent an agent with separate
-shell/browser tools from bypassing it. It is not evidence of a live benchmark
-score or an enforced agent tool sandbox.
+same Run's durable null-artifact sidecar. A temporary attended relay used the
+gateway and transport for one selected paired-remote Chrome V1 Codex sub-agent
+canary on Kubernetes; the pinned evaluator returned raw `1.0`. That is an
+exploratory single-task result, not a benchmark rate. The temporary relay did
+not enforce the agent's other tool access or pin its model version. The
+durable operator entry below replaces that temporary relay, but it likewise
+does not enforce a model tool sandbox or select an agent.
+
+### Attended paired-remote agent relay
+
+`agent_action_relay.py` connects an operator-supplied JSONL proposal stream
+to one fresh `auv-osworld-action --interactive` Run. The caller must have
+already booted, installed, paired, and prepared the pinned V1 episode using
+`k8s_phase_adapter.py`; this entry does not create/delete cluster resources,
+call the evaluator, or choose GUI actions. Give it absolute paths and an
+independently measured binary digest:
+
+```bash
+python3 evals/osworld/agent_action_relay.py \
+  --config /absolute/episode/config.json \
+  --episode-dir /absolute/episode \
+  --action-binary /absolute/auv-osworld-action \
+  --action-sha256 64-lowercase-hex-digits \
+  --max-actions 32 --max-captures 32
+```
+
+The config must be inside and name the episode directory. Existing action
+context, trace, sidecars, or checkpoint PNGs cause refusal; do not resume or
+retry the same Run. Before starting Rust, the relay verifies the binary hash,
+the install Device ID and guest-binary evidence, and the episode-local paired
+profile's Device ID, local-forward endpoint, and presence of a credential.
+It opens only `Episode.forward(auv=True)`, which rechecks the existing Pod and
+Service identities. The profile credential is never printed.
+
+Read the `ready` JSONL response, then send one complete JSON object per line
+on stdin using the interactive proposal schema above. A `capture` receipt
+includes `checkpoint_path` (absolute, byte-verified PNG) and
+`checkpoint_sha256`; the next `action` must cite that Run ID, relative
+checkpoint filename, and digest as `based_on`. `finish` yields a verified
+terminal receipt and exit 0. `abort` yields a verified canceled receipt and
+exit 1. EOF, malformed/oversized proposal, budget/deadline failure, or child
+failure emits `session_end` and exits 1; the relay closes/reaps the child and
+does not retry uncertain GUI input. The 64 KiB line, 1 MiB request stream,
+32-action/32-capture, and 180-second proposal idle bounds are below Rust's
+interactive limits. A new proposal must start within 540 seconds of `ready`;
+an in-flight exchange can finish later, subject to the transport's response
+timeout and Rust's hard 570-second Run limit. Run this with a live stdin
+pipe or PTY; an execution wrapper that immediately closes stdin cancels the
+Run before any proposal.
+
+This entry is only an attended operator I/O boundary. It cannot prove that a
+Codex sub-agent used no other tools, cannot pin model identity, and is not a
+batch denominator or a guest-local shared-socket adapter. See the
+[Kubernetes evidence](../../docs/ai/references/ops/2026-10-05-osworld-kubernetes-x11-evidence.md)
+for the earlier selected canary and its evidence level.
 
 ## Fixed paired-remote typed-action infrastructure trial
 
@@ -286,7 +337,7 @@ The protocol rejects unknown fields and commands, shell/OSWorld GUI relay,
 `EXECUTE`, and action-level `WAIT`/`DONE`/`FAIL`; only `finish`/`abort` control
 the session. Limits are 64 KiB per line, 1 MiB of total requests, 1,000
 actions, 32 checkpoint captures,
-60 seconds idle, and 570 seconds after the Run is ready. This is an attended
+240 seconds idle, and 570 seconds after the Run is ready. This is an attended
 local diagnostic interface, not a new arbitrary-action Kubernetes phase:
 `batch_runner.py` still closes action stdin and the capture-only controls stay
 unchanged. The ignored isolated-Xorg gate checks one Run across before/after

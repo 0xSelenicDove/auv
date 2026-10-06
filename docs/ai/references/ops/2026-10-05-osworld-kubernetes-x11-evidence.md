@@ -1614,6 +1614,55 @@ exploratory agent success** through the paired-remote one-Run gateway, not
 a benchmark completion rate, enforced tool isolation, guest-local gateway
 evidence, or V2.1 agent-gateway evidence.
 
+### Durable relay CLI paired-remote live negative control
+
+The checked-in `evals/osworld/agent_action_relay.py` replaced the temporary
+operator relay. Before committing that entry, the operator ran one fresh
+Chrome V1 non-solving control on `liet-gpu-1`. The task-local
+[protocol](/private/tmp/auv-osworld-relay-live-1006e.KQbI8y/protocol.json)
+SHA256 was `1948fc9e8fb0db6e8a74395a50b93994dd283e28bcc3e318ad7799aa07347e7f`;
+the [episode config](/private/tmp/auv-osworld-relay-live-1006e.KQbI8y/chrome-relay-live-1006e/config.json)
+SHA256 was `a942d03b32eb311be451244d2ea1f3be950618ecf8c3d148f77cec5ab0fab18c`.
+The installed guest AUV SHA256 was
+`2a8e53eecfef1dcd8fa8368fa480d6df36e254527c7e60be3ac82802e7073427`,
+and the operator-pinned host action binary SHA256 was
+`861fdd93c069b40354f26fd02910d7417cb4a4d0a12a19ad79caa03207297100`.
+The existing adapter verified the pinned qcow2 backing file, QEMU/KVM
+overlay, Pod identity, pairing, and official Chrome setup. No task GUI input
+was sent through the OSWorld setup/evaluator plane or VNC.
+
+The **durable CLI itself** opened the paired AUV forward and one interactive
+Run `96ec0953bba03392b17fc60d5f2b8e0f`. The operator supplied only
+`capture → MOVE_TO(600,500) → capture → finish`; the action cited the first
+AUV PNG SHA256
+`1d150614c562ab1a7552490b0a6d3e00695d31b97196cc772e2f221ad0697fe5`.
+The [decision trace](/private/tmp/auv-osworld-relay-live-1006e.KQbI8y/chrome-relay-live-1006e/agent_decisions.json)
+SHA256 was `ebab1f7a8e02fab75123c97ae0a872e25d290fc9c1216afd804aa2a14705dee1`:
+four ordered receipts, one input, two captures, `status=finished`, no pending
+forward. It matched the Rust [request
+log](/private/tmp/auv-osworld-relay-live-1006e.KQbI8y/chrome-relay-live-1006e/action-requests.json)
+SHA256 `f53325f8d195fcd411b6dfbebbd8e1f3cd1cef58535ebf4b0a613eb7c58bbad5`,
+[input result](/private/tmp/auv-osworld-relay-live-1006e.KQbI8y/chrome-relay-live-1006e/input-action-results.json)
+SHA256 `1644250b7b98ef77a7ccc4b6440809cbf006fda817fafc96f2c7af88d8ffdea1`,
+and [terminal sidecar](/private/tmp/auv-osworld-relay-live-1006e.KQbI8y/chrome-relay-live-1006e/action_evidence.json)
+SHA256 `198148b30d064e8761c4782d68eef1ea75834c8b9dd0e18ab4a096ab549cf381`.
+The original input result selected `foreground_system_events`, reported
+`succeeded=true` and `verified=false`. The second and [final AUV
+PNG](/private/tmp/auv-osworld-relay-live-1006e.KQbI8y/chrome-relay-live-1006e/final-screenshot.png)
+both had SHA256
+`bee540a450e45329fd598f8ed215b3481bd16d18129f12ff4b2e9c994c6e96a1`.
+The pinned Chrome evaluator returned raw `0.0`, as expected from a
+non-solving pointer move. This is a live **operator-relay transport gate**,
+not an agent attempt or task success.
+
+UID-preconditioned reset removed only proxy Pod
+`0712c309-2bd2-45e0-a7d8-16a0c56f1dfe`, Service
+`48f20800-3f46-4b22-aab5-d047fee27b58`, and QEMU Pod
+`6ec674ad-7ee1-4ae4-99eb-d86f67451904`. An independent label query found
+no Pods or Services for the episode. The V1 hot PVC/PV UIDs remained
+`34143535-4ac2-42f2-a443-08db3f6b49ff` and
+`8e8e46f1-0670-4a55-b06a-8caebb4d5a73`.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

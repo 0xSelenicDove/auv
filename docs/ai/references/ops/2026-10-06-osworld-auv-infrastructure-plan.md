@@ -654,6 +654,20 @@ make the agent I/O boundary durable and enforce allowed tools, then add a
 guest-local gateway run and a predeclared multi-task cohort. See the
 [evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
 
+The operator-side paired-remote I/O boundary is now checked in as
+`agent_action_relay.py`. It validates the pinned binary and existing episode
+pairing, supervises one Run through the existing gateway/transport, and
+rejects old evidence or ambiguous terminal state. Its 7 new offline tests
+pass; the complete 111-test Python OSWorld suite passes with 10 existing
+skips. A fresh Chrome V1 live **non-solving** control exercised the checked-in
+CLI through `capture → MOVE_TO → capture → finish`, produced matching Rust
+sidecars, returned expected pinned raw `0.0`, and cleaned task resources by
+UID while preserving the hot PVC/PV. This closes the durable attended relay
+path, **not** a model connector, enforced tool sandbox, guest-local path, or
+batch agent score. Next is still tool-isolated model I/O and a pinned model
+identity, followed by guest-local gateway and a predeclared cohort. See the
+[evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
+
 ## Operating rules
 
 - Work through these items in order; each item may be delegated to one bounded
