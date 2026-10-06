@@ -363,8 +363,14 @@ written as soon as the Run ID is observed; terminal stdout mirrors it. Local
 Rust tests pass, but its live Xorg cancellation/hold-release gates remain
 ignored and it is **not wired to the K8s phase adapter**. Thus this is an
 implementation milestone, not proof of live GUI-action delivery or OSWorld
-task completion. The next gate is to run it on an isolated guest, then freeze
-the two-task batch scripts and denominator before execution.
+task completion. A subsequent independent Chrome guest did complete all six
+phases using this entry through the paired-remote topology. It recorded a
+successful foreground-system-events click attempt and a same-Runner PNG, but
+the typed result has `verified=false` and the pinned evaluator returned
+`0.0`; the click was not a solution. Its UID-safe reset preserved the hot
+PVC/PV. This closes one paired typed-action delivery gate, not guest-local
+entry coverage or a multi-task batch. The next gate is to freeze the two-task
+batch scripts and denominator before execution.
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires

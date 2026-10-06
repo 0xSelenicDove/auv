@@ -974,6 +974,26 @@ delivery. Reset succeeded and independently confirmed absence of the three
 UID-matched task resources and paired profile; the V1 hot PVC/PV remained
 Bound with unchanged UIDs. Do not use this trial as action-capability evidence.
 
+The next independent fresh Chrome episode, `osw-v1-typed-1006i`, used the
+same frozen `CLICK(1885,87) → DONE` plan with a Python interpreter that passed
+the new `requests` preflight. Its [ledger](/private/tmp/auv-osworld-v1-typed-live2.efmFXQ/output/ledger.json)
+records all six phases as `ok`, one completed episode, and no failure layers.
+The foreground action entry created AUV Run
+`0c007a310e9d8a5589f3d7e92b879a08`; its original
+[`InputActionResult`](/private/tmp/auv-osworld-v1-typed-live2.efmFXQ/output/chrome-typed-click-i/input-action-results.json)
+records one successful `foreground_system_events` click attempt with
+`verified=false` and `mouse_disturbance=foreground`, followed by `DONE` with
+no delivery. The same Runner's [final PNG](/private/tmp/auv-osworld-v1-typed-live2.efmFXQ/output/chrome-typed-click-i/final-screenshot.png)
+has independently checked SHA256
+`62f98cefbe12ba7007eed7259e29f8983e67eb80e2479b407ae06ce199ffbe4f`;
+the action sidecar and terminal stdout agree. The capture shows a Chrome
+update popover, but no before/after receiver proves the click caused it.
+The pinned evaluator returned raw `0.0`: the fixed click did not solve the
+Chrome task. UID-safe reset removed all three task-owned resources, removed
+the pairing profile, and preserved the hot PVC/PV UIDs and Bound state. This
+is one paired-remote typed-action delivery gate, **not** a multi-task batch,
+semantic success claim, or agent completion rate.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve
