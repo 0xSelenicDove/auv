@@ -320,7 +320,7 @@ single-task capture-only infrastructure gate. It does not test agent GUI
 actions, task-solving performance, a multi-task predeclared batch, V2.1, or
 the full upstream provider. Those remain separate next slices.
 
-Next bounded work, in order:
+The following bounded sequence is in progress:
 
 1. Add the pinned V1 VLC `5ac2891a-eacd-4954-b339-98abba077adb`
    setup/getter/metric method chain to the benchmark-local evaluator bridge.
@@ -353,6 +353,18 @@ completed the six-phase capture-only control with verified Run/PNG and raw
 evaluator `0.0`; setup checked the guest's opposite initial config value.
 This closes the VLC negative gate but does not substitute for the two-task
 AUV-action batch or an agent attempt.
+
+The second slice now has a local foreground `auv-osworld-action --plan`
+entry. It validates a predeclared typed action sequence before connecting,
+selects an explicit paired or guest-local AUV context, runs the sequence on
+one persistent Runner, and records its Run ID, original per-step
+`InputActionResult` values, and same-Runner final PNG/SHA256. The sidecar is
+written as soon as the Run ID is observed; terminal stdout mirrors it. Local
+Rust tests pass, but its live Xorg cancellation/hold-release gates remain
+ignored and it is **not wired to the K8s phase adapter**. Thus this is an
+implementation milestone, not proof of live GUI-action delivery or OSWorld
+task completion. The next gate is to run it on an isolated guest, then freeze
+the two-task batch scripts and denominator before execution.
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
