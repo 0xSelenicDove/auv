@@ -89,6 +89,9 @@ function includes(text: string, query: string): boolean {
 export class MockBackend implements Backend {
   readonly kind = 'mock'
   readonly label = 'Mock desktop'
+  #captureCount = 0
+  /** Rendered captures by reference, newest last. */
+  readonly #captures = new Map<string, OffscreenCanvas>()
   #count = 0
   #draft = ''
   #focused = false
@@ -183,6 +186,16 @@ export class MockBackend implements Backend {
     const display = this.#display(displayId)
     await delay(40)
     return this.#render(display.frame, display.scale, `display:${display.id}`)
+  }
+
+  async captureImage(frame: CapturedFrame, maxSize: { height: number, width: number }): Promise<Blob> {
+    const source = this.#captures.get(frame.ref)
+    if (!source)
+      throw new Error(`capture ${frame.ref} was not found: it was evicted; capture again`)
+    const fit = Math.min(1, maxSize.width / source.width, maxSize.height / source.height)
+    const canvas = new OffscreenCanvas(Math.max(1, Math.round(source.width * fit)), Math.max(1, Math.round(source.height * fit)))
+    canvas.getContext('2d')!.drawImage(source, 0, 0, canvas.width, canvas.height)
+    return await canvas.convertToBlob({ type: 'image/png' })
   }
 
   async captureWindow(windowId: string): Promise<CapturedFrame> {
@@ -472,8 +485,16 @@ export class MockBackend implements Backend {
     this.#paintDesktop(ctx, bounds)
     for (const window of this.#windows)
       this.#paintWindow(ctx, window)
-    const rgba = new Uint8Array(ctx.getImageData(0, 0, width, height).data.buffer)
-    return { bounds: { ...bounds }, height, rgba, scale, source, width }
+    const ref = `mock-cap-${++this.#captureCount}`
+    this.#captures.set(ref, canvas)
+    // NOTICE(mock-capture-store): like the Runner's capture store, keep only
+    // recent captures; live mode renders a display every 900 ms.
+    for (const old of this.#captures.keys()) {
+      if (this.#captures.size <= 64)
+        break
+      this.#captures.delete(old)
+    }
+    return { bounds: { ...bounds }, height, ref, scale, source, width }
   }
 
   /** Applies a wheel delta; only the Music song list scrolls. Returns whether it moved. */

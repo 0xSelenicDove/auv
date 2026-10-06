@@ -1063,10 +1063,10 @@ owner of a reference decides which routes may use it.
   records which calls belong to it. It does not own window references.
   Clients must not re-resolve a known window by app or title only because the
   Run changed.
-- **Runner resources.** An example is `FrameBufferRef`. Planned capture
-  references are another. They name state that lives inside one Runner
-  process. They are valid only on a Run-affine route that reaches the same
-  Runner, and they end with that Runner.
+- **Runner resources.** Examples are `FrameBufferRef` and `CaptureRef` (see
+  [Capture Frame](#capture-frame)). They name state that lives inside one
+  Runner process. They are valid only on a Run-affine route that reaches the
+  same Runner, and they end with that Runner.
 
 ## Window
 
@@ -1303,15 +1303,39 @@ approval by itself.
 ## Capture Frame
 
 Capture frame is a provisional term for an in-memory screenshot or cropped
-image result before it is persisted as an artifact. A capture frame should carry
+image result before it is persisted as an artifact. A capture frame carries
 image data plus coordinate metadata, capture source, backend, scale, and timing
 information.
 
-Driver crates may produce capture frames. The caller or configured
-instrumentation path decides whether to persist them as artifacts. This keeps
-the operation path from requiring synchronous filename allocation or image
-writes when the caller only needs pixels for OCR, recognition, or immediate
-interaction logic.
+In process, driver crates produce capture frames (`auv_driver::Capture`) with
+their pixels, and the caller or configured instrumentation path decides whether
+to persist them as artifacts. This keeps the operation path from requiring
+synchronous filename allocation or image writes when the caller only needs
+pixels for OCR, recognition, or immediate interaction logic.
+
+Across the Runner API, a capture frame stays in the Runner that produced it
+(see "Image Payloads" in `AGENTS.md`):
+
+- **Capture reference** (`CaptureRef`, *provisional*): a Runner resource that
+  names one capture in that Runner's **capture store**. Capture, find-text and
+  scroll-until responses return `CapturedFrame` with `ref`, bounds, origin,
+  scale and `pixel_size`, but no pixels.
+- **Capture store** (*provisional*): the Runner's in-memory cache of the
+  captures it produced. It evicts the least recently used captures beyond a
+  byte budget (512 MiB, `AUV_CAPTURE_STORE_BUDGET_MIB`) and captures unused for
+  ten minutes (`AUV_CAPTURE_STORE_IDLE_SECONDS`). An evicted, expired or
+  unknown reference fails with `NOT_FOUND`; the caller captures again.
+- **Capture image fetch** (`GetCaptureImage`): the explicit call that moves
+  pixels to a client, optionally cropped to a normalized region, fit inside a
+  maximum size, and encoded as RGBA, PNG, JPEG, or lossless WebP.
+- **Image evidence artifacts** (screenshots, OCR sources, overlays) are
+  lossless WebP (`image/webp`), encoded by `auv_tracing::image_artifact`.
+- OCR on a held capture sends only its reference
+  (`RecognizeTextRequest.capture_ref`). Sending a `CapturedFrame` with pixels is
+  for caller-owned images only.
+
+Design and evidence:
+`docs/ai/references/driver/2026-10-06-capture-references-and-positions-design.md`.
 
 ## Input Mode
 

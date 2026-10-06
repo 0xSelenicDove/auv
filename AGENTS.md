@@ -201,11 +201,11 @@ Runner owns. Do not treat them as ordinary response data.
 - Only caller-owned images may be uploaded as pixels. An example is an image
   the user supplies.
 
-Existing APIs that predate this rule:
-`RecognizeTextRequest.capture`, `FindWindowTextResponse.capture`,
-`FindDisplayTextResponse.capture`, `ScrollUntilObservation.capture` and
-`GetRecentFramesResponse` frames. Do not copy their shape into new APIs. When
-you change one of them, move it toward references.
+Captures, find-text evidence, scroll-until observations and OCR already
+follow this rule: they use `CaptureRef`, and `GetCaptureImage` is the explicit
+pixel fetch (see "Capture Frame" in `docs/TERMS_AND_CONCEPTS.md`). One existing
+API predates it: `GetRecentFramesResponse` frames
+(`TODO(recent-frames-capture-refs)`). Do not copy its shape into new APIs.
 
 ## Architecture Surfaces
 

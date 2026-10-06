@@ -16,6 +16,25 @@ message RgbFrame {
   bytes data = 3;
 }
 
+enum ImageEncoding {
+  IMAGE_ENCODING_UNSPECIFIED = 0;
+  // Tightly packed RGBA8 rows (`RgbaFrame`); the default.
+  IMAGE_ENCODING_RGBA = 1;
+  IMAGE_ENCODING_PNG = 2;
+  // Fixed quality 85.
+  IMAGE_ENCODING_JPEG = 3;
+  // Lossless WebP: exact pixels, usually 30–70% smaller than PNG for UI.
+  IMAGE_ENCODING_WEBP = 4;
+}
+
+// Image bytes in a container format (`IMAGE_ENCODING_PNG` or `IMAGE_ENCODING_JPEG`).
+message EncodedImage {
+  ImageEncoding encoding = 1;
+  uint32 width = 2;
+  uint32 height = 3;
+  bytes data = 4;
+}
+
 message RgbaFrame {
   uint32 width = 1;
   uint32 height = 2;

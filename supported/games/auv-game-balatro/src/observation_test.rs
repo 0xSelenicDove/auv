@@ -8,7 +8,7 @@ use crate::model::{BalatroPhase, StoreItemKind};
 
 use super::{
   BalatroDetectionSets, CardAttributeDetectionSets, balatro_runner_options, build_state_from_detections, detector_spec,
-  driver_runner_options, enrich_ui_numeric_readings_from_recognition, load_remote_class_names, ocr_capture_for_ui,
+  driver_runner_options, enrich_ui_numeric_readings_from_recognition, load_remote_class_names, ocr_region_for_ui,
   store_items_for_store_context,
 };
 
@@ -228,13 +228,13 @@ fn one_identity_detection_cannot_read_multiple_overlapping_hand_slots() {
 }
 
 #[test]
-fn ocr_capture_is_limited_to_detected_numeric_ui_and_preserves_screen_projection() {
+fn ocr_region_is_limited_to_detected_numeric_ui() {
   // ROOT CAUSE:
   //
   // If live observation sent the entire display back to Linux Tesseract, OCR
   // dominated latency even though Balatro numeric readings occupy a small UI
-  // region. The fix derives one padded OCR crop from numeric UI detections and
-  // ignores unrelated controls.
+  // region. The fix derives one padded OCR region from numeric UI detections
+  // and ignores unrelated controls; the Runner crops the held capture to it.
   let image_size = ImageSize {
     width: 1000,
     height: 600,
@@ -278,25 +278,16 @@ fn ocr_capture_is_limited_to_detected_numeric_ui_and_preserves_screen_projection
     ],
   };
 
-  let capture = Capture {
-    origin: None,
-    image: RgbaImage::new(1000, 600),
-    bounds: Rect::new(10.0, 20.0, 500.0, 300.0),
-    scale_factor: 2.0,
-    backend: "fixture".to_string(),
-    fallback_reason: None,
-  };
+  let region = ocr_region_for_ui(&ui).expect("numeric UI should produce an OCR region");
 
-  let crop = ocr_capture_for_ui(&capture, &ui).expect("numeric UI should produce an OCR capture");
-
-  assert_eq!(crop.image.dimensions(), (370, 392));
-  assert_eq!(crop.bounds, Rect::new(55.0, 77.0, 185.0, 196.0));
-  assert_eq!(crop.scale_factor, 2.0);
-  assert_eq!(crop.backend, "fixture");
+  // Numeric UI spans x 100..450 and y 120..500 of 1000x600, padded by 1%.
+  let close = |actual: f64, expected: f64| (actual - expected).abs() < 1e-9;
+  assert!(close(region.x, 0.09) && close(region.y, 0.19), "{region:?}");
+  assert!(close(region.width, 0.37) && close(region.height, 500.0 / 600.0 + 0.01 - 0.19), "{region:?}");
 }
 
 #[test]
-fn ocr_capture_is_absent_without_numeric_ui() {
+fn ocr_region_is_absent_without_numeric_ui() {
   let image_size = ImageSize {
     width: 1000,
     height: 600,
@@ -316,16 +307,7 @@ fn ocr_capture_is_absent_without_numeric_ui() {
     }],
   };
 
-  let capture = Capture {
-    origin: None,
-    image: RgbaImage::new(1000, 600),
-    bounds: Rect::new(0.0, 0.0, 1000.0, 600.0),
-    scale_factor: 1.0,
-    backend: "fixture".to_string(),
-    fallback_reason: None,
-  };
-
-  assert_eq!(ocr_capture_for_ui(&capture, &ui), None);
+  assert_eq!(ocr_region_for_ui(&ui), None);
 }
 
 #[test]

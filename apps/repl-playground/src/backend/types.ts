@@ -30,6 +30,11 @@ export interface Backend {
   /** Opens a correlation scope for one script execution, when supported. */
   beginRun: () => Promise<string | undefined>
   captureDisplay: (displayId?: string) => Promise<CapturedFrame>
+  /**
+   * Encoded pixels of a capture, fit inside `maxSize` (never enlarged). The
+   * only call that moves pixels; everything else passes `CapturedFrame.ref`.
+   */
+  captureImage: (frame: CapturedFrame, maxSize: { height: number, width: number }) => Promise<Blob>
   captureWindow: (windowId: string) => Promise<CapturedFrame>
   clickScreen: (point: Point, options?: ClickOptions) => Promise<InputReceipt>
   clickWindow: (windowId: string, point: Point, options?: ClickOptions) => Promise<InputReceipt>
@@ -54,16 +59,16 @@ export interface Backend {
   typeText: (text: string) => Promise<InputReceipt>
 }
 
-/** Pixels plus their logical placement, as returned by a capture. */
+/** A capture the backend holds: its reference plus logical placement, without pixels. */
 export interface CapturedFrame {
   bounds: Rect
+  /** Pixel height. */
   height: number
-  /** Backend-native frame (e.g. the AUV `CapturedFrame` message) for round-trips like OCR. */
-  native?: unknown
-  /** Tightly packed RGBA, `width * height * 4` bytes. */
-  rgba: Uint8Array
+  /** Backend capture reference (AUV `CaptureRef.captureId`) for OCR and `captureImage`. */
+  ref: string
   scale: number
   source: string
+  /** Pixel width. */
   width: number
 }
 

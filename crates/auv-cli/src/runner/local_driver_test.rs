@@ -1,5 +1,9 @@
 use super::*;
 
+fn test_capture_store() -> CaptureStore {
+  CaptureStore::new(CaptureStoreOptions::default())
+}
+
 #[tokio::test]
 async fn streamed_mouse_motion_rejects_cancel_before_begin() {
   let mut requests = tokio_stream::iter([Ok(proto::StreamMouseMotionRequest {
@@ -552,6 +556,7 @@ fn overlay_shadow_mapper_preserves_native_dimensions_and_rejects_invalid_blur() 
 async fn keyboard_rpc_requires_explicit_recipient_before_delivery() {
   let service = LocalInputService {
     session: auv_driver::open_local().unwrap(),
+    captures: test_capture_store(),
   };
   let error = service
     .input_keyboard(Request::new(proto::InputKeyboardRequest {
@@ -585,7 +590,10 @@ fn keyboard_press_request(key: &str, count: u32) -> proto::KeyboardInput {
 async fn targeted_keyboard_rpc_rejects_changed_window_owner() {
   let session = auv_driver::open_local().unwrap();
   let window = session.window().list().unwrap().into_iter().find(|window| window.process_id.is_some()).unwrap();
-  let service = LocalInputService { session };
+  let service = LocalInputService {
+    session,
+    captures: test_capture_store(),
+  };
   for dry_run in [false, true] {
     let error = service
       .input_keyboard(Request::new(proto::InputKeyboardRequest {
@@ -614,6 +622,7 @@ async fn keyboard_rpc_retains_failed_action_index_before_any_delivery() {
   use prost::Message;
   let service = LocalInputService {
     session: auv_driver::open_local().unwrap(),
+    captures: test_capture_store(),
   };
   let error = service
     .input_keyboard(Request::new(proto::InputKeyboardRequest {
@@ -641,6 +650,7 @@ async fn press_keys_rpc_uses_the_keyboard_repeat_validation_contract() {
   use prost::Message;
   let service = LocalInputService {
     session: auv_driver::open_local().unwrap(),
+    captures: test_capture_store(),
   };
   let error = service
     .press_keys(Request::new(proto::PressKeysRequest {
@@ -666,6 +676,7 @@ async fn press_keys_rpc_uses_the_keyboard_repeat_validation_contract() {
 async fn keyboard_hold_rpc_rejects_missing_deadline_before_delivery() {
   let service = LocalInputService {
     session: auv_driver::open_local().unwrap(),
+    captures: test_capture_store(),
   };
   let target = proto::InputTarget {
     recipient: Some(proto::input_target::Recipient::Foreground(true)),
@@ -700,6 +711,7 @@ async fn keyboard_rpc_reports_wire_validation_position_without_delivering_prefix
   use prost::Message;
   let service = LocalInputService {
     session: auv_driver::open_local().unwrap(),
+    captures: test_capture_store(),
   };
   let error = service
     .input_keyboard(Request::new(proto::InputKeyboardRequest {
@@ -729,6 +741,7 @@ mod linux_keyboard_tests {
     use auv_driver::Driver;
     let service = LocalInputService {
       session: auv_driver::LocalDriver::new().open_local().unwrap(),
+      captures: super::test_capture_store(),
     };
     let press = |key: &str| proto::KeyboardInput {
       action: Some(proto::keyboard_input::Action::Press(proto::KeyboardPress {
@@ -1036,14 +1049,7 @@ fn scroll_until_rpc_decodes_step_condition_and_region() {
   );
   assert_eq!(request.settle, std::time::Duration::from_millis(400));
   assert_eq!(request.motion_region, Some(auv_driver::RatioRect::new(0.0, 0.1, 1.0, 0.8)));
-  assert_eq!(
-    request.observe,
-    auv_scan::ScrollUntilObserve {
-      capture: true,
-      text: true
-    },
-    "payloads are opt-out"
-  );
+  assert_eq!(request.observe, auv_scan::ScrollUntilObserve { text: true }, "payloads are opt-out");
   assert!(request.validate().is_ok());
 
   let opted_out = scroll_until_request_from_proto(proto::ScrollUntilBegin {
@@ -1052,20 +1058,11 @@ fn scroll_until_rpc_decodes_step_condition_and_region() {
       delta_y: 10.0,
     })),
     condition: Some(proto::scroll_until_begin::Condition::End(proto::ScrollUntilEnd {})),
-    observe: Some(proto::ScrollUntilObserve {
-      omit_capture: true,
-      omit_text: false,
-    }),
+    observe: Some(proto::ScrollUntilObserve { omit_text: true }),
     ..Default::default()
   })
   .unwrap();
-  assert_eq!(
-    opted_out.observe,
-    auv_scan::ScrollUntilObserve {
-      capture: false,
-      text: true
-    }
-  );
+  assert_eq!(opted_out.observe, auv_scan::ScrollUntilObserve { text: false });
 
   for malformed in [
     proto::ScrollUntilBegin {
@@ -1099,8 +1096,9 @@ fn scroll_until_rpc_decodes_step_condition_and_region() {
 }
 
 #[test]
-fn scroll_until_observation_carries_capture_text_and_stop_reason() {
-  let observation = auv_scan::ScrollUntilObservation {
+fn scroll_until_observation_carries_capture_ref_text_and_stop_reason() {
+  let captures = test_capture_store();
+  let observation = |capture_bytes: u32, text, stop| auv_scan::ScrollUntilObservation {
     steps: 3,
     delivered: auv_driver::Scroll::new(0.0, 1500.0),
     motion: Some(auv_scan::ViewportPixelMotion {
@@ -1109,40 +1107,132 @@ fn scroll_until_observation_carries_capture_text_and_stop_reason() {
       no_motion: true,
     }),
     no_motion_streak: 2,
-    capture: Some(auv_driver::Capture {
+    capture: auv_driver::Capture {
       origin: None,
-      image: image::RgbaImage::new(2, 1),
+      image: image::RgbaImage::new(capture_bytes, 1),
       bounds: auv_driver::Rect::new(10.0, 20.0, 2.0, 1.0),
       scale_factor: 1.0,
       backend: "test".to_string(),
       fallback_reason: None,
-    }),
-    text: Some(auv_driver::TextRecognition {
-      origin: None,
-      text: "END OF FEED".to_string(),
-      regions: Vec::new(),
-    }),
-    stop: Some(auv_scan::ScrollUntilStopReason::EndByNoVisualProgress),
+    },
+    text,
+    stop,
   };
-  let proto = scroll_until_observation_to_proto(observation, false);
+  let proto = scroll_until_observation_to_proto(
+    observation(
+      2,
+      Some(auv_driver::TextRecognition {
+        origin: None,
+        text: "END OF FEED".to_string(),
+        regions: Vec::new(),
+      }),
+      Some(auv_scan::ScrollUntilStopReason::EndByNoVisualProgress),
+    ),
+    false,
+    &captures,
+  );
   assert_eq!((proto.steps, proto.no_motion_streak), (3, 2));
   assert_eq!(proto.stop, proto::ScrollUntilStopReason::EndByNoVisualProgress as i32);
-  assert_eq!(proto.capture.and_then(|capture| capture.image).map(|image| image.data.len()), Some(8));
+  let capture = proto.capture.expect("capture");
+  assert!(capture.image.is_none(), "observations never carry pixels");
+  let reference = capture.r#ref.expect("capture ref").capture_id;
+  assert_eq!(captures.get(&reference).map(|stored| stored.image.dimensions()), Some((2, 1)));
   assert_eq!(proto.text.map(|text| text.text).as_deref(), Some("END OF FEED"));
   assert!(!proto.awaiting_decision);
 
-  let pending = auv_scan::ScrollUntilObservation {
-    steps: 0,
-    delivered: auv_driver::Scroll::new(0.0, 0.0),
-    motion: None,
-    no_motion_streak: 0,
-    capture: None,
-    text: None,
-    stop: None,
-  };
-  let proto = scroll_until_observation_to_proto(pending, true);
+  let proto = scroll_until_observation_to_proto(observation(1, None, None), true, &captures);
   assert_eq!(proto.stop, proto::ScrollUntilStopReason::Unspecified as i32);
-  assert!(proto.awaiting_decision && proto.capture.is_none() && proto.text.is_none());
+  assert!(proto.awaiting_decision && proto.text.is_none());
+}
+
+fn gradient_capture(width: u32, height: u32) -> auv_driver::Capture {
+  auv_driver::Capture {
+    origin: None,
+    image: image::RgbaImage::from_fn(width, height, |x, y| image::Rgba([x as u8, y as u8, 0, 255])),
+    bounds: auv_driver::Rect::new(0.0, 0.0, f64::from(width) / 2.0, f64::from(height) / 2.0),
+    scale_factor: 2.0,
+    backend: "fixture".to_string(),
+    fallback_reason: None,
+  }
+}
+
+#[test]
+fn capture_image_crops_outward_and_fits_inside_max_size() {
+  use auv_api_proto::auv::api::image::v1 as image_proto;
+  let capture = gradient_capture(10, 4);
+  // x 0.25..0.55 of 10 px covers pixels 2.5..5.5, rounded outward to 2..6.
+  let region = auv_driver::RatioRect::new(0.25, 0.5, 0.3, 0.5);
+  let response = capture_image_to_proto(&capture, region, None, image_proto::ImageEncoding::Rgba).unwrap();
+  let Some(proto::get_capture_image_response::Image::Rgba(frame)) = response.image else {
+    panic!("expected RGBA pixels");
+  };
+  assert_eq!((frame.width, frame.height), (4, 2));
+  assert_eq!(&frame.data[..4], &[2, 2, 0, 255], "the crop starts at the outward-rounded pixel");
+
+  let full = auv_driver::RatioRect::new(0.0, 0.0, 1.0, 1.0);
+  let bounded = capture_image_to_proto(
+    &capture,
+    full,
+    Some(image_proto::PixelSize {
+      width: 5,
+      height: 5,
+    }),
+    image_proto::ImageEncoding::Png,
+  )
+  .unwrap();
+  let Some(proto::get_capture_image_response::Image::Encoded(png)) = bounded.image else {
+    panic!("expected an encoded image");
+  };
+  assert_eq!((png.encoding, png.width, png.height), (image_proto::ImageEncoding::Png as i32, 5, 2));
+  assert_eq!(image::load_from_memory(&png.data).unwrap().to_rgba8().dimensions(), (5, 2));
+
+  let enlarged = capture_image_to_proto(
+    &capture,
+    full,
+    Some(image_proto::PixelSize {
+      width: 100,
+      height: 100,
+    }),
+    image_proto::ImageEncoding::Jpeg,
+  )
+  .unwrap();
+  let Some(proto::get_capture_image_response::Image::Encoded(jpeg)) = enlarged.image else {
+    panic!("expected an encoded image");
+  };
+  assert_eq!((jpeg.width, jpeg.height), (10, 4), "max_size never enlarges");
+  assert_eq!(image::load_from_memory(&jpeg.data).unwrap().to_rgb8().dimensions(), (10, 4));
+}
+
+#[test]
+fn capture_image_webp_is_lossless() {
+  use auv_api_proto::auv::api::image::v1 as image_proto;
+  let capture = gradient_capture(10, 4);
+  let full = auv_driver::RatioRect::new(0.0, 0.0, 1.0, 1.0);
+  let response = capture_image_to_proto(&capture, full, None, image_proto::ImageEncoding::Webp).unwrap();
+  let Some(proto::get_capture_image_response::Image::Encoded(webp)) = response.image else {
+    panic!("expected an encoded image");
+  };
+  assert_eq!((webp.encoding, webp.width, webp.height), (image_proto::ImageEncoding::Webp as i32, 10, 4));
+  assert_eq!(image::load_from_memory(&webp.data).unwrap().to_rgba8(), capture.image, "WebP keeps every pixel");
+}
+
+#[test]
+fn unknown_capture_reference_is_not_found_with_a_recapture_hint() {
+  let captures = test_capture_store();
+  let stored = captures.insert(gradient_capture(2, 2));
+  assert!(stored_capture(&captures, proto::CaptureRef { capture_id: stored }).is_ok());
+
+  let missing = stored_capture(
+    &captures,
+    proto::CaptureRef {
+      capture_id: "cap-0-404".into(),
+    },
+  )
+  .unwrap_err();
+  assert_eq!(missing.code(), tonic::Code::NotFound);
+  assert!(missing.message().contains("capture again"), "{}", missing.message());
+  let empty = stored_capture(&captures, proto::CaptureRef::default()).unwrap_err();
+  assert_eq!(empty.code(), tonic::Code::InvalidArgument);
 }
 
 #[test]

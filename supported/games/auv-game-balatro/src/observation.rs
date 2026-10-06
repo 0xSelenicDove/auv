@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use auv_driver::{Capture, InputActionResult, Point, RatioRect, ScreenPoint, TextRecognition};
+use auv_driver::{InputActionResult, Point, RatioRect, ScreenPoint, TextRecognition};
 use auv_inference_common::{ImageSize, InferenceError};
 use auv_task_object_detection::{BoundingBox, Detection, DetectionResult};
 use image::RgbImage;
@@ -196,7 +196,7 @@ pub async fn hover_read_display_frame_points_via_api(
       let capture = driver.displays().capture(None).await.map_err(api_error)?.capture;
       let recognition = driver
         .recognize_text(
-          capture.clone(),
+          &capture,
           Some(NormalizedRegion {
             x: request.region.x,
             y: request.region.y,
@@ -212,7 +212,8 @@ pub async fn hover_read_display_frame_points_via_api(
       #[cfg(feature = "tracing")]
       {
         crate::run_read::emit_json_artifact(auv_driver::INPUT_ACTION_RESULT_PURPOSE, &moved);
-        crate::run_read::emit_png_artifact("auv.balatro.object_hover.capture", &frame_source, &capture.image);
+        let pixels = driver.captures().pixels(&capture).await.map_err(api_error)?;
+        crate::run_read::emit_image_artifact("auv.balatro.object_hover.capture", &frame_source, &pixels.image);
       }
       observations.push(HoverReadObservation {
         point: screen_point,
@@ -228,7 +229,7 @@ pub async fn hover_read_display_frame_points_via_api(
 }
 
 async fn move_mouse_to(driver: &auv::client::runner::RunnerClient, point: Point) -> Result<InputActionResult, ObservationError> {
-  let mut stream = driver.input().move_mouse(auv_driver::MouseMotionPlan::direct(point)).await.map_err(api_error)?;
+  let mut stream = driver.input().move_mouse(auv_driver::MoveMouseRequest::direct(point)).await.map_err(api_error)?;
   while let Some(event) = stream.next().await.map_err(api_error)? {
     if let auv::client::runner::MouseMotionEvent::Completed { action, .. } = event {
       return Ok(action);
@@ -464,9 +465,10 @@ async fn observe_live_with_runners(
       Err(error) => return Err(api_error(error)),
     }
   };
-  let capture = captured;
+  // The detectors run on local pixels; OCR below reads the Runner-held capture.
+  let capture = driver.captures().pixels(&captured).await.map_err(api_error)?;
   #[cfg(feature = "tracing")]
-  crate::run_read::emit_png_artifact("auv.balatro.observation.capture", &source, &capture.image);
+  crate::run_read::emit_image_artifact("auv.balatro.observation.capture", &source, &capture.image);
   let image = image::DynamicImage::ImageRgba8(capture.image.clone()).to_rgb8();
   let frame = image_proto::RgbFrame {
     width: image.width(),
@@ -478,10 +480,11 @@ async fn observe_live_with_runners(
     height: frame.height,
   };
   let detections = detect_via_api(balatro, config, entities_classes, ui_classes, frame).await?;
-  let recognition = match ocr_capture_for_ui(&capture, &detections.ui) {
-    Some(ocr_capture) => {
-      driver.recognize_text(ocr_capture, None, Vec::new(), vec!["zh-Hans".to_string(), "en-US".to_string()]).await.map_err(api_error)?
-    }
+  let recognition = match ocr_region_for_ui(&detections.ui) {
+    Some(region) => driver
+      .recognize_text(&captured, Some(region), Vec::new(), vec!["zh-Hans".to_string(), "en-US".to_string()])
+      .await
+      .map_err(api_error)?,
     None => Default::default(),
   };
   let mut state = build_state_from_detections(source, image_size, &image, detections, no_cache);
@@ -518,41 +521,6 @@ fn ocr_region_for_ui(ui: &DetectionResult) -> Option<NormalizedRegion> {
     y: y1,
     width: x2 - x1,
     height: y2 - y1,
-  })
-}
-
-fn ocr_capture_for_ui(capture: &Capture, ui: &DetectionResult) -> Option<Capture> {
-  let region = ocr_region_for_ui(ui)?;
-  let image_width = capture.image.width();
-  let image_height = capture.image.height();
-  if image_width == 0 || image_height == 0 {
-    return None;
-  }
-  let x = (region.x * f64::from(image_width)).round().clamp(0.0, f64::from(image_width)) as u32;
-  let y = (region.y * f64::from(image_height)).round().clamp(0.0, f64::from(image_height)) as u32;
-  let width = (region.width * f64::from(image_width)).round().clamp(0.0, f64::from(image_width - x)) as u32;
-  let height = (region.height * f64::from(image_height)).round().clamp(0.0, f64::from(image_height - y)) as u32;
-  if width == 0 || height == 0 {
-    return None;
-  }
-
-  let x_scale = capture.bounds.size.width / f64::from(image_width);
-  let y_scale = capture.bounds.size.height / f64::from(image_height);
-  Some(Capture {
-    origin: capture.origin.as_ref().map(|origin| auv_driver::Position {
-      point: auv_driver::Point::new(origin.point.x + f64::from(x) * x_scale, origin.point.y + f64::from(y) * y_scale),
-      coordinate_space: origin.coordinate_space.clone(),
-    }),
-    image: image::imageops::crop_imm(&capture.image, x, y, width, height).to_image(),
-    bounds: auv_driver::Rect::new(
-      capture.bounds.origin.x + f64::from(x) * x_scale,
-      capture.bounds.origin.y + f64::from(y) * y_scale,
-      f64::from(width) * x_scale,
-      f64::from(height) * y_scale,
-    ),
-    scale_factor: capture.scale_factor,
-    backend: capture.backend.clone(),
-    fallback_reason: capture.fallback_reason.clone(),
   })
 }
 

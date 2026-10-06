@@ -23,6 +23,26 @@ struct PixelDimensions {
   height: u32,
 }
 
+impl PixelDimensions {
+  fn report_value(&self) -> String {
+    format!("{}x{}", self.width, self.height)
+  }
+}
+
+/// Facts of a Runner-held capture; the same JSON as an in-process capture.
+pub fn runner_capture_result(capture: &auv::client::runner::RunnerCapture) -> CaptureResult<'_> {
+  CaptureResult {
+    bounds: &capture.bounds,
+    pixel_dimensions: PixelDimensions {
+      width: capture.pixel_width,
+      height: capture.pixel_height,
+    },
+    scale_factor: capture.scale_factor,
+    backend: &capture.backend,
+    fallback_reason: capture.fallback_reason.as_deref(),
+  }
+}
+
 pub fn capture_result(capture: &auv_driver::Capture) -> CaptureResult<'_> {
   CaptureResult {
     bounds: &capture.bounds,
@@ -42,9 +62,6 @@ pub struct DisplayCaptureResult<'a> {
   capture: CaptureResult<'a>,
 }
 
-pub fn display_capture_result<'a>(display: &'a auv_driver::Display, capture: &'a auv_driver::Capture) -> DisplayCaptureResult<'a> {
-  DisplayCaptureResult {
-    display,
-    capture: capture_result(capture),
-  }
+pub fn display_capture_result<'a>(display: &'a auv_driver::Display, capture: CaptureResult<'a>) -> DisplayCaptureResult<'a> {
+  DisplayCaptureResult { display, capture }
 }

@@ -69,21 +69,19 @@ pub struct ScrollUntilRequest {
 
 /// Opt-outs for the data attached to each [`ScrollUntilObservation`].
 ///
-/// Motion evidence is always included. Text recognition still runs for a
+/// Motion evidence and the capture are always included: the loop captures
+/// every step for motion detection anyway, and Runners return captures by
+/// reference. Text recognition still runs for a
 /// [`ScrollUntilCondition::TextVisible`] condition even when `text` is off;
 /// only the observation omits it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScrollUntilObserve {
-  pub capture: bool,
   pub text: bool,
 }
 
 impl Default for ScrollUntilObserve {
   fn default() -> Self {
-    Self {
-      capture: true,
-      text: true,
-    }
+    Self { text: true }
   }
 }
 
@@ -162,8 +160,8 @@ pub struct ScrollUntilObservation {
   /// Motion since the previous observation; `None` before the first step.
   pub motion: Option<ViewportPixelMotion>,
   pub no_motion_streak: u32,
-  /// The window capture, unless opted out.
-  pub capture: Option<Capture>,
+  /// The window capture this observation was made from.
+  pub capture: Capture,
   /// Text recognized in the capture, unless opted out. Region bounds are
   /// offsets from the recognition origin, as for window text recognition.
   pub text: Option<TextRecognition>,
@@ -258,7 +256,7 @@ pub fn scroll_until(
       delivered: result.delivered,
       motion: result.last_motion,
       no_motion_streak,
-      capture: request.observe.capture.then_some(capture),
+      capture,
       text: text.filter(|_| request.observe.text),
       stop,
     })?;

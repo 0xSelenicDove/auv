@@ -280,7 +280,32 @@ const same = next.windows.from(window) // a client, Window, WindowRef or window 
 const fresh = await next.windows.get(window) // current metadata; NOT_FOUND once closed
 ```
 
-Driver enums such as `MouseButton`, `InputDeliveryPath` and
+Captures stay in the Runner. `capture()`, `findText()` and `scrollUntil()`
+observations return a `CapturedFrame` with a `ref` and metadata (bounds,
+`pixelSize`, origin), not pixels. Pass the frame back for OCR, and fetch pixels
+only when you need them, bounded and encoded:
+
+```ts
+import { ImageEncoding } from '@auv-js/sdk'
+
+const { capture: frame } = await window.capture({ signal })
+const text = await runner.recognizeText(frame!, { region: { height: 1, width: 0.3, x: 0, y: 0 } })
+const thumbnail = await runner.captures.image(frame!, {
+  encoding: ImageEncoding.JPEG,
+  maxSize: { height: 800, width: 1280 },
+})
+const bitmap = await createImageBitmap(new Blob([thumbnail.data], { type: 'image/jpeg' }))
+```
+
+Encodings: `RGBA` (default, raw rows), `PNG`, `JPEG` (quality 85, smallest for
+photo-heavy screens) and `WEBP` (lossless, about JPEG's size for UI, exact
+pixels).
+
+A capture reference fails with NOT_FOUND once the Runner evicts it (least
+recently used beyond its memory budget, or idle for ten minutes); capture
+again. To OCR an image you own, pass `{ frame: { image, bounds, scaleFactor } }`.
+
+Driver enums such as `MouseButton`, `InputDeliveryPath`, `ImageEncoding` and
 `ScrollUntilStopReason` are exported from `@auv-js/sdk`.
 
 Create a Run for each workflow that needs its own correlation identity:

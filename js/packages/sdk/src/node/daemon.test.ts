@@ -79,10 +79,12 @@ describe('startAuv', { timeout: 30_000 }, () => {
     try {
       const clients = connections.map(connection => createAuv(connection))
       const request = {
-        backend: 'auv-js-reuse',
-        bounds: { height: 16, width: 64, x: 0, y: 0 },
-        image: { data: new Uint8Array(64 * 16 * 4).fill(255), height: 16, width: 64 },
-        scaleFactor: 1,
+        frame: {
+          backend: 'auv-js-reuse',
+          bounds: { height: 16, width: 64, x: 0, y: 0 },
+          image: { data: new Uint8Array(64 * 16 * 4).fill(255), height: 16, width: 64 },
+          scaleFactor: 1,
+        },
       }
       // Cold, concurrent first use must resolve to one local child.
       await Promise.all(clients.map(client => client.runner({ runnerClass: 'auv.core.local' }).recognizeText(request)))

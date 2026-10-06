@@ -10,7 +10,19 @@ export interface RecordedCall {
   result?: unknown
 }
 
-type RecordedMethod = Exclude<keyof Backend, 'accessibilityTree' | 'beginRun' | 'dispose' | 'endRun' | 'kind' | 'label'>
+/** A live run's device calls, plus the capture images loaded during it. */
+export interface Recording {
+  entries: RecordedCall[]
+  /**
+   * Images by capture reference. NOTICE(replay-capture-images): bitmaps load
+   * asynchronously after a capture call returns, so image fetches are kept
+   * out of the ordered call log and looked up by reference instead.
+   */
+  images: Map<string, Blob>
+  label: string
+}
+
+type RecordedMethod = Exclude<keyof Backend, 'accessibilityTree' | 'beginRun' | 'captureImage' | 'dispose' | 'endRun' | 'kind' | 'label'>
 
 /**
  * Wraps a live backend and records every device call with its result, so the
@@ -19,6 +31,7 @@ type RecordedMethod = Exclude<keyof Backend, 'accessibilityTree' | 'beginRun' | 
 export class RecordingBackend implements Backend {
   accessibilityTree?: () => Promise<AxNode | null>
   readonly entries: RecordedCall[] = []
+  readonly images = new Map<string, Blob>()
   readonly kind: Backend['kind']
 
   readonly label: string
@@ -40,6 +53,12 @@ export class RecordingBackend implements Backend {
 
   captureDisplay(displayId?: string): Promise<CapturedFrame> {
     return this.#record('captureDisplay', [displayId], () => this.inner.captureDisplay(displayId))
+  }
+
+  async captureImage(frame: CapturedFrame, maxSize: { height: number, width: number }): Promise<Blob> {
+    const image = await this.inner.captureImage(frame, maxSize)
+    this.images.set(frame.ref, image)
+    return image
   }
 
   captureWindow(windowId: string): Promise<CapturedFrame> {
@@ -132,8 +151,8 @@ export class ReplayBackend implements Backend {
   readonly label: string
   #index = 0
 
-  constructor(private readonly entries: readonly RecordedCall[], source: string) {
-    this.label = `Replay of ${source}`
+  constructor(private readonly recording: Recording) {
+    this.label = `Replay of ${recording.label}`
   }
 
   activateApp(bundleId: string): Promise<InputReceipt> {
@@ -146,6 +165,13 @@ export class ReplayBackend implements Backend {
 
   captureDisplay(displayId?: string): Promise<CapturedFrame> {
     return this.#next('captureDisplay', [displayId])
+  }
+
+  async captureImage(frame: CapturedFrame): Promise<Blob> {
+    const image = this.recording.images.get(frame.ref)
+    if (!image)
+      throw new Error(`The recording has no image for capture ${frame.ref}`)
+    return image
   }
 
   captureWindow(windowId: string): Promise<CapturedFrame> {
@@ -209,7 +235,7 @@ export class ReplayBackend implements Backend {
 
   async #next<T>(method: RecordedMethod, args: unknown[]): Promise<T> {
     const index = this.#index++
-    const entry = this.entries[index]
+    const entry = this.recording.entries[index]
     const key = argumentKey(args)
     if (!entry)
       throw new ReplayDivergence(`Device call #${index + 1} ${method}(${key}) goes beyond the recording; run live from here.`)
@@ -230,12 +256,12 @@ export class ReplayDivergence extends Error {
   }
 }
 
-/** Canonical form of call arguments; frames are identified by source and bounds, not pixels. */
+/** Canonical form of call arguments; frames are identified by source and bounds, not their per-run reference. */
 function argumentKey(args: unknown[]): string {
   // Omitted optional arguments (e.g. no OCR `region`) do not show as `null`.
   const end = args.findLastIndex(arg => arg !== undefined) + 1
   return JSON.stringify(args.slice(0, end), (_key, value: unknown) => {
-    if (value && typeof value === 'object' && 'rgba' in value) {
+    if (value && typeof value === 'object' && 'ref' in value && 'source' in value) {
       const frame = value as CapturedFrame
       return { bounds: frame.bounds, source: frame.source }
     }

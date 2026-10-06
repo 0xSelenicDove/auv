@@ -503,7 +503,9 @@ message ScrollUntilTextVisible {
 // Motion evidence is always included. A text condition still recognizes text
 // when `omit_text` is set; only the observation omits it.
 message ScrollUntilObserve {
-  bool omit_capture = 1;
+  // Captures always travel by reference, so there is nothing to omit.
+  reserved 1;
+  reserved "omit_capture";
   bool omit_text = 2;
 }
 
@@ -576,7 +578,7 @@ message ScrollUntilObservation {
   // Absent before the first step.
   ViewportPixelMotion motion = 3;
   uint32 no_motion_streak = 4;
-  // Absent when opted out.
+  // This step's capture by reference, without pixels.
   CapturedFrame capture = 5;
   // Same shape as `TextRecognitionService/RecognizeText`; absent when opted out.
   RecognizeTextResponse text = 6;

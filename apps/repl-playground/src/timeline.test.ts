@@ -7,7 +7,7 @@ import { latestFramesAt } from './timeline'
 function frame(ref: string, seq: number, run: number): Resource {
   return {
     capturedAt: seq,
-    frame: { bounds: { height: 1, width: 1, x: 0, y: 0 }, height: 1, rgba: new Uint8Array(4), scale: 1, source: 'window:w-counter', width: 1 },
+    frame: { bounds: { height: 1, width: 1, x: 0, y: 0 }, height: 1, ref: 'cap-1', scale: 1, source: 'window:w-counter', width: 1 },
     handle: { $ref: ref as `frame:${string}`, bounds: { height: 1, width: 1, x: 0, y: 0 }, height: 1, kind: 'frame', scale: 1, source: 'window:w-counter', width: 1 },
     kind: 'frame',
     run,
