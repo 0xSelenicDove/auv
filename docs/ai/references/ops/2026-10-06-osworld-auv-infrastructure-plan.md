@@ -685,7 +685,15 @@ open independently of the relay topology. See the [evidence note]
 The next exploratory V1 Chrome→VLC Codex-agent cohort now has a
 [pre-boot declaration](2026-10-06-osworld-v1-codex-agent-cohort.md) fixing
 membership, order, shared prompt/budgets, denominator two, and evidence
-categories. This is a docs-only planning gate, not an executed cohort: the
+categories. The [two-row execution](2026-10-06-osworld-v1-codex-agent-cohort-evidence.md)
+used separate fresh V1 guests and pinned evaluators, but neither action Run
+finished: Chrome hit the relay's 540-second total deadline before typing the
+folder name; VLC reached Advanced Preferences, then the gateway rejected a
+second action against a consumed checkpoint because the operator prompt had
+not explained the one-action-per-capture rule. Both evaluators returned raw
+`0.0` on incomplete guest states; the declared denominator remains two, not
+a selected success rate. The attended relay's operator/model round trips and
+its protocol description are now measured harness gaps. The
 attended JSONL relay cannot be passed directly to `batch_runner.py`, which
 closes action stdin. Model build identity and AUV-only tool isolation remain
 unverified, so any eventual result must be labeled selected exploratory

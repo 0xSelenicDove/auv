@@ -685,6 +685,23 @@ is not a `batch_runner.py` action phase because the runner closes phase stdin;
 do not report its two rows as an unattended batch ledger or official OSWorld
 rate.
 
+The [first predeclared two-row attempt](2026-10-06-osworld-v1-codex-agent-cohort-evidence.md)
+exposed two operator-facing constraints. A relay session has a 540-second
+total window even if no single proposal has idled for 180 seconds; account
+for model, image transfer, and operator-message latency before boot. Also,
+each successfully forwarded action consumes its checkpoint provenance:
+capture again before proposing another action, even if a click and typing
+appear visually grounded in the same earlier frame. The gateway rejects
+such a second action before AUV delivery. Explain this in the agent tool
+contract; do not bypass the gate or retry inside a frozen cohort.
+
+Both fresh V1 guests also had PackageKit hold `/var/lib/apt/lists/lock` during
+the pinned install phase. Diagnose the exact guest PID/error first; in a
+disposable task VM only, temporarily stop PackageKit as non-GUI setup if it
+is the confirmed holder. A setup HTTP timeout during `apt-get install` does
+not mean the guest subprocess stopped. Before any retry, check its process
+state and installed packages, then resume only the same task-owned episode.
+
 For an agent-selected task attempt, do not send unreviewed agent JSONL
 directly to `auv-osworld-action`. Keep one foreground interactive child under
 `agent_action_transport.py` and pass proposals through
