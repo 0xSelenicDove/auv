@@ -46,12 +46,12 @@ configuration):
       "runner_identity": "actual-runner-or-session-identity"
     },
     "phases": {
-      "boot": {"argv": ["audited-boot-program"], "timeout_seconds": 900},
-      "install": {"argv": ["audited-install-program"], "timeout_seconds": 300},
-      "setup": {"argv": ["audited-setup-program"], "timeout_seconds": 180},
-      "action": {"argv": ["audited-auv-agent-program"], "timeout_seconds": 600},
-      "evaluate": {"argv": ["audited-evaluator-program"], "timeout_seconds": 180},
-      "reset": {"argv": ["audited-task-owned-cleanup-program"], "timeout_seconds": 180}
+      "boot": { "argv": ["audited-boot-program"], "timeout_seconds": 900 },
+      "install": { "argv": ["audited-install-program"], "timeout_seconds": 300 },
+      "setup": { "argv": ["audited-setup-program"], "timeout_seconds": 180 },
+      "action": { "argv": ["audited-auv-agent-program"], "timeout_seconds": 600 },
+      "evaluate": { "argv": ["audited-evaluator-program"], "timeout_seconds": 180 },
+      "reset": { "argv": ["audited-task-owned-cleanup-program"], "timeout_seconds": 180 }
     }
   }]
 }
@@ -76,7 +76,7 @@ JSON object on its final stdout line:
 ```json
 {
   "run_ids": ["full-auv-run-id-1", "full-auv-run-id-2"],
-  "final_artifact": {"path": "final-screenshot.png", "sha256": "actual-file-sha256"}
+  "final_artifact": { "path": "final-screenshot.png", "sha256": "actual-file-sha256" }
 }
 ```
 
