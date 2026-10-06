@@ -170,13 +170,14 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
       .and_then(|displays| crate::commands::display::list_displays_output(&displays)),
     "display.capture" => match runner.displays().capture(None).await {
       Err(status) => Err(format!("CaptureService/CaptureDisplay failed: {status}")),
-      Ok(capture) => match capture_pixels(&runner, &capture.capture).await {
+      Ok(capture) => match evidence_pixels(&runner, &capture.capture).await {
         Err(error) => Err(error),
         Ok(pixels) => {
-          crate::commands::display::recorded_display_capture_output(&auv_driver::DisplayCapture {
-            display: capture.display,
-            capture: pixels,
-          })
+          crate::commands::display::recorded_display_capture_output(
+            &capture.display,
+            crate::commands::runner_capture_result(&capture.capture),
+            pixels.as_ref(),
+          )
           .await
         }
       },
@@ -185,13 +186,14 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
       Err(error) => Err(error),
       Ok(region) => match runner.displays().capture_region(region, None).await {
         Err(status) => Err(format!("CaptureService/CaptureRegion failed: {status}")),
-        Ok(capture) => match capture_pixels(&runner, &capture.capture).await {
+        Ok(capture) => match evidence_pixels(&runner, &capture.capture).await {
           Err(error) => Err(error),
           Ok(pixels) => {
-            crate::commands::screen::recorded_region_capture_output(&auv_driver::RegionCapture {
-              display: capture.display,
-              capture: pixels,
-            })
+            crate::commands::screen::recorded_region_capture_output(
+              &capture.display,
+              crate::commands::runner_capture_result(&capture.capture),
+              pixels.as_ref(),
+            )
             .await
           }
         },
@@ -210,13 +212,14 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
       };
       match response {
         Err(status) => Err(format!("WindowService/ResolveWindow or CaptureService/CaptureWindow failed: {status}")),
-        Ok(response) => match capture_pixels(&runner, &response.capture).await {
+        Ok(response) => match evidence_pixels(&runner, &response.capture).await {
           Err(error) => Err(error),
           Ok(pixels) => {
-            crate::commands::window::recorded_window_capture_output(&crate::commands::window::WindowCapture {
-              window: response.window,
-              capture: pixels,
-            })
+            crate::commands::window::recorded_window_capture_output(
+              &response.window,
+              crate::commands::runner_capture_result(&response.capture),
+              pixels.as_ref(),
+            )
             .await
           }
         },
@@ -231,13 +234,13 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
         };
         match response {
           Err(status) => Err(format!("WindowService/ResolveWindow or TextRecognitionService/FindWindowText failed: {status}")),
-          Ok(response) => capture_pixels(&runner, &response.capture).await.and_then(|pixels| {
+          Ok(response) => evidence_pixels(&runner, &response.capture).await.and_then(|pixels| {
             crate::commands::window::recorded_window_text_matches_output(
               &crate::commands::window::WindowTextRecognition {
                 window: response.window,
                 matches: response.matches,
               },
-              &pixels,
+              pixels.as_ref(),
             )
           }),
         }
@@ -263,13 +266,13 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
           .await;
           match response {
             Err(error) => Err(error),
-            Ok(response) => capture_pixels(&runner, &response.capture).await.and_then(|pixels| {
+            Ok(response) => evidence_pixels(&runner, &response.capture).await.and_then(|pixels| {
               crate::commands::window::recorded_window_text_matches_output(
                 &crate::commands::window::WindowTextRecognition {
                   window: response.window,
                   matches: response.matches,
                 },
-                &pixels,
+                pixels.as_ref(),
               )
             }),
           }
@@ -282,9 +285,9 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
         let response = runner.displays().find_text(None, query).await;
         match response {
           Err(status) => Err(format!("TextRecognitionService/FindDisplayText failed: {status}")),
-          Ok(response) => capture_pixels(&runner, &response.capture)
+          Ok(response) => evidence_pixels(&runner, &response.capture)
             .await
-            .and_then(|pixels| crate::commands::screen::recorded_screen_text_matches_output(&response.matches, &pixels)),
+            .and_then(|pixels| crate::commands::screen::recorded_screen_text_matches_output(&response.matches, pixels.as_ref())),
         }
       }
     },
@@ -310,7 +313,7 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
           point: response.point,
           action: response.action,
         };
-        crate::commands::screen::recorded_screen_text_click_output(&result, &capture_pixels(&runner, &capture).await?)
+        crate::commands::screen::recorded_screen_text_click_output(&result, evidence_pixels(&runner, &capture).await?.as_ref())
       }
       .await
     }
@@ -335,9 +338,9 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
         .await;
         match response {
           Err(error) => Err(error),
-          Ok(response) => capture_pixels(&runner, &response.capture)
+          Ok(response) => evidence_pixels(&runner, &response.capture)
             .await
-            .and_then(|pixels| crate::commands::screen::recorded_screen_text_matches_output(&response.matches, &pixels)),
+            .and_then(|pixels| crate::commands::screen::recorded_screen_text_matches_output(&response.matches, pixels.as_ref())),
         }
       }
     },
@@ -377,7 +380,7 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
           options,
           action: response.action,
         };
-        crate::commands::window::recorded_window_text_click_output(&result, &capture_pixels(&runner, &capture).await?)
+        crate::commands::window::recorded_window_text_click_output(&result, evidence_pixels(&runner, &capture).await?.as_ref())
       }
       .await
     }
@@ -409,15 +412,20 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
 }
 
 /// Fetches a Runner-held capture's pixels for the PNG evidence artifacts these
-/// commands record.
+/// commands record, or `None` when this call records no artifacts: results
+/// themselves need only the capture's metadata.
 // TODO(runner-side-capture-artifacts): let the Runner persist evidence from the
 // capture reference instead of moving pixels to the invoke frontend; see
 // docs/ai/references/driver/2026-10-06-capture-references-and-positions-design.md.
-async fn capture_pixels(
+async fn evidence_pixels(
   runner: &auv::client::runner::RunnerClient,
   capture: &auv::client::runner::RunnerCapture,
-) -> Result<auv_driver::Capture, String> {
-  runner.captures().pixels(capture).await.map_err(|status| format!("CaptureService/GetCaptureImage failed: {status}"))
+) -> Result<Option<image::RgbaImage>, String> {
+  if !auv_tracing::Context::current().can_publish_artifacts() {
+    return Ok(None);
+  }
+  let pixels = runner.captures().pixels(capture).await.map_err(|status| format!("CaptureService/GetCaptureImage failed: {status}"))?;
+  Ok(Some(pixels.image))
 }
 
 async fn selected_click_point(input: &crate::InvokeCommandInput, runner: &auv::client::runner::RunnerClient) -> crate::InvokeCommandResult {

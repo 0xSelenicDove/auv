@@ -109,7 +109,7 @@ async fn capture_window(input: InvokeCommandInput, args: CaptureWindowArgs) -> I
       CaptureFrame::new(result.window.frame).with_label(result.window.title.clone().unwrap_or_else(|| "selected window".to_string())),
     );
     let overlay = super::overlay::show_overlay(&input, &session, capture_overlay, show_options(120, 180))?;
-    let mut output = window_capture_output_with_artifact(&result, artifact)?;
+    let mut output = window_capture_output_with_artifact(&result.window, super::capture_result(&result.capture), artifact)?;
     output.report.as_mut().expect("window capture output always has a report").fields.push(overlay.report_field());
     // TODO(invoke-window-capture-backend): live testing on 2026-06-18 showed
     // ScreenCaptureKit single-window capture can time out and xcap fallback can
@@ -145,16 +145,29 @@ pub fn window_capture_result(result: &WindowCapture) -> WindowCaptureResult<'_> 
   }
 }
 
-/// Records and projects a capture returned by either a local or remote Driver.
-pub async fn recorded_window_capture_output(result: &WindowCapture) -> InvokeCommandResult {
-  let artifact = emit_png_with_receipt("auv.driver.window_capture", &result.capture.image).await;
-  window_capture_output_with_artifact(result, artifact)
+/// Records and projects a Runner-held window capture. `image` is its pixels
+/// when this call records artifacts.
+pub async fn recorded_window_capture_output(
+  window: &auv_driver::Window,
+  capture: super::CaptureResult<'_>,
+  image: Option<&image::RgbaImage>,
+) -> InvokeCommandResult {
+  let artifact = match image {
+    Some(image) => emit_png_with_receipt("auv.driver.window_capture", image).await,
+    None => None,
+  };
+  window_capture_output_with_artifact(window, capture, artifact)
 }
 
-fn window_capture_output_with_artifact(result: &WindowCapture, artifact: Option<ArtifactMetadata>) -> InvokeCommandResult {
-  let mut output = InvokeCommandOutput::from_result(&window_capture_result(result))?;
-  let mut fields = window_report_fields(&result.window);
-  fields.push(InvokeReportField::new("Pixel size", format!("{}x{}", result.capture.image.width(), result.capture.image.height())));
+fn window_capture_output_with_artifact(
+  window: &auv_driver::Window,
+  capture: super::CaptureResult<'_>,
+  artifact: Option<ArtifactMetadata>,
+) -> InvokeCommandResult {
+  let pixel_size = capture.pixel_dimensions.report_value();
+  let mut output = InvokeCommandOutput::from_result(&WindowCaptureResult { window, capture })?;
+  let mut fields = window_report_fields(window);
+  fields.push(InvokeReportField::new("Pixel size", pixel_size));
   output.report = Some(InvokeReport::new(fields, Vec::new()));
   Ok(output.with_artifacts(artifact))
 }
@@ -370,8 +383,10 @@ pub struct WindowTextClick {
 
 /// Records the exact OCR source and typed delivery evidence, then builds the
 /// transport-independent `window.clickText` result.
-pub fn recorded_window_text_click_output(result: &WindowTextClick, capture: &auv_driver::Capture) -> InvokeCommandResult {
-  emit_png("auv.driver.window_ocr_source", &capture.image);
+pub fn recorded_window_text_click_output(result: &WindowTextClick, ocr_source: Option<&image::RgbaImage>) -> InvokeCommandResult {
+  if let Some(image) = ocr_source {
+    emit_png("auv.driver.window_ocr_source", image);
+  }
   super::input::emit_input_action_result(&result.action);
   window_text_click_output_base(result)
 }
@@ -532,8 +547,10 @@ fn window_text_matches_output(
 
 /// Records the OCR source and builds the transport-independent
 /// `window.findText` result.
-pub fn recorded_window_text_matches_output(result: &WindowTextRecognition, capture: &auv_driver::Capture) -> InvokeCommandResult {
-  emit_png("auv.driver.window_ocr_source", &capture.image);
+pub fn recorded_window_text_matches_output(result: &WindowTextRecognition, ocr_source: Option<&image::RgbaImage>) -> InvokeCommandResult {
+  if let Some(image) = ocr_source {
+    emit_png("auv.driver.window_ocr_source", image);
+  }
   window_text_matches_output_base(result)
 }
 

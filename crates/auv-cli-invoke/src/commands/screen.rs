@@ -57,7 +57,7 @@ async fn capture_region(input: InvokeCommandInput, args: CaptureRegionArgs) -> I
   #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
   {
     let (capture, artifact) = capture_screen_region_recorded(region).await?;
-    region_capture_output(&capture, artifact)
+    region_capture_output(&capture.display, super::capture_result(&capture.capture), artifact)
   }
   #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
   {
@@ -91,23 +91,35 @@ async fn capture_screen_region_recorded(region: auv_driver::Rect) -> Result<(auv
   }
 }
 
-fn region_capture_output(capture: &auv_driver::RegionCapture, artifact: Option<ArtifactMetadata>) -> InvokeCommandResult {
-  let mut output = InvokeCommandOutput::from_result(&super::display_capture_result(&capture.display, &capture.capture))?;
+fn region_capture_output(
+  display: &auv_driver::Display,
+  capture: super::CaptureResult<'_>,
+  artifact: Option<ArtifactMetadata>,
+) -> InvokeCommandResult {
+  let pixel_size = capture.pixel_dimensions.report_value();
+  let mut output = InvokeCommandOutput::from_result(&super::display_capture_result(display, capture))?;
   output.report = Some(InvokeReport::new(
     vec![
-      InvokeReportField::new("Display ID", capture.display.id.clone()),
-      InvokeReportField::new("Pixel size", format!("{}x{}", capture.capture.image.width(), capture.capture.image.height())),
+      InvokeReportField::new("Display ID", display.id.clone()),
+      InvokeReportField::new("Pixel size", pixel_size),
     ],
     Vec::new(),
   ));
   Ok(output.with_artifacts(artifact))
 }
 
-/// Records and projects a region capture returned by either a local or remote
-/// Driver.
-pub async fn recorded_region_capture_output(capture: &auv_driver::RegionCapture) -> InvokeCommandResult {
-  let artifact = emit_png_with_receipt("auv.driver.screen_region_capture", &capture.capture.image).await;
-  region_capture_output(capture, artifact)
+/// Records and projects a Runner-held region capture. `image` is its pixels
+/// when this call records artifacts.
+pub async fn recorded_region_capture_output(
+  display: &auv_driver::Display,
+  capture: super::CaptureResult<'_>,
+  image: Option<&image::RgbaImage>,
+) -> InvokeCommandResult {
+  let artifact = match image {
+    Some(image) => emit_png_with_receipt("auv.driver.screen_region_capture", image).await,
+    None => None,
+  };
+  region_capture_output(display, capture, artifact)
 }
 
 #[derive(Clone, Debug, Args, serde::Serialize, serde::Deserialize)]
@@ -235,8 +247,10 @@ fn screen_text_matches_output(matches: &auv_driver::OcrMatches) -> InvokeCommand
 
 /// Records the OCR source and builds the transport-independent
 /// `screen.findText` result.
-pub fn recorded_screen_text_matches_output(matches: &auv_driver::OcrMatches, capture: &auv_driver::Capture) -> InvokeCommandResult {
-  emit_png("auv.driver.screen_ocr_source", &capture.image);
+pub fn recorded_screen_text_matches_output(matches: &auv_driver::OcrMatches, ocr_source: Option<&image::RgbaImage>) -> InvokeCommandResult {
+  if let Some(image) = ocr_source {
+    emit_png("auv.driver.screen_ocr_source", image);
+  }
   screen_text_matches_output(matches)
 }
 
@@ -292,8 +306,10 @@ fn screen_text_click_output(result: &ScreenTextClick) -> InvokeCommandResult {
 
 /// Builds the transport-independent `screen.clickText` result and records the
 /// OCR source capture through the shared tracing artifact path.
-pub fn recorded_screen_text_click_output(result: &ScreenTextClick, capture: &auv_driver::Capture) -> InvokeCommandResult {
-  emit_png("auv.driver.screen_ocr_source", &capture.image);
+pub fn recorded_screen_text_click_output(result: &ScreenTextClick, ocr_source: Option<&image::RgbaImage>) -> InvokeCommandResult {
+  if let Some(image) = ocr_source {
+    emit_png("auv.driver.screen_ocr_source", image);
+  }
   screen_text_click_output(result)
 }
 

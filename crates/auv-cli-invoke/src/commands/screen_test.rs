@@ -71,7 +71,8 @@ fn region_capture_result_keeps_pixels_out_of_json() {
     },
   };
 
-  let output = region_capture_output(&capture, None).expect("region result should serialize");
+  let output =
+    region_capture_output(&capture.display, super::super::capture_result(&capture.capture), None).expect("region result should serialize");
   let result = output.result().expect("capture should have a result");
 
   assert_eq!(result["display"]["id"], "display_1");
