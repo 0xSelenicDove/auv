@@ -1,7 +1,8 @@
 # OSWorld-V2.1 gated assets: narrow preflight
 
-Date: 2026-10-06. Scope: static release/asset audit only; no guest, GUI,
-setup, or evaluator was run. This is not an AUV task result.
+Date: 2026-10-06. Scope: pinned release/asset audit followed by a separate
+live guest **environment preflight**. No task solve, export, or evaluator was
+run. This is not an AUV task result.
 
 ## Release identity and access
 
@@ -66,5 +67,43 @@ URL, and no CDP path in the task class.
 
 The task class does not request a physical GPU. Whether the pinned Xorg guest
 has a working Shotcut install, codecs, and enough software-rendering capacity
-remains a live preflight question; no GPU sufficiency claim follows from the
+was a live preflight question; no GPU sufficiency claim follows from the
 static code. AUV must own every agent GUI observation/action in that pilot.
+
+## Task044 live environment preflight
+
+A fresh official V2.1 QEMU/KVM overlay ran on `liet-gpu-1` as task-owned Pod
+and Service `osworld-v2-task044-preflight` (Pod UID
+`94d38c79-391e-4fc9-914d-8498a00c060b`) with a separate `-proxy` Pod.
+The pinned video was transferred through the setup control plane to
+`/home/user/Desktop/promo_video.mp4`; `/setup/upload` reported
+`File Uploaded: 5789382 bytes`, and the guest SHA256 was
+`987ee02e31537ad83cbe3da15502366d88be944e8b8cec08538adf51185d5108`.
+`/setup/launch` with `['shotcut']` reported `shotcut launched successfully`,
+and the process was observed running. This was a control-plane-equivalent
+setup, **not** a direct call to Python `Task044.setup()`.
+
+Guest `ffprobe` identified H.264/AAC video at 834×1112, about 7.06 seconds;
+`ffmpeg -hwaccel none` decoded three frames on CPU. Installed guest AUV
+0.0.28 (binary SHA256
+`2a8e53eecfef1dcd8fa8368fa480d6df36e254527c7e60be3ac82802e7073427`)
+was paired as Device
+`f39358fa3caccdd02ba781a049495401f7a105207b60687a1158094f14ede4e2`.
+Only AUV `input.clickPoint`, `input.typeText`, `input.keys`, and capture
+opened the video and canceled Shotcut's initial variable-frame-rate
+“Convert to Edit-Friendly” prompt. Capture Run
+`e69063bd-e625-691f-c6be-f476b20c1346` (PNG SHA256
+`86b565969313a65b60284f1a0cd6e74580198dc9db878e1a624ff6c06552d5a0`)
+visibly shows `promo_video.mp4` in Shotcut's preview. The prompt cancellation
+belongs only to this disposable preflight, not a later benchmark episode.
+No crop, project save, export, or evaluator call occurred. A GUI preview and
+CPU `ffmpeg` decode do **not** prove Shotcut's own pure-software rendering or
+export performance.
+
+Before AUV ran, the guest needed a bounded install of `libtesseract4`,
+`liblept5`, and English Tesseract data. The task-owned Pod, Service, proxy,
+port-forward, and pairing profile were subsequently removed and checked
+absent; `osworld-v2-hot` remained Bound. A later Task044 attempt must start
+from a **new** overlay, treat the VFR prompt as part of its action budget, and
+record an actual evaluator result rather than promoting this preflight to a
+task score.

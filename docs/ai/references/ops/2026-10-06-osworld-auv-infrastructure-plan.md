@@ -262,8 +262,12 @@ The pinned gated inventory is 1,084 files / 4,920,057,674 bytes; a narrow
 follow-up downloaded and hash-verified only Task099's image and Task044's
 5,789,382-byte Shotcut video. Task044's reachable setup/evaluator code has
 no PyAutoGUI GUI input, CDP, or mocked-site dependency, but Shotcut/codec
-behavior in the guest is not live-validated. See the
-[asset preflight](2026-10-06-osworld-v2-assets-preflight.md). Broader batch
+behavior in the guest needed live validation. A separate fresh V2.1 guest
+preflight has since verified the asset bytes, Shotcut launch and AUV preview,
+plus CPU decoding; it did **not** crop/export/evaluate the task or establish
+Shotcut export performance. See the
+[asset and environment preflight](2026-10-06-osworld-v2-assets-preflight.md).
+Broader batch
 coverage is the trigger to sync and verify the full pinned asset snapshot.
 
 Task setup and evaluator code need their own input audit before batch execution.

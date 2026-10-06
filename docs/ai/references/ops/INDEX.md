@@ -33,7 +33,7 @@ Count: **29**
 - [`2026-10-05-osworld-kubernetes-x11-evidence.md`](2026-10-05-osworld-kubernetes-x11-evidence.md): Live paired and shared-socket X11 evidence, OSWorld action mapping, direct QEMU Pod design, and KubeVirt/CDI decision boundary.
 - [`2026-10-05-osworld-kubernetes-runbook.md`](2026-10-05-osworld-kubernetes-runbook.md): Operator runbook for booting retained OSWorld V1/V2.1 qcow2 images on ihome, reaching the guest, installing AUV, and exercising guest-local or paired control.
 - [`2026-10-06-osworld-auv-infrastructure-plan.md`](2026-10-06-osworld-auv-infrastructure-plan.md): Ordered TODO and acceptance gates for aligning the X11 PR, mapping OSWorld actions, revalidating official guests, batching tasks, and evaluating an agent.
-- [`2026-10-06-osworld-v2-assets-preflight.md`](2026-10-06-osworld-v2-assets-preflight.md): Pinned Hugging Face access, size and hash evidence for V2.1 Task099/044 assets, plus the Task044 setup/evaluator boundary for a later live pilot.
+- [`2026-10-06-osworld-v2-assets-preflight.md`](2026-10-06-osworld-v2-assets-preflight.md): Pinned Hugging Face access, size and hash evidence for V2.1 Task099/044 assets, Task044 setup/evaluator audit, and a Shotcut live environment preflight without task scoring.
 
 ## Related
 
