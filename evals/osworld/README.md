@@ -83,7 +83,7 @@ JSON object on its final stdout line:
 The screenshot file must be inside the episode directory. The runner verifies
 its bytes against the digest and compares terminal stdout with the sidecar.
 
-### Local typed-action entry (not wired to Kubernetes)
+## Local typed-action entry (not wired to Kubernetes)
 
 `auv-osworld-action` is a separate foreground entry for an operator-audited,
 predeclared sequence. It is **not** the fixed K8s adapter action; both Chrome
@@ -101,8 +101,8 @@ environment paths. One paired-context plan is:
     "profiles_file": "/absolute/path/to/paired-profiles.json"
   },
   "actions": [
-    {"action_type": "CLICK", "x": 420, "y": 300},
-    {"action_type": "TYPING", "text": "example"},
+    { "action_type": "CLICK", "x": 420, "y": 300 },
+    { "action_type": "TYPING", "text": "example" },
     "DONE"
   ]
 }
