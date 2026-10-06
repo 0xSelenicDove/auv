@@ -58,7 +58,8 @@ dependency was added.
 - Lossless `--compact-json` now removes formatting whitespace; see
   [compact JSON measurements](../invoke-cli/2026-10-06-compact-json.md).
   Command-specific field projection remains deferred.
-- Reproduce the benchmark's no-effect scroll against receiver state and compare
-  targeting/focus policies before changing input delivery or adding fallbacks.
+- The foreground no-effect case was reproduced and fixed using exact-window
+  preparation; see [receiver evidence](2026-10-06-foreground-scroll-preparation.md).
+  Other stall causes and background-delivery reliability remain separate.
 - Benchmark reusable workflows with first-run discovery costs separated from
   repeated execution and failed runs.

@@ -454,7 +454,20 @@ impl WindowApi<'_> {
             continue;
           }
           let screen_point = self.to_screen_point(window, point)?;
-          let result = self.session.input().scroll_global_hid(screen_point.point(), scroll, options.settle)?;
+          // Global HID is hit-tested against the foreground desktop. Prepare the
+          // exact recipient as clicks/drags do; posting alone can leave a covered
+          // window unchanged. BackgroundOnly never reaches this branch.
+          // Focus confirmation already waits for the exact window; avoid an
+          // extra fixed delay on every timed-scroll sample.
+          // TODO: amortize preparation across timed motion/stream samples when
+          // that lifecycle can detect focus changes; each sample currently
+          // confirms its recipient, favoring correctness over throughput.
+          let lease = self.prepare_for_input(window, foreground_prepare_options(Duration::ZERO))?;
+          let scroll_result = self.session.input().scroll_global_hid(screen_point.point(), scroll, options.settle);
+          let restore_result = self.restore_input(lease);
+          let mut result = scroll_result?;
+          restore_result?;
+          result.focus_disturbance = DisturbanceLevel::Foreground;
           attempts.extend(result.attempts);
           return Ok(InputActionResult {
             selected_path: result.selected_path,

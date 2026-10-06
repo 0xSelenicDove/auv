@@ -89,3 +89,5 @@ Count: **63**
 - Shared vocabulary: [`../../../TERMS_AND_CONCEPTS.md`](../../../TERMS_AND_CONCEPTS.md)
 
 - [`2026-09-17-click-buttons-contract.md`](2026-09-17-click-buttons-contract.md): BG-1 left/right/middle integration, API changes, and receiver validation.
+
+- [macOS foreground scroll preparation](2026-10-06-foreground-scroll-preparation.md): Reproduced inactive-window stall, shared preparation fix, before/after receiver test, background-only preservation, and timing limits.

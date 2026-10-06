@@ -1133,3 +1133,67 @@ fn shared_key_symbols_preserve_macos_named_key_behavior() {
   assert!(special_key_code("back").is_err());
   assert!(special_key_code("insert").is_err());
 }
+
+// ROOT CAUSE:
+//
+// Foreground window scrolling posted global HID without preparing the exact
+// recipient. An inactive/covered fixture remained at the top despite success.
+// The foreground path must activate and focus its window before posting input;
+// background-only must leave foreground ownership unchanged.
+#[test]
+#[ignore = "requires CanvasFixture reset to top, ScrollCover fixture, and macOS Accessibility"]
+fn foreground_scroll_prepares_window_and_moves_receiver() {
+  let session = MacosDriverSession { _private: () };
+  let target = session.window().resolve(SelectWindow::main_visible().owned_by(App::bundle("local.auv.CanvasFixture"))).unwrap();
+  let cover = session.window().resolve(SelectWindow::main_visible().owned_by(App::bundle("local.auv.ScrollCover"))).unwrap();
+  activate_process(i64::from(cover.process_id.unwrap())).unwrap();
+  thread::sleep(Duration::from_millis(100));
+  let position = || {
+    session
+      .accessibility()
+      .capture_app_tree("local.auv.CanvasFixture", 12, 100)
+      .unwrap()
+      .nodes
+      .into_iter()
+      .find(|node| node.role == "AXScrollBar")
+      .unwrap()
+      .value
+      .parse::<f64>()
+      .unwrap()
+  };
+  assert_eq!(position(), 0.0, "reset fixture before running");
+  let action = session
+    .window()
+    .scroll(
+      &target,
+      WindowPoint::new(450.0, 400.0),
+      Scroll::new(0.0, 400.0),
+      ScrollOptions {
+        policy: InputPolicy::ForegroundPreferred,
+        settle: Duration::from_millis(150),
+        ..Default::default()
+      },
+    )
+    .unwrap();
+  assert!(position() > 0.0, "successful posting must actually move the fixture");
+  assert_eq!(action.focus_disturbance, DisturbanceLevel::Foreground);
+  assert!(!action.verified, "receiver assertion is independent of raw delivery evidence");
+
+  activate_process(i64::from(cover.process_id.unwrap())).unwrap();
+  let foreground = || crate::native::window::list_windows(ListWindowsOptions::all_visible(1)).unwrap().frontmost_app_bundle_id;
+  assert_eq!(foreground(), "local.auv.ScrollCover");
+  let background = session
+    .window()
+    .scroll(
+      &target,
+      WindowPoint::new(450.0, 400.0),
+      Scroll::new(0.0, 400.0),
+      ScrollOptions {
+        policy: InputPolicy::BackgroundOnly,
+        ..Default::default()
+      },
+    )
+    .unwrap();
+  assert_eq!(background.focus_disturbance, DisturbanceLevel::None);
+  assert_eq!(foreground(), "local.auv.ScrollCover");
+}
