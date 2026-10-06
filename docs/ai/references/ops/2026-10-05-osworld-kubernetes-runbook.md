@@ -528,7 +528,7 @@ scope and hashes. VLC and V2.1 are not supported by this bridge.
 
 ## 10. What remains manual
 
-### Experimental single-episode phase adapter (live boot checked; no batch score)
+### Experimental single-episode phase adapter (one completed capture control)
 
 `evals/osworld/k8s_phase_adapter.py` now builds a six-phase manifest for
 `batch_runner.py` around the pinned V1 Chrome bookmark-folder task. Its fixed
@@ -548,8 +548,10 @@ The fifth live gate passed that path, pairing, and setup, then exposed a
 host-side selector bug: it passed the canonical ID to `--device` (name
 selector). The evaluator returned `0.0` without an AUV Run or screenshot;
 this is not a completed capture control. The adapter now uses `--device-id`,
-which still needs live verification. Do not use these gates to claim a
-benchmark score.
+and the sixth fresh episode completed all six phases. Its AUV Run and PNG
+were verified, and the pinned evaluator returned the expected raw `0.0`.
+This is a capture-only infrastructure negative control, not an agent task
+attempt or representative benchmark completion rate; see the evidence note.
 
 The operator supplies a JSON configuration with exactly these fields:
 `batch_id`, `episode_id`, `namespace`, `kubeconfig`, `context`, `node`, `runtime_pod`,

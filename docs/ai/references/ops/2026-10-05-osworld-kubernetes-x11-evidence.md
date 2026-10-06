@@ -918,6 +918,24 @@ resources were independently absent, the pairing profile was removed, and
 the hot PVC/PV retained their original UIDs and Bound status. A test-first
 adapter fix now uses `--device-id`; that change has not been rechecked live.
 
+A sixth independent episode, `osw-v1-neg-1006f`, completed at
+03:14:23–03:17:25 UTC on the corrected adapter. The fixed denominator was
+one; boot, install, setup, paired-AUV capture, pinned evaluator, and UID-safe
+reset all finished `ok`, with no failure layers. AUV Run
+`2b84ead3-e774-bb9d-fb7a-33dbb3ec27aa` produced a 1920×1080 Chrome
+new-tab [PNG](/private/tmp/auv-osworld-v1-negative-live6.xaK2a5/run/chrome-capture-only-f/final-screenshot.png)
+with independently verified SHA256
+`c1489b4d7f7311c07554954ffd7e1fcc301486b631f373a07e4e1e64428b31cd`.
+The exact pinned evaluator returned raw `0.0`, as expected when the only AUV
+action is a screenshot and no task-solving GUI input is sent. The
+[completed ledger](/private/tmp/auv-osworld-v1-negative-live6.xaK2a5/run/ledger.json)
+records verified AUV evidence, the raw score, all phase times, and cleanup.
+After reset, the three task-owned resources were independently absent, the
+pairing profile was removed, and the V1 hot PVC/PV retained their original
+UIDs and Bound status. This validates one capture-only infrastructure path,
+not an agent attempt, task completion rate, V2.1 batch, or full upstream
+provider integration.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

@@ -310,8 +310,14 @@ canonical ID to CLI `--device`, whose contract is name selection. The
 unchanged desktop's evaluator-only score was `0.0`; no AUV Run or artifact
 exists, so this is not a valid capture negative control. Reset again removed
 the task-owned resources and preserved the hot PVC/PV. A test-first change
-switches the adapter to `--device-id`; the six-phase path remains unverified
-live.
+switched the adapter to `--device-id`; the six-phase path was not yet
+verified live at that point.
+
+The sixth fresh episode completed the full six-phase path with verified AUV
+Run/PNG evidence and raw pinned Chrome evaluator score `0.0`. This closes the
+single-task capture-only infrastructure gate. It does not test agent GUI
+actions, task-solving performance, a multi-task predeclared batch, V2.1, or
+the full upstream provider. Those remain separate next slices.
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
