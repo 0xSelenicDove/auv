@@ -442,9 +442,12 @@ substitute shell checks.
 
 ## 8. Reset between tasks
 
-The source qcow2 is mounted read-only. qemu-docker keeps the writable guest
-state in the runtime Pod, so deleting and recreating the runtime Pod creates a
-fresh episode while preserving the hot base image:
+The source qcow2 is mounted read-only. The pinned qemu-docker image creates
+`/boot.qcow2` as a qcow2 backing-file overlay of `/System.qcow2` on the
+runtime container's writable root layer, and QEMU boots with
+`-hda /boot.qcow2`. It does **not** use QEMU `-snapshot`. Deleting and
+recreating the runtime Pod discards that container layer and creates a fresh
+episode while preserving the hot base image:
 
 ```bash
 kubectl -n "$OSWORLD_NAMESPACE" delete pod "$OSWORLD_PROXY" "$OSWORLD_POD"
@@ -532,7 +535,9 @@ scope and hashes. VLC and V2.1 are not supported by this bridge.
 action is **one paired-AUV `display.capture` negative control**. It sends no
 GUI input and does not measure agent ability or an AUV task-solving attempt;
 the expected evaluator value is `0.0`. This adapter has local boundary tests,
-but has **not** booted a cluster guest or produced a live score. Do not use it
+but its first live V1 negative-control run stopped during boot because the old
+overlay check incorrectly required QEMU `-snapshot`. No live score resulted.
+The revised backing-file check has not yet passed a live boot. Do not use it
 to claim an official benchmark run.
 
 The operator supplies a JSON configuration with exactly these fields:
@@ -541,10 +546,12 @@ The operator supplies a JSON configuration with exactly these fields:
 `base_qcow_sha256`, `guest_auv_binary`, `host_auv_binary`,
 `upstream_checkout`, `setup_local_port`, and `auv_local_port`. The three
 resource names must be distinct and task-owned; `proxy_image` must be an
-audited digest-pinned image containing `/bin/sh` and `socat`. The V1 hot qcow2
-SHA256 has **not** been measured in the retained evidence, so
-`base_qcow_sha256` must come from a fresh read of the mounted file. No
-placeholder hash or image is supplied. The binary paths must contain the
+audited digest-pinned image containing `/bin/sh` and `socat`. A read-only,
+task-owned hash Pod measured the retained V1 hot `System.qcow2` at
+24,460,197,888 bytes and SHA256
+`6bf667a852b3c307f61d9f09c42559351f45e0607e428b4997becf534cf4d313`;
+boot still recomputes and compares the mounted file's hash. No placeholder
+hash or image is supplied. The binary paths must contain the
 specific validated guest and paired-Mac artifacts pinned in the adapter;
 this is not a current-PR-head build. Configuration or manifest generation
 fails when any of those checks is absent. The adapter also requires the
@@ -560,9 +567,14 @@ PYTHONDONTWRITEBYTECODE=1 python3 evals/osworld/batch_runner.py --manifest /abso
 
 Boot records the fresh runtime/proxy Pod UIDs, container IDs, restart counts,
 actual image digests, Service UID, and retained PVC/PV identities. It checks
-the read-only base mount, exact base hash, and a live QEMU command containing
-`-enable-kvm` and `-snapshot`; if the pinned runtime uses a different overlay
-mechanism, the adapter will stop rather than infer freshness. Its Pod probes
+read-only flags on both the PVC volume source and container mount, exact base
+hash, and a live QEMU
+command containing `-enable-kvm` and `-hda /boot.qcow2`. It verifies the
+running qcow2 overlay's `/System.qcow2` backing path and format, that the
+overlay is on the container's writable root rather than a Pod volume, that
+QEMU has the overlay open, and that the runtime Pod/container identity did
+not change during the audit. If those live checks fail, the adapter stops
+rather than infer freshness. Its Pod probes
 check TCP availability, then the adapter requires four successful non-GUI
 `/terminal` responses across at least 15 seconds. It does not use the
 OSWorld `/screenshot` endpoint to observe pixels. Every later

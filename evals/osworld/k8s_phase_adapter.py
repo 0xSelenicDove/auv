@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -176,22 +177,62 @@ class Episode:
                 "restart_count": status["restartCount"], "image_id": status["imageID"]}
 
     def _overlay(self) -> dict:
+        runtime_identity = self._pod_snapshot(self.config["runtime_pod"], "qemu", RUNTIME_IMAGE)
         runtime = self.get("pod", self.config["runtime_pod"])
         container = next(item for item in runtime["spec"]["containers"] if item["name"] == "qemu")
         image_mount = next(item for item in container["volumeMounts"] if item["name"] == "image")
         image_volume = next(item for item in runtime["spec"]["volumes"] if item["name"] == "image")
         if image_mount != {"name": "image", "mountPath": "/System.qcow2", "subPath": "System.qcow2", "readOnly": True}:
             raise ValueError("base qcow2 is not mounted read-only at the audited path")
-        if image_volume["persistentVolumeClaim"] != {"claimName": self.config["base_pvc"]}:
-            raise ValueError("base qcow2 PVC mismatch")
-        processes = self.kubectl("exec", self.config["runtime_pod"], "-c", "qemu", "--", "ps", "-eo", "args")
-        qemu = [line for line in processes.splitlines() if "qemu-system" in line and "-enable-kvm" in line]
-        if len(qemu) != 1 or "-snapshot" not in qemu[0] or "/System.qcow2" not in qemu[0]:
-            raise ValueError("live QEMU command does not prove KVM and a disposable -snapshot overlay")
-        guest_hash = self.kubectl("exec", self.config["runtime_pod"], "-c", "qemu", "--", "sha256sum", "/System.qcow2").split()[0]
+        if image_volume["persistentVolumeClaim"] != {"claimName": self.config["base_pvc"], "readOnly": True}:
+            raise ValueError("base qcow2 PVC source is not read-only or has changed")
+        if any(Path("/boot.qcow2").is_relative_to(Path(item["mountPath"]))
+               for item in container["volumeMounts"]):
+            raise ValueError("boot overlay path is covered by a Pod volume mount")
+
+        exec_args = ("exec", self.config["runtime_pod"], "-c", "qemu", "--")
+        processes = self.kubectl(*exec_args, "ps", "-eo", "pid=,args=")
+        qemu = []
+        for line in processes.splitlines():
+            fields = line.strip().split(maxsplit=1)
+            if len(fields) != 2 or not fields[0].isdigit():
+                continue
+            argv = shlex.split(fields[1])
+            if argv and Path(argv[0]).name == "qemu-system-x86_64":
+                qemu.append((fields[0], fields[1], argv))
+        if len(qemu) != 1:
+            raise ValueError("expected one live QEMU process in the pinned runtime container")
+        pid, command, argv = qemu[0]
+        if "-enable-kvm" not in argv or argv.count("-hda") != 1 or argv[argv.index("-hda") + 1:argv.index("-hda") + 2] != ["/boot.qcow2"]:
+            raise ValueError("live QEMU does not use KVM and the audited /boot.qcow2 overlay")
+
+        # NOTICE: The pinned qemu-docker image creates this qcow2 backing-file
+        # overlay in /run/install.sh; it does not use QEMU's -snapshot flag.
+        # Recheck live metadata because an image script alone cannot prove which
+        # file this exact process opened.
+        info = json.loads(self.kubectl(*exec_args, "qemu-img", "info", "-U", "--output=json", "/boot.qcow2"))
+        if (info.get("filename"), info.get("format"), info.get("backing-filename"),
+            info.get("full-backing-filename"), info.get("backing-filename-format")) != (
+                "/boot.qcow2", "qcow2", "/System.qcow2", "/System.qcow2", "qcow2"):
+            raise ValueError("live boot qcow2 does not have the pinned base as its backing file")
+        mount = json.loads(self.kubectl(*exec_args, "findmnt", "-T", "/boot.qcow2", "-J", "-o", "TARGET,FSTYPE,SOURCE"))
+        filesystems = mount.get("filesystems", [])
+        if len(filesystems) != 1 or filesystems[0].get("target") != "/" or filesystems[0].get("fstype") != "overlay":
+            raise ValueError("boot qcow2 is not on the container writable root layer")
+        fd_targets = self.kubectl(*exec_args, "/bin/sh", "-ec",
+                                  'for fd in /proc/"$1"/fd/*; do readlink "$fd" || :; done',
+                                  "sh", pid).splitlines()
+        if "/boot.qcow2" not in fd_targets:
+            raise ValueError("live QEMU process has not opened the audited boot overlay")
+        guest_hash = self.kubectl(*exec_args, "sha256sum", "/System.qcow2").split()[0]
         if guest_hash != self.config["base_qcow_sha256"]:
             raise ValueError("mounted V1 base qcow2 SHA256 mismatch")
-        return {"qemu_argv": qemu[0], "base_qcow_sha256": guest_hash, "overlay": "QEMU -snapshot on read-only base"}
+        if self._pod_snapshot(self.config["runtime_pod"], "qemu", RUNTIME_IMAGE) != runtime_identity:
+            raise ValueError("runtime Pod UID/container identity changed during overlay audit")
+        return {"qemu_pid": int(pid), "qemu_argv": command, "base_qcow_sha256": guest_hash,
+                "backing_file": "/System.qcow2", "boot_file": "/boot.qcow2",
+                "boot_filesystem": filesystems[0], "runtime": runtime_identity,
+                "overlay": "qcow2 backing-file on container writable root"}
 
     def assert_identity(self) -> dict:
         identity = json.loads(self.identity_path.read_text())
@@ -383,7 +424,7 @@ class Episode:
                                                            "failureThreshold": 3},
                                         "volumeMounts": [{"name": "image", "mountPath": "/System.qcow2", "subPath": "System.qcow2", "readOnly": True},
                                                          {"name": "kvm", "mountPath": "/dev/kvm"}]}],
-                        "volumes": [{"name": "image", "persistentVolumeClaim": {"claimName": c["base_pvc"]}},
+                        "volumes": [{"name": "image", "persistentVolumeClaim": {"claimName": c["base_pvc"], "readOnly": True}},
                                     {"name": "kvm", "hostPath": {"path": "/dev/kvm", "type": "CharDevice"}}]}}
         service = {"apiVersion": "v1", "kind": "Service", "metadata": {"name": c["runtime_service"], "labels": labels},
                    "spec": {"selector": self._labels("qemu"), "ports": [{"name": "setup", "port": 5000, "targetPort": 5000},
@@ -403,6 +444,8 @@ class Episode:
         proxy_id = self._pod_snapshot(c["proxy_pod"], "proxy", c["proxy_image"])
         service_uid = self.get("service", c["runtime_service"])["metadata"]["uid"]
         overlay = self._overlay()
+        if overlay["runtime"] != runtime:
+            raise ValueError("runtime Pod UID/container identity changed before overlay audit")
         write_json(self.identity_path, {"runtime": runtime, "proxy": proxy_id, "service_uid": service_uid,
                                         "overlay": overlay, "retained_pvc": retained})
         self._stable_guest_control()

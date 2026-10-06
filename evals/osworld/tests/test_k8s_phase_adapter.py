@@ -18,6 +18,24 @@ adapter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(adapter)
 
 
+# Frozen from the 2026-10-06 V1 live boot that the old -snapshot assertion rejected.
+LIVE_V1_QEMU_ARGV = (
+    "qemu-system-x86_64 -cpu host,kvm=on,l3-cache=on,+hypervisor,migratable=no,+invtsc "
+    "-smp 4,sockets=1,dies=1,cores=4,threads=1 -m 8G "
+    "-machine type=q35,smm=off,graphics=off,vmport=off,dump-guest-core=off,hpet=off,accel=kvm "
+    "-enable-kvm -global kvm-pit.lost_tick_policy=discard -display vnc=:0,websocket=5700 "
+    "-vga virtio -monitor telnet:localhost:7100,server,nowait,nodelay "
+    "-name qemu,process=qemu,debug-threads=on -serial mon:stdio "
+    "-device qemu-xhci,id=xhci -device usb-tablet "
+    "-netdev tap,id=hostnet0,ifname=qemu,vhost=on,vhostfd=40,script=no,downscript=no "
+    "-device virtio-net-pci,romfile=,netdev=hostnet0,mac=02:E4:1B:C3:6B:DF,id=net0 "
+    "-hda /boot.qcow2 -pflash /storage/uefi.rom "
+    "-object rng-random,id=objrng0,filename=/dev/urandom "
+    "-device virtio-rng-pci,rng=objrng0,id=rng0,bus=pcie.0,addr=0x1c "
+    "-device virtio-balloon-pci,id=balloon0,bus=pcie.0,addr=0x4"
+)
+
+
 def config() -> dict:
     return {
         "batch_id": "control-1", "episode_id": "chrome-1", "namespace": "bench",
@@ -105,7 +123,7 @@ class AdapterTest(unittest.TestCase):
              patch.object(self.episode, "kubectl"), \
              patch.object(self.episode, "_pod_snapshot", side_effect=[{"uid": "vm"}, {"uid": "proxy"}]), \
              patch.object(self.episode, "get", return_value={"metadata": {"uid": "svc"}}), \
-             patch.object(self.episode, "_overlay", return_value={"overlay": "snapshot"}), \
+             patch.object(self.episode, "_overlay", return_value={"overlay": "qcow2 backing-file", "runtime": {"uid": "vm"}}), \
              patch.object(self.episode, "_stable_guest_control"), \
              patch.object(self.episode, "assert_identity"), \
              patch.object(adapter.time, "sleep"):
@@ -114,6 +132,8 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(service["spec"]["selector"], pod["metadata"]["labels"])
         self.assertNotEqual(service["spec"]["selector"], proxy["metadata"]["labels"])
         self.assertEqual(pod["spec"]["containers"][0]["startupProbe"]["tcpSocket"], {"port": 5000})
+        self.assertEqual(pod["spec"]["volumes"][0]["persistentVolumeClaim"],
+                         {"claimName": "osworld-v1-hot", "readOnly": True})
         self.assertNotIn("/screenshot", json.dumps(created))
         self.assertEqual(json.loads(self.episode.identity_path.read_text())["runtime"]["uid"], "vm")
 
@@ -129,21 +149,93 @@ class AdapterTest(unittest.TestCase):
         self.assertTrue(all(call.args[0].endswith("/terminal") for call in urlopen.call_args_list))
         self.assertEqual(sleep.call_count, 3)
 
-    def test_overlay_requires_snapshot_readonly_base_and_hash(self):
+    def test_overlay_rejects_unprotected_base_and_persistent_boot_path_before_exec(self):
         pod = {"spec": {"containers": [{"name": "qemu", "volumeMounts": [
             {"name": "image", "mountPath": "/System.qcow2", "subPath": "System.qcow2", "readOnly": True}]}],
-            "volumes": [{"name": "image", "persistentVolumeClaim": {"claimName": "osworld-v1-hot"}}]}}
-        with patch.object(self.episode, "get", return_value=pod), patch.object(self.episode, "kubectl", side_effect=[
-            "qemu-system-x86_64 -enable-kvm -drive file=/System.qcow2 -snapshot\n", "b" * 64 + "  /System.qcow2\n"]):
-            evidence = self.episode._overlay()
-        self.assertEqual(evidence["base_qcow_sha256"], "b" * 64)
+            "volumes": [{"name": "image", "persistentVolumeClaim": {"claimName": "osworld-v1-hot", "readOnly": True}}]}}
         pod["spec"]["containers"][0]["volumeMounts"][0]["readOnly"] = False
-        with patch.object(self.episode, "get", return_value=pod):
+        with patch.object(self.episode, "_pod_snapshot", return_value={"uid": "vm"}), \
+             patch.object(self.episode, "get", return_value=pod), \
+             patch.object(self.episode, "kubectl") as kubectl:
             with self.assertRaisesRegex(ValueError, "read-only"):
                 self.episode._overlay()
+            kubectl.assert_not_called()
         pod["spec"]["containers"][0]["volumeMounts"][0]["readOnly"] = True
-        with patch.object(self.episode, "get", return_value=pod), patch.object(self.episode, "kubectl", return_value="qemu-system-x86_64 -enable-kvm -drive file=/System.qcow2"):
-            with self.assertRaisesRegex(ValueError, "-snapshot"):
+        pod["spec"]["volumes"][0]["persistentVolumeClaim"]["readOnly"] = False
+        with patch.object(self.episode, "_pod_snapshot", return_value={"uid": "vm"}), \
+             patch.object(self.episode, "get", return_value=pod), \
+             patch.object(self.episode, "kubectl") as kubectl:
+            with self.assertRaisesRegex(ValueError, "PVC source is not read-only"):
+                self.episode._overlay()
+            kubectl.assert_not_called()
+        pod["spec"]["volumes"][0]["persistentVolumeClaim"]["readOnly"] = True
+        pod["spec"]["containers"][0]["volumeMounts"].append({"name": "other", "mountPath": "/boot.qcow2"})
+        with patch.object(self.episode, "_pod_snapshot", return_value={"uid": "vm"}), \
+             patch.object(self.episode, "get", return_value=pod), \
+             patch.object(self.episode, "kubectl") as kubectl:
+            with self.assertRaisesRegex(ValueError, "covered by a Pod volume mount"):
+                self.episode._overlay()
+            kubectl.assert_not_called()
+
+    def test_live_v1_boot_accepts_verified_disposable_backing_file_overlay(self):
+        # ROOT CAUSE:
+        # The pinned runtime creates /boot.qcow2 with /System.qcow2 as its
+        # backing file. The old assertion required QEMU -snapshot and rejected
+        # the real fresh overlay before the episode could install AUV.
+        pod = {
+            "metadata": {"uid": "runtime-uid", "labels": self.episode._labels("qemu")},
+            "spec": {"nodeName": "liet-gpu-1", "containers": [{
+                "name": "qemu", "image": adapter.RUNTIME_IMAGE,
+                "volumeMounts": [{"name": "image", "mountPath": "/System.qcow2",
+                                  "subPath": "System.qcow2", "readOnly": True}],
+            }], "volumes": [{"name": "image", "persistentVolumeClaim": {
+                "claimName": "osworld-v1-hot", "readOnly": True}}]},
+            "status": {"containerStatuses": [{"name": "qemu", "ready": True,
+                "restartCount": 0, "containerID": "containerd://live-container",
+                "imageID": "docker.io/" + adapter.RUNTIME_IMAGE}]},
+        }
+        overrides = {}
+
+        def observed_command(*args, **_kwargs):
+            if "qemu-img" in args and "qemu-img" in overrides:
+                return overrides["qemu-img"]
+            if "/bin/sh" in args and "/bin/sh" in overrides:
+                return overrides["/bin/sh"]
+            if "ps" in args:
+                return "42 " + LIVE_V1_QEMU_ARGV + "\n"
+            if "qemu-img" in args:
+                return json.dumps({"filename": "/boot.qcow2", "format": "qcow2",
+                                   "backing-filename": "/System.qcow2",
+                                   "full-backing-filename": "/System.qcow2",
+                                   "backing-filename-format": "qcow2"})
+            if "findmnt" in args:
+                return json.dumps({"filesystems": [{"target": "/", "fstype": "overlay", "source": "overlay"}]})
+            if "sha256sum" in args:
+                return "b" * 64 + "  /System.qcow2\n"
+            if "/bin/sh" in args:
+                return "/boot.qcow2\n/System.qcow2\n"
+            self.fail(f"unexpected cluster command: {args}")
+
+        with patch.object(self.episode, "get", return_value=pod), \
+             patch.object(self.episode, "kubectl", side_effect=observed_command):
+            evidence = self.episode._overlay()
+        self.assertEqual(evidence["base_qcow_sha256"], "b" * 64)
+        self.assertEqual(evidence["backing_file"], "/System.qcow2")
+        self.assertEqual(evidence["boot_file"], "/boot.qcow2")
+        self.assertEqual(evidence["runtime"]["uid"], "runtime-uid")
+
+        overrides["qemu-img"] = json.dumps({"filename": "/boot.qcow2", "format": "qcow2",
+            "backing-filename": "/different.qcow2", "full-backing-filename": "/different.qcow2",
+            "backing-filename-format": "qcow2"})
+        with patch.object(self.episode, "get", return_value=pod), \
+             patch.object(self.episode, "kubectl", side_effect=observed_command):
+            with self.assertRaisesRegex(ValueError, "backing file"):
+                self.episode._overlay()
+        del overrides["qemu-img"]
+        overrides["/bin/sh"] = "/System.qcow2\n"
+        with patch.object(self.episode, "get", return_value=pod), \
+             patch.object(self.episode, "kubectl", side_effect=observed_command):
+            with self.assertRaisesRegex(ValueError, "has not opened"):
                 self.episode._overlay()
 
     def test_identity_fails_if_container_restarted_under_same_pod_uid(self):
