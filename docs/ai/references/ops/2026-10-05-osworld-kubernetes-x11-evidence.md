@@ -936,6 +936,28 @@ UIDs and Bound status. This validates one capture-only infrastructure path,
 not an agent attempt, task completion rate, V2.1 batch, or full upstream
 provider integration.
 
+### Pinned VLC capture-only Kubernetes control
+
+An independent V1 VLC `play-and-exit` episode, `osw-v1-vlc-neg-1006g`, ran
+at 03:53:02–03:56:02 UTC. It selected task
+`5ac2891a-eacd-4954-b339-98abba077adb` and its pinned JSON SHA256
+`4e038a7bb4c3770186209d68402e678ff723238cb31684fe452f0b0c6f4665da`.
+On a fresh verified overlay, all six phases passed: boot, installed/paired
+AUV, pinned VLC setup (including guest `play-and-exit=1` postcondition),
+paired-AUV capture, the original pinned method-body evaluator, and UID-safe
+reset. The [ledger](/private/tmp/auv-osworld-v1-vlc-negative-live1.SXC05i/run/ledger.json)
+records fixed denominator one, no failure layers, and verified AUV Run
+`cf47a4bb-4d8f-99d2-080c-af809a0fef04`. Its [PNG](/private/tmp/auv-osworld-v1-vlc-negative-live1.SXC05i/run/vlc-capture-only-g/final-screenshot.png)
+shows the 1920×1080 Ubuntu desktop with the VLC main window; independently
+measured SHA256 is
+`8caf7e9a402e266167beb8ffc6e525ee471d98e00f9cad376330da96dd71ac95`.
+The raw evaluator score was `0.0`, expected because no task-solving GUI input
+was sent. After reset, the three task-owned resources were independently
+absent, the pairing profile and local forwards were gone, and the V1 hot
+PVC/PV retained their original UIDs and Bound state. This is one
+capture-only infrastructure control, not a scripted AUV solution, a blinded
+agent attempt, or a two-task completion rate.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve

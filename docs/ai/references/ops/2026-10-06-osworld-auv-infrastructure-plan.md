@@ -348,9 +348,11 @@ the guest config file's opposite initial value before scoring. Boundary tests
 reject unreviewed guest commands, misleading HTTP 200 responses, wrong file
 paths, and changed upstream/task bytes. The K8s phase adapter now accepts
 either fixed task while keeping its action capture-only and UID-safe cleanup
-unchanged. The pinned Python suite passed locally; no new VLC live guest or
-evaluator score has been produced by this slice. The VLC live no-action gate
-remains a prerequisite for the two-task batch.
+unchanged. The pinned Python suite passed locally. A fresh VLC guest then
+completed the six-phase capture-only control with verified Run/PNG and raw
+evaluator `0.0`; setup checked the guest's opposite initial config value.
+This closes the VLC negative gate but does not substitute for the two-task
+AUV-action batch or an agent attempt.
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires

@@ -553,6 +553,9 @@ and the sixth fresh episode completed all six phases. Its AUV Run and PNG
 were verified, and the pinned evaluator returned the expected raw `0.0`.
 This is a capture-only infrastructure negative control, not an agent task
 attempt or representative benchmark completion rate; see the evidence note.
+The separately named VLC control later completed the same six-phase path
+with its fixed task, a verified AUV capture of the VLC window, raw evaluator
+`0.0`, and UID-safe reset. Neither episode delivered task-solving GUI input.
 
 The operator supplies a JSON configuration with exactly these fields:
 `batch_id`, `episode_id`, `namespace`, `kubeconfig`, `context`, `node`, `runtime_pod`,
@@ -560,8 +563,8 @@ The operator supplies a JSON configuration with exactly these fields:
 `base_qcow_sha256`, `guest_auv_binary`, `host_auv_binary`,
 `upstream_checkout`, `setup_local_port`, and `auv_local_port`, with an optional
 `task_id`. Omitting `task_id` selects the already live-checked Chrome task;
-the only other accepted ID is the pinned VLC `play-and-exit` task, which is
-locally tested but has **not** passed a live control. The three
+the only other accepted ID is the pinned VLC `play-and-exit` task. Both have
+now passed separate capture-only live controls. The three
 resource names must be distinct and task-owned; `proxy_image` must be an
 audited digest-pinned image containing `/bin/sh` and `socat`. A read-only,
 task-owned hash Pod measured the retained V1 hot `System.qcow2` at
