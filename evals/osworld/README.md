@@ -92,11 +92,25 @@ runs, even after an earlier failure, and must end stdout with JSON arrays
 `removed_resources` and `retained_pvcs_verified`. Cleanup failure is appended
 as a separate layer without replacing the original failure.
 
-Only the local process/ledger behavior is tested today:
+Local process, phase-adapter, and pinned evaluator boundary tests run with:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals/osworld/tests -p 'test_batch_runner.py' -v
+OSWORLD_V1_CHECKOUT=/path/to/clean/pinned/OSWorld PYTHONDONTWRITEBYTECODE=1 \
+  python3 -m unittest discover -s evals/osworld/tests -p 'test_*.py' -v
 ```
+
+One operator-audited Kubernetes episode has also completed all six phases
+on a fresh V1 overlay. Its fixed action was a paired-AUV `display.capture`
+only, followed by the pinned Chrome evaluator's expected raw `0.0`. The
+evidence [record](../../docs/ai/references/ops/2026-10-05-osworld-kubernetes-x11-evidence.md)
+links its ledger with the AUV Run ID, verified PNG digest, and UID-safe reset. This is a
+single-task infrastructure negative control, not a task-solving attempt or
+multi-task batch. The configured guest AUV binary is tied to a pinned older
+source commit; do not treat this as a current-PR-head guest binary test.
+
+The evaluator bridge also has a locally tested allowlist for the pinned V1
+VLC `play-and-exit` task. It has not yet passed a fresh live guest control;
+the completed Kubernetes episode above remains Chrome-only.
 
 The repository [infrastructure plan](../../docs/ai/references/ops/2026-10-06-osworld-auv-infrastructure-plan.md)
 and [Kubernetes runbook](../../docs/ai/references/ops/2026-10-05-osworld-kubernetes-runbook.md)

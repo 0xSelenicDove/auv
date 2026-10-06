@@ -18,9 +18,10 @@ install AUV, and retrieve results; they must not deliver GUI actions. Do not
 use CUA/CUA REPL, VNC input, PyAutoGUI, `xdotool`, or OSWorld `/execute` for GUI
 input.
 
-The current [evidence](2026-10-05-osworld-kubernetes-x11-evidence.md) proves
-one evaluated GIMP task on both official images, plus separate action-level
-baselines. It does not prove an OSWorld completion rate. The
+The current [evidence](2026-10-05-osworld-kubernetes-x11-evidence.md) includes
+an evaluated GIMP task on both official images, separate action-level baselines,
+and one completed V1 capture-only Kubernetes episode. It does not prove an
+OSWorld completion rate. The
 [runbook](2026-10-05-osworld-kubernetes-runbook.md) records the existing KVM Pod
 and guest installation route.
 
@@ -207,7 +208,7 @@ V2.1 2.71 s). Exact test executable, binary, and result hashes are in the
 evidence note. This closes the guest-local adapter-delivery gate, not a full
 paired-remote episode or a task-evaluator gate.
 
-### 4. Batch scheduler and evaluator pilot — local durable runner implemented; Kubernetes adapter pending
+### 4. Batch scheduler and evaluator pilot — one live capture control passed; multi-task action batch pending
 
 Only after action gates pass, run a small, reproducible official-task batch on
 fresh overlays. Each episode needs a known image revision, task assets and
@@ -318,6 +319,36 @@ Run/PNG evidence and raw pinned Chrome evaluator score `0.0`. This closes the
 single-task capture-only infrastructure gate. It does not test agent GUI
 actions, task-solving performance, a multi-task predeclared batch, V2.1, or
 the full upstream provider. Those remain separate next slices.
+
+Next bounded work, in order:
+
+1. Add the pinned V1 VLC `5ac2891a-eacd-4954-b339-98abba077adb`
+   setup/getter/metric method chain to the benchmark-local evaluator bridge.
+   Assert its no-action score, initial `play-and-exit` state, and that this
+   fixed upstream path sends no GUI input through PyAutoGUI. Keep the bridge
+   explicitly limited to the reviewed Chrome and VLC tasks.
+2. Give the action phase a foreground, benchmark-local client of the existing
+   typed `ActionExecutor` and one persistent AUV Runner. Predeclare structured
+   actions and terminal policy; record every AUV result, a final screenshot,
+   and all Run IDs. Test independent native event receipt and cleanup on
+   failure, interrupt, and deadline. This is scripted automation evidence,
+   not a blinded agent claim.
+3. Predeclare exactly two independent episodes (Chrome and VLC), each with a
+   fresh verified overlay, pinned task/assets, separate 10-minute action
+   budget, evaluator, and UID-safe reset. First prove the VLC no-action
+   evaluator on a fresh guest; then run the fixed two-task AUV-action batch
+   without changing its denominator or scripts after seeing an outcome.
+   Report phase failures separately from raw scores and preserve the final
+   image/PVC identities. Only after that gate should an agent policy be
+   frozen and evaluated as a distinct trial.
+
+The first of these slices now has a local pinned-source implementation:
+`v1_evaluator.py` allows the reviewed VLC setup/getter/metric chain and checks
+the guest config file's opposite initial value before scoring. Boundary tests
+reject unreviewed guest commands, misleading HTTP 200 responses, wrong file
+paths, and changed upstream/task bytes. The 49-test Python suite passed. No
+new VLC live guest or evaluator score has been produced by this slice; its
+live no-action gate remains the prerequisite for the two-task batch.
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires

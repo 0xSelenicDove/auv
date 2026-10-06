@@ -1,4 +1,4 @@
-"""Evaluator-only OSWorld V1 boundary for one audited Chrome pilot task.
+"""Evaluator-only OSWorld V1 boundary for audited Chrome and VLC pilot tasks.
 
 The external Kubernetes guest is already running. This module never calls
 DesktopEnv.step(), starts a provider, or delivers GUI input. Run `prepare`,
@@ -15,6 +15,7 @@ import logging
 import math
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import time
@@ -24,13 +25,19 @@ from urllib.parse import urlsplit
 
 
 UPSTREAM_REV = "b138d348256078fa634fc3b73567a7337c793e6b"
+VLC_TASK = "5ac2891a-eacd-4954-b339-98abba077adb"
+# NOTICE: The pinned V1 Ubuntu guest runs as /home/user (see the OSWorld
+# Kubernetes runbook). Revisit this path if the selected guest image changes.
+VLC_CONFIG_PATH = "/home/user/.config/vlc/vlcrc"
 TASKS = {
     "2ad9387a-65d8-4e33-ad5b-7580065a27ca": (
         "chrome", "4ddb526e5f3b9efa72a01e3ccae86ee4d698f480e4a526f9dfde85fd9499559c"
     ),
-    # TODO: VLC is intentionally omitted: its setup/getter/metric methods are
-    # not in this Chrome-only slice. Add it after a reviewed pinned method chain
-    # and a live negative control both pass.
+    VLC_TASK: (
+        "vlc", "4e038a7bb4c3770186209d68402e678ff723238cb31684fe452f0b0c6f4665da"
+    ),
+    # TODO: Other V1 task chains remain unreviewed. Add each only after its
+    # pinned setup/getter/metric path and a live negative control are audited.
 }
 
 
@@ -57,7 +64,7 @@ def _pinned_members(source: Path, class_name: str | None, names: tuple[str, ...]
     """Compile only reviewed original V1 definitions, avoiding unrelated imports.
 
     NOTICE: V1's module imports every provider and evaluator dependency, including
-    unrelated heavy packages. This exploratory Chrome-only boundary executes the
+    unrelated heavy packages. This exploratory task allowlist executes the
     selected pinned method bodies, not the complete upstream module or provider.
     """
     tree = ast.parse(source.read_text())
@@ -74,16 +81,88 @@ def _pinned_members(source: Path, class_name: str | None, names: tuple[str, ...]
     return namespace[class_name] if class_name else namespace
 
 
-def _pinned_runtime(upstream: Path):
-    """Assemble only the audited Chrome evaluator methods from V1 source."""
+def _pinned_runtime(upstream: Path, task: dict):
+    """Assemble only the audited task evaluator methods from V1 source."""
     # Every selected definition is from the clean checkout verified by load_task.
     # The fixed globals mirror the pinned modules' imports/constants used here.
     import requests
 
+    if task["id"] == VLC_TASK:
+        # NOTICE: Upstream _execute_setup accepts HTTP 200 without checking
+        # the guest command's returncode. The pinned VLC setup writes the
+        # baseline answer through that endpoint; reject false success here.
+        # The same guard constrains getter-side /execute to read-only queries.
+        source_post = requests.post
+        source_get = requests.get
+
+        def audited_get(url, **kwargs):
+            if not url.endswith("/terminal"):
+                raise ValueError("VLC evaluator attempted an unreviewed guest endpoint")
+            try:
+                response = source_get(url, **kwargs)
+            except Exception:
+                raise RuntimeError("VLC guest control request failed") from None
+            if response.status_code != 200:
+                raise RuntimeError("VLC guest control endpoint is not ready")
+            return response
+
+        # ns receives the exact pinned prefix below before either request
+        # function can be called by a constructed controller.
+        def audited_post(url, **kwargs):
+            if url.endswith("/setup/launch"):
+                if json.loads(kwargs["data"]) != task["config"][0]["parameters"]:
+                    raise ValueError("VLC launch differs from pinned task setup")
+            elif url.endswith("/setup/execute"):
+                if json.loads(kwargs["data"]) != {**task["config"][1]["parameters"], "shell": False}:
+                    raise ValueError("VLC setup command differs from pinned task setup")
+            elif url.endswith("/execute"):
+                command = json.loads(kwargs["data"])["command"]
+                allowed = [
+                    ["python", "-c", ns["PYAUTOGUI_PKGS_PREFIX"].format(command=query)] for query in (
+                        "import platform; print(platform.system())",
+                        "import os; print(os.path.expanduser('~/.config/vlc/vlcrc'))",
+                    )
+                ]
+                if command not in allowed:
+                    raise ValueError("VLC evaluator attempted an unreviewed guest command")
+            elif url.endswith("/file"):
+                if kwargs.get("data") != {"file_path": VLC_CONFIG_PATH}:
+                    raise ValueError("unexpected VLC config path")
+            else:
+                raise ValueError("VLC evaluator attempted an unreviewed guest endpoint")
+            try:
+                response = source_post(url, **kwargs)
+            except Exception:
+                raise RuntimeError("VLC guest request failed") from None
+            if url.endswith("/setup/launch"):
+                expected = f"{task['config'][0]['parameters']['command']} launched successfully"
+                if response.status_code != 200 or response.text != expected:
+                    raise RuntimeError("VLC launch was not confirmed by the pinned setup endpoint")
+            elif url.endswith(("/setup/execute", "/execute")):
+                try:
+                    result = response.json() if response.status_code == 200 else None
+                except Exception:
+                    raise RuntimeError("VLC guest command returned invalid JSON") from None
+                if not isinstance(result, dict) or set(result) != {"status", "output", "error", "returncode"} \
+                        or result.get("returncode") != 0 or isinstance(result.get("returncode"), bool) \
+                        or not isinstance(result.get("output"), str) or not isinstance(result.get("error"), str) \
+                        or result.get("status") != "success":
+                    raise RuntimeError("VLC guest command did not complete successfully")
+                if urlsplit(url).path == "/execute":
+                    path_query = command[2].endswith("expanduser('~/.config/vlc/vlcrc'))")
+                    expected = VLC_CONFIG_PATH if path_query else "Linux"
+                    if result["output"].strip() != expected or result["error"]:
+                        raise ValueError("unexpected VLC evaluator query result")
+                elif result["output"] or result["error"]:
+                    raise RuntimeError("VLC setup command returned unexpected output")
+            return response
+
+        requests = types.SimpleNamespace(post=audited_post, get=audited_get, exceptions=requests.exceptions)
+
     root = upstream / "desktop_env"
     ns = {
         "__builtins__": __builtins__, "requests": requests, "json": json,
-        "logging": logging, "os": os, "shlex": shlex, "time": time,
+        "logging": logging, "os": os, "re": re, "shlex": shlex, "time": time,
         "traceback": traceback, "MAX_RETRIES": 20,
         "CHROME_STDERR_LOG": "/tmp/osworld_chrome_stderr.log",
         "logger": logging.getLogger("desktopenv.evaluator-only"),
@@ -99,22 +178,33 @@ def _pinned_runtime(upstream: Path):
     ), ns)
     setup_source = root / "controllers" / "setup.py"
     _pinned_members(setup_source, None, ("_wrap_chrome_launch_for_stderr_capture",), ns)
-    setup = _pinned_members(setup_source, "SetupController", (
-        "__init__", "reset_cache_dir", "setup", "_launch_setup", "_sleep_setup"
-    ), ns)
+    setup_methods = ("__init__", "reset_cache_dir", "setup", "_launch_setup", "_sleep_setup")
+    if task["id"] == VLC_TASK:
+        setup_methods += ("_execute_setup",)
+    setup = _pinned_members(setup_source, "SetupController", setup_methods, ns)
+    if task["id"] == VLC_TASK:
+        _pinned_members(setup_source, None, ("_redact_command_for_log",), ns)
     getters = types.SimpleNamespace()
     metrics = types.SimpleNamespace()
     ns["getters"] = getters
     ns["metrics"] = metrics
-    getter_chrome = root / "evaluators" / "getters" / "chrome.py"
-    _pinned_members(getter_chrome, None, ("_is_arm_architecture", "get_bookmarks"), ns)
-    getters.get_bookmarks = ns["get_bookmarks"]
     getter_misc = root / "evaluators" / "getters" / "misc.py"
     _pinned_members(getter_misc, None, ("get_rule",), ns)
     getters.get_rule = ns["get_rule"]
-    metric_chrome = root / "evaluators" / "metrics" / "chrome.py"
-    _pinned_members(metric_chrome, None, ("is_expected_bookmarks",), ns)
-    metrics.is_expected_bookmarks = ns["is_expected_bookmarks"]
+    if task["id"] == VLC_TASK:
+        getter_vlc = root / "evaluators" / "getters" / "vlc.py"
+        _pinned_members(getter_vlc, None, ("get_vlc_config",), ns)
+        getters.get_vlc_config = ns["get_vlc_config"]
+        metric_vlc = root / "evaluators" / "metrics" / "vlc.py"
+        _pinned_members(metric_vlc, None, ("check_play_and_exit",), ns)
+        metrics.check_play_and_exit = ns["check_play_and_exit"]
+    else:
+        getter_chrome = root / "evaluators" / "getters" / "chrome.py"
+        _pinned_members(getter_chrome, None, ("_is_arm_architecture", "get_bookmarks"), ns)
+        getters.get_bookmarks = ns["get_bookmarks"]
+        metric_chrome = root / "evaluators" / "metrics" / "chrome.py"
+        _pinned_members(metric_chrome, None, ("is_expected_bookmarks",), ns)
+        metrics.is_expected_bookmarks = ns["is_expected_bookmarks"]
     desktop = _pinned_members(root / "desktop_env.py", "DesktopEnv", (
         "_set_task_info", "_set_evaluator_info", "evaluate", "vm_platform", "vm_machine"
     ), ns)
@@ -123,7 +213,12 @@ def _pinned_runtime(upstream: Path):
 
 def external_env(task: dict, episode_dir: Path, host: str, port: int, chromium_port: int, upstream: Path):
     """Bind pinned evaluator methods to a Kubernetes-owned guest, never step."""
-    desktop, controller, setup = _pinned_runtime(upstream)
+    task_id = task.get("id")
+    if task_id not in TASKS:
+        raise ValueError("task is not in the pinned V1 allowlist")
+    if task != load_task(upstream, task_id)[0]:
+        raise ValueError(f"task differs from the pinned {TASKS[task_id][0].upper()} task")
+    desktop, controller, setup = _pinned_runtime(upstream, task)
     env = desktop.__new__(desktop)
     env.vm_ip = host
     env.server_port = port
@@ -143,7 +238,7 @@ def external_env(task: dict, episode_dir: Path, host: str, port: int, chromium_p
         screen_width=env.screen_width,
         screen_height=env.screen_height,
     )
-    # NOTICE: The allowlisted task has an ordinary metric, not the infeasible
+    # NOTICE: Both allowlisted tasks have ordinary metrics, not the infeasible
     # FAIL-control protocol. Reopen action-history bridging only when that
     # task class is approved and AUV control signals are recorded durably.
     env.action_history = []
@@ -156,6 +251,20 @@ def external_env(task: dict, episode_dir: Path, host: str, port: int, chromium_p
 def prepare(env) -> None:
     if not env.setup_controller.setup(env.config, False):
         raise RuntimeError("upstream SetupController.setup returned false")
+    if env.task_id == VLC_TASK:
+        # The pinned metric treats a missing key as the successful default 0.
+        # Check the setup's opposite baseline in the fetched guest file so an
+        # HTTP 200 without a real write cannot become a false task success.
+        try:
+            config_path = env.result_getter(env, env.evaluator["result"])
+        except Exception:
+            raise RuntimeError("VLC setup file verification failed") from None
+        contents = Path(config_path).read_text()
+        if not any(line.strip() == "play-and-exit=1" for line in contents.splitlines()) \
+                or env.metric(config_path, {"expected_play_and_exit": 1}) != 1:
+            raise RuntimeError("VLC setup did not establish play-and-exit=1")
+        # NOTICE: /setup/launch confirms process spawn, not that VLC rendered
+        # or is ready for GUI input; live acceptance must check that separately.
 
 
 def evaluate(env) -> float:
