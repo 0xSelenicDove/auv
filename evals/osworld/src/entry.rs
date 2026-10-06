@@ -2,8 +2,10 @@
 
 use std::{
   fs,
+  future::Future,
   io::Read as _,
   path::{Path, PathBuf},
+  time::Duration,
 };
 
 use auv::{
@@ -21,12 +23,16 @@ use tempfile::NamedTempFile;
 
 use crate::{Action, ActionExecutor, ControlSignal, parse_action};
 
+const MAX_FINAL_SETTLE_MS: u64 = 5_000;
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Plan {
   version: u8,
   context: Context,
   actions: Vec<Value>,
+  #[serde(default)]
+  final_settle_ms: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -46,6 +52,7 @@ enum Context {
 struct ValidatedPlan {
   context: Context,
   actions: Vec<Action>,
+  final_settle_ms: u64,
 }
 
 impl Plan {
@@ -55,6 +62,9 @@ impl Plan {
     }
     if self.actions.is_empty() || self.actions.len() > 1000 {
       return Err("action plan needs 1..=1000 predeclared actions".into());
+    }
+    if self.final_settle_ms > MAX_FINAL_SETTLE_MS {
+      return Err(format!("final_settle_ms must be 0..={MAX_FINAL_SETTLE_MS}"));
     }
     match &self.context {
       Context::Paired {
@@ -79,6 +89,7 @@ impl Plan {
     Ok(ValidatedPlan {
       context: self.context,
       actions,
+      final_settle_ms: self.final_settle_ms,
     })
   }
 }
@@ -185,11 +196,25 @@ async fn interrupted() {
   }
 }
 
+async fn settle_before_capture(final_settle_ms: u64, cancel: impl Future<Output = ()>) -> bool {
+  if final_settle_ms == 0 {
+    return true;
+  }
+  tokio::select! {
+    biased;
+    _ = cancel => false,
+    _ = tokio::time::sleep(Duration::from_millis(final_settle_ms)) => true,
+  }
+}
+
 /// Execute a predeclared sequence, then print the final sidecar JSON on the
 /// final stdout line. Errors remain process failures, not benchmark scores.
 // TODO(osworld-action-entry-live): Runner finish and cancellation release are
 // covered only by the ignored isolated-Xorg gate; run it before claiming live
 // GUI-action baseline capability or wiring this entry into the K8s adapter.
+// TODO(osworld-adaptive-observation): Intermediate screenshot/branching is
+// deferred: this fixed plan only adds a bounded final settle. Revisit after
+// an owner-approved observation contract and fresh UI-state evidence.
 pub async fn run(plan_path: &Path) -> Result<(), String> {
   let plan = read_plan(plan_path)?;
   let (dir, sidecar) = episode_paths()?;
@@ -251,6 +276,11 @@ pub async fn run(plan_path: &Path) -> Result<(), String> {
         }
       }
     }
+  }
+
+  if outcome == RunOutcome::Succeeded && !settle_before_capture(plan.final_settle_ms, &mut cancel).await {
+    outcome = RunOutcome::Canceled;
+    error = Some("final settle interrupted".to_string());
   }
 
   let mut final_artifact = None;
@@ -358,6 +388,35 @@ mod tests {
   }
 
   #[test]
+  fn final_settle_is_optional_bounded_integer_in_strict_plan() {
+    let base =
+      json!({"version":1,"context":{"kind":"guest-local","device_id":"device","daemon_endpoint":"unix:///tmp/auv.sock"},"actions":["DONE"]});
+    let default: Plan = serde_json::from_value(base.clone()).unwrap();
+    assert_eq!(default.validate().unwrap().final_settle_ms, 0);
+    let mut at_limit = base.clone();
+    at_limit["final_settle_ms"] = json!(5000);
+    let at_limit: Plan = serde_json::from_value(at_limit).unwrap();
+    assert_eq!(at_limit.validate().unwrap().final_settle_ms, 5000);
+    let mut over_limit = base.clone();
+    over_limit["final_settle_ms"] = json!(5001);
+    let over_limit: Plan = serde_json::from_value(over_limit).unwrap();
+    assert!(over_limit.validate().is_err());
+    for invalid in [json!(-1), json!(1.5), json!(true), json!("100")] {
+      let mut wrong_type = base.clone();
+      wrong_type["final_settle_ms"] = invalid;
+      assert!(serde_json::from_value::<Plan>(wrong_type).is_err());
+    }
+  }
+
+  #[tokio::test]
+  async fn interrupt_during_final_settle_prevents_capture() {
+    let began = std::time::Instant::now();
+    let settled = settle_before_capture(5_000, tokio::time::sleep(std::time::Duration::from_millis(10))).await;
+    assert!(!settled);
+    assert!(began.elapsed() < std::time::Duration::from_secs(1));
+  }
+
+  #[test]
   fn final_png_is_inside_episode_and_digest_matches_bytes() {
     let dir = tempfile::tempdir().unwrap();
     let image = image::RgbaImage::from_pixel(2, 2, image::Rgba([1, 2, 3, 255]));
@@ -394,7 +453,7 @@ mod tests {
     let mut stdout = Vec::new();
     let failed_capture = evidence("run-1", None);
     emit_terminal(&mut stdout, &sidecar, &failed_capture).unwrap();
-    let line = stdout.split(|byte| *byte == b'\n').filter(|line| !line.is_empty()).next_back().unwrap();
+    let line = stdout.split(|byte| *byte == b'\n').rfind(|line| !line.is_empty()).unwrap();
     assert_eq!(serde_json::from_slice::<Value>(line).unwrap(), serde_json::from_slice::<Value>(&fs::read(sidecar).unwrap()).unwrap());
     assert!(failed_capture["final_artifact"].is_null());
     assert!(failed_capture.get("score").is_none());

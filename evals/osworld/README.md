@@ -171,7 +171,8 @@ environment paths. One paired-context plan is:
     { "action_type": "CLICK", "x": 420, "y": 300 },
     { "action_type": "TYPING", "text": "example" },
     "DONE"
-  ]
+  ],
+  "final_settle_ms": 1000
 }
 ```
 
@@ -180,7 +181,13 @@ For an AUV binary running inside the guest, replace `context` with
 The context and action plan reject extra fields; actions use `parse_action`'s
 enumerated structured schema, not shell, Python, or OSWorld `/execute` GUI
 relay. The profile file is a credential store, not copied into the plan or
-stdout. An operator can invoke the local entry with:
+stdout. `final_settle_ms` is optional (default `0`) and must be an integer
+from `0` to `5000`. After the last action, the entry waits that long before
+the same Runner's final capture. A TERM/Ctrl+C during this delay cancels the
+Run, attempts normal cleanup/finish, exits nonzero, and does not produce a
+success screenshot. This does not change the no-op `WAIT` control action or
+provide intermediate adaptive observation. An operator can invoke the local
+entry with:
 
 ```bash
 AUV_OSWORLD_EPISODE_DIR=/absolute/episode \
