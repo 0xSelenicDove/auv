@@ -93,6 +93,17 @@ class AgentActionRelayTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not match"):
             self.prepare()
 
+    def test_help_describes_single_use_checkpoint_and_total_deadline(self):
+        output = io.StringIO()
+        with patch.object(sys, "argv", ["agent_action_relay.py", "--help"]), \
+             patch.object(sys, "stdout", output), \
+             self.assertRaises(SystemExit) as exited:
+            relay.main()
+        self.assertEqual(exited.exception.code, 0)
+        help_text = " ".join(output.getvalue().split())
+        self.assertIn("total session", help_text)
+        self.assertIn("verified action receipt consumes its checkpoint", help_text)
+
     def test_rejects_existing_trace_and_sidecar_before_child(self):
         for name in ("agent_decisions.json", "action_evidence.json", "checkpoint-0002.png"):
             with self.subTest(name=name):
@@ -126,6 +137,9 @@ class AgentActionRelayTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(FakeEpisode.forwards, [(False, True)])
         self.assertEqual([item["op"] for item in output], ["ready", "receipt", "receipt", "receipt"])
+        self.assertEqual(output[0]["limits"], {"actions": 2, "captures": 2,
+            "proposal_idle_seconds": 180, "session_seconds": 540})
+        self.assertEqual(output[0]["rules"], {"action_checkpoint": "latest_verified_single_use"})
         self.assertEqual(output[1]["checkpoint_path"], str((self.directory / first_name).resolve()))
         self.assertEqual(output[1]["checkpoint_sha256"], first_digest)
         self.assertEqual(output[-1]["status"], "finished")

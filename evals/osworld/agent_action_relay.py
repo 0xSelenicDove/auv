@@ -174,7 +174,10 @@ def run_session(directory: Path, binary: Path, context: dict, *, max_actions: in
                                       max_actions=max_actions, max_captures=max_captures)
             deadline = time.monotonic() + SESSION_SECONDS
             emit({"op": "ready", "run_id": gate.run_id, "episode_dir": str(directory),
-                  "limits": {"actions": max_actions, "captures": max_captures}}, output)
+                  "limits": {"actions": max_actions, "captures": max_captures,
+                             "proposal_idle_seconds": IDLE_SECONDS,
+                             "session_seconds": SESSION_SECONDS},
+                  "rules": {"action_checkpoint": "latest_verified_single_use"}}, output)
             for count, proposal in enumerate(proposal_lines(input_fd, child, deadline=deadline), 1):
                 if count > MAX_PROPOSALS or time.monotonic() >= deadline:
                     raise TimeoutError("proposal count or session budget exceeded")
@@ -202,7 +205,10 @@ def run_session(directory: Path, binary: Path, context: dict, *, max_actions: in
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, epilog=(
+        "JSONL ready advertises the total session and proposal-idle deadlines. "
+        "Every action requires a fresh AUV capture; a verified action receipt consumes its checkpoint."
+    ))
     parser.add_argument("--config", type=Path, required=True, help="absolute reviewed episode config")
     parser.add_argument("--episode-dir", type=Path, required=True, help="absolute fresh episode directory")
     parser.add_argument("--action-binary", type=Path, required=True, help="absolute auv-osworld-action binary")

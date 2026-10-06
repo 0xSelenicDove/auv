@@ -699,6 +699,16 @@ closes action stdin. Model build identity and AUV-only tool isolation remain
 unverified, so any eventual result must be labeled selected exploratory
 evidence rather than a formal benchmark score.
 
+The paired and guest-local attended relays now expose their existing 180-second
+proposal idle limit, 540-second total session limit, and single-use checkpoint
+rule in the machine-readable `ready` receipt. The CLI help and protocol README
+say that an action with a verified delivery receipt consumes its capture;
+offline tests cover both topology entries. This closes the misleading protocol
+description exposed by the VLC row. It does **not** speed up operator/model
+round trips, change the Rust 570-second Run limit, isolate model tools, or
+authorize a replay of the frozen cohort. A direct model-I/O path and a new
+predeclared cohort remain separate next slices.
+
 ## Operating rules
 
 - Work through these items in order; each item may be delegated to one bounded

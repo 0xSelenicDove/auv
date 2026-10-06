@@ -147,17 +147,25 @@ Read the `ready` JSONL response, then send one complete JSON object per line
 on stdin using the interactive proposal schema above. A `capture` receipt
 includes `checkpoint_path` (absolute, byte-verified PNG) and
 `checkpoint_sha256`; the next `action` must cite that Run ID, relative
-checkpoint filename, and digest as `based_on`. `finish` yields a verified
-terminal receipt and exit 0. `abort` yields a verified canceled receipt and
-exit 1. EOF, malformed/oversized proposal, budget/deadline failure, or child
-failure emits `session_end` and exits 1; the relay closes/reaps the child and
-does not retry uncertain GUI input. The 64 KiB line, 1 MiB request stream,
-32-action/32-capture, and 180-second proposal idle bounds are below Rust's
-interactive limits. A new proposal must start within 540 seconds of `ready`;
-an in-flight exchange can finish later, subject to the transport's response
-timeout and Rust's hard 570-second Run limit. Run this with a live stdin
-pipe or PTY; an execution wrapper that immediately closes stdin cancels the
-Run before any proposal.
+checkpoint filename, and digest as `based_on`. The `ready` response declares
+`rules.action_checkpoint: "latest_verified_single_use"`: every action needs
+the latest verified AUV capture, and an action with a verified delivery
+receipt consumes that checkpoint. Capture again before proposing another action, even when the
+next action follows directly from the same visible screen. `finish` yields a
+verified terminal receipt and exit 0. `abort` yields a verified canceled
+receipt and exit 1. EOF, malformed/oversized proposal, budget/deadline
+failure, or child failure emits `session_end` and exits 1; the relay closes
+and reaps the child without retrying uncertain GUI input. The 64 KiB line,
+1 MiB request stream, 32-action/32-capture, and 180-second proposal idle
+bounds are below Rust's interactive limits. The `ready.limits` object publishes both
+`proposal_idle_seconds: 180` and `session_seconds: 540`. The 540-second bound
+is a **total Run session deadline**, started immediately before `ready` is
+emitted; sending proposals does not reset it. The 180-second idle timer is
+separate and resets after each complete proposal line. A new proposal must
+be complete before both deadlines; an in-flight exchange can finish later,
+subject to the transport's response timeout and Rust's hard 570-second Run
+limit. Run this with a live stdin pipe or PTY; an execution wrapper that
+immediately closes stdin cancels the Run before any proposal.
 
 This entry is only an attended operator I/O boundary. It cannot prove that a
 Codex sub-agent used no other tools, cannot pin model identity, and is not a

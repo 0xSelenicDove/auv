@@ -153,6 +153,9 @@ class GuestLocalRelayTest(unittest.TestCase):
         replies = [json.loads(line) for line in output.getvalue().splitlines()]
         self.assertEqual(code, 0)
         self.assertEqual([value["op"] for value in replies], ["ready", "receipt", "receipt", "receipt"])
+        self.assertEqual(replies[0]["limits"], {"actions": 2, "captures": 2,
+            "proposal_idle_seconds": 180, "session_seconds": 540})
+        self.assertEqual(replies[0]["rules"], {"action_checkpoint": "latest_verified_single_use"})
         self.assertEqual(replies[1]["checkpoint_sha256"], digest)
         self.assertEqual(replies[-1]["status"], "finished")
         self.assertEqual(json.loads((directory / "agent_decisions.json").read_text())["status"], "finished")
