@@ -33,3 +33,5 @@ Count: **23**
 - Parent index: [`../INDEX.md`](../INDEX.md)
 - Docs overview: [`../../../README.md`](../../../README.md)
 - Shared vocabulary: [`../../../TERMS_AND_CONCEPTS.md`](../../../TERMS_AND_CONCEPTS.md)
+
+- [Compact invoke JSON](2026-10-06-compact-json.md): Opt-in lossless single-line output, regression coverage, and response-text token counts.

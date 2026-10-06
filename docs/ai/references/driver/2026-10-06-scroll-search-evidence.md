@@ -55,8 +55,9 @@ dependency was added.
 - Runner final screenshots need capture references rather than transferring every
   observation's pixels to the invoke client. The current protocol cannot provide
   a final artifact reference; this remains explicitly deferred at the call site.
-- Compact agent JSON should be opt-in and preserve verification, failures, and
-  artifact references; no output schema is changed in this slice.
+- Lossless `--compact-json` now removes formatting whitespace; see
+  [compact JSON measurements](../invoke-cli/2026-10-06-compact-json.md).
+  Command-specific field projection remains deferred.
 - Reproduce the benchmark's no-effect scroll against receiver state and compare
   targeting/focus policies before changing input delivery or adding fallbacks.
 - Benchmark reusable workflows with first-run discovery costs separated from

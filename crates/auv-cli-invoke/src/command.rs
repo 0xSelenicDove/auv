@@ -24,6 +24,7 @@ pub enum InvokeCommandCliParse {
     store_root: Option<PathBuf>,
     dry_run: bool,
     json: bool,
+    compact_json: bool,
     detail: bool,
     wide: bool,
     overlay_enabled: bool,
@@ -660,6 +661,7 @@ where
     store_root: matches.get_one::<PathBuf>("auv_store_root").cloned(),
     dry_run: matches.get_flag("auv_dry_run"),
     json: matches.get_flag("auv_json"),
+    compact_json: matches.get_flag("auv_compact_json"),
     detail: matches.get_flag("auv_detail"),
     wide: matches.get_flag("auv_wide"),
     overlay_enabled: !matches.get_flag("auv_no_overlay"),
@@ -685,6 +687,12 @@ pub(crate) fn with_invoke_context(command: Command, target: TargetPolicy) -> Com
         .help("Directory used to persist the recorded run and artifacts."),
     )
     .arg(Arg::new("auv_json").long("json").action(ArgAction::SetTrue).help("Render machine-readable JSON output."))
+    .arg(
+      Arg::new("auv_compact_json")
+        .long("compact-json")
+        .action(ArgAction::SetTrue)
+        .help("Render single-line JSON with all result, verification, failure, and artifact fields preserved."),
+    )
     .arg(Arg::new("auv_detail").long("detail").action(ArgAction::SetTrue).help("Include diagnostic detail in human output."))
     .arg(Arg::new("auv_wide").long("wide").action(ArgAction::SetTrue).help("Include extra columns in human table output."))
 }

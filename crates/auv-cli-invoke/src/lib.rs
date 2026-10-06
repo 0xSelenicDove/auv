@@ -72,6 +72,7 @@ pub fn parse_invoke_args(arguments: &[String]) -> Result<InvokeCliParse, String>
       store_root,
       dry_run,
       json,
+      compact_json,
       detail,
       wide,
       overlay_enabled,
@@ -86,7 +87,12 @@ pub fn parse_invoke_args(arguments: &[String]) -> Result<InvokeCliParse, String>
         typed_args,
         store_root,
         dry_run,
-        output: InvokeOutputOptions { json, detail, wide },
+        output: InvokeOutputOptions {
+          json,
+          compact_json,
+          detail,
+          wide,
+        },
       })
     }
   }

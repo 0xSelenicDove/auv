@@ -10,9 +10,9 @@ pub struct InvokeCliOutcome {
 }
 
 pub fn render_invoke_result(result: &InvokeResult, options: InvokeOutputOptions) -> Result<InvokeCliOutcome, String> {
-  if options.json {
+  if options.json || options.compact_json {
     let mut stdout = io::stdout().lock();
-    result.write_json(&mut stdout)?;
+    result.write_json(&mut stdout, options.compact_json)?;
   } else {
     let stdout = io::stdout();
     let mut stream = AutoStream::new(stdout.lock(), ColorChoice::Auto);

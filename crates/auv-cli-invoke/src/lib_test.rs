@@ -73,3 +73,26 @@ fn retired_point_command_ids_are_not_registered() {
     assert!(error.contains("unknown invoke command"), "{error}");
   }
 }
+
+#[test]
+fn compact_json_is_a_presentation_flag_and_implies_json() {
+  for flags in [
+    vec!["--compact-json"],
+    vec!["--json", "--compact-json"],
+    vec!["--compact-json", "--json"],
+  ] {
+    let mut arguments = vec!["display.list".to_string()];
+    arguments.extend(flags.into_iter().map(str::to_string));
+    let InvokeCliParse::Invoke { output, inputs, .. } = parse_invoke_args(&arguments).unwrap() else {
+      panic!("expected invoke");
+    };
+    assert!(output.compact_json);
+    assert!(!inputs.contains_key("compact-json"));
+  }
+  let InvokeCliParse::Invoke { output, .. } = parse_invoke_args(&["display.list".into(), "--json".into()]).unwrap() else {
+    panic!("expected invoke");
+  };
+  assert!(output.json && !output.compact_json);
+  assert!(render_command_help(default_registry().resolve("display.list").unwrap()).contains("--compact-json"));
+  assert!(render_help_index(&default_registry()).contains("--compact-json"));
+}

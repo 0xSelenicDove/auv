@@ -61,6 +61,8 @@ pub struct InvokeRequest {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct InvokeOutputOptions {
   pub json: bool,
+  /// Single-line JSON; implies JSON output without omitting any fields.
+  pub compact_json: bool,
   pub detail: bool,
   pub wide: bool,
 }

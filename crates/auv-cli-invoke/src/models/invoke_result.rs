@@ -107,7 +107,7 @@ impl InvokeResult {
     }
   }
 
-  pub(crate) fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), String> {
+  pub(crate) fn write_json<W: Write>(&self, writer: &mut W, compact: bool) -> Result<(), String> {
     let output = InvokeResultJsonOutput {
       run_id: &self.run_id,
       status: self.status().as_str(),
@@ -120,7 +120,12 @@ impl InvokeResult {
         _ => None,
       },
     };
-    serde_json::to_writer_pretty(&mut *writer, &output).map_err(|error| format!("failed to serialize invoke output: {error}"))?;
+    let serialized = if compact {
+      serde_json::to_writer(&mut *writer, &output)
+    } else {
+      serde_json::to_writer_pretty(&mut *writer, &output)
+    };
+    serialized.map_err(|error| format!("failed to serialize invoke output: {error}"))?;
     writeln!(writer).map_err(|error| format!("failed to write invoke output: {error}"))
   }
 
@@ -163,8 +168,8 @@ impl InvokeResult {
 
   pub fn render_to_string(&self, options: InvokeOutputOptions) -> Result<String, String> {
     let mut bytes = Vec::new();
-    if options.json {
-      self.write_json(&mut bytes)?;
+    if options.json || options.compact_json {
+      self.write_json(&mut bytes, options.compact_json)?;
     } else {
       self.write_human(&mut bytes, options, false)?;
     }
