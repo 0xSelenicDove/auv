@@ -609,12 +609,18 @@ Focused offline tests include the expected no-answer zero and exact-coordinate
 full score. A fresh official V2.1 KVM guest subsequently passed the bridge's
 image-upload/readback and no-answer evaluation: upstream raw score `0.0`,
 direct `/file` HTTP 404 for `position.txt`, and UID-preconditioned cleanup.
-The new guest did not have AUV installed, so no screenshot or action Run was
-recorded. This establishes a live **file-only negative control**, not an
-AUV task episode. The bridge does not boot or identify a Pod, enforce AUV-only
-action execution, run Task044, or schedule a V2.1 batch. The next gate is a
-fresh UID-pinned Task099 episode with a source-pinned installed AUV binary,
-action/capture evidence, exact upstream raw result, and safe reset. See the
+The first guest did not have AUV installed, so no screenshot or action Run
+was recorded. A second fresh guest used an Ubuntu 22.04 ELF built from exact
+PR head `1148f382`: installed AUV completed `display.list` and an X11
+`display.capture` Run with a byte-verified 1920×1080 PNG. Task099 setup and
+the pinned evaluator on that same Pod again returned raw `0.0` for an absent
+answer; all task-owned Pod, Service, and build resources were UID-safely
+removed while retained PVCs stayed Bound. This closes a **current-head AUV
+observation plus evaluator negative control**, not task-directed input or an
+agent result. The bridge still does not boot or identify a Pod, enforce
+AUV-only action execution, run Task044, or schedule a V2.1 batch. The next
+gate is a fresh UID-pinned Task099 action episode, then a predeclared V2.1
+multi-task cohort. See the
 [live acceptance record](2026-10-07-osworld-v2-task099-bridge-acceptance.md).
 
 ### 5. Agent/harness evaluation — two selected V2.1 attempts, no rate

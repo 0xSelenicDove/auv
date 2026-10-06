@@ -38,7 +38,7 @@ Count: **35**
 - [`2026-10-06-osworld-v1-codex-agent-cohort-evidence.md`](2026-10-06-osworld-v1-codex-agent-cohort-evidence.md): Two incomplete prompt-restricted Codex-agent V1 Runs on fresh guests, their raw evaluator results, relay/protocol failure layers, and cleanup evidence.
 - [`2026-10-06-osworld-v2-assets-preflight.md`](2026-10-06-osworld-v2-assets-preflight.md): Pinned Hugging Face access, size and hash evidence for V2.1 Task099/044 assets, Task044 setup/evaluator audit, and a Shotcut live environment preflight without task scoring.
 - [`2026-10-06-osworld-v2-task044-episode.md`](2026-10-06-osworld-v2-task044-episode.md): One bounded blind AUV-only Task044 Shotcut attempt, partial evaluator score, protocol limitations, artifact hashes, and cleanup evidence.
-- [`2026-10-07-osworld-v2-task099-bridge-acceptance.md`](2026-10-07-osworld-v2-task099-bridge-acceptance.md): Fresh V2.1 QEMU/KVM Task099 file-only bridge negative control, pinned raw evaluator zero, UID-safe reset, and explicit no-AUV scope.
+- [`2026-10-07-osworld-v2-task099-bridge-acceptance.md`](2026-10-07-osworld-v2-task099-bridge-acceptance.md): Two fresh V2.1 Task099 negative controls: pinned file-only bridge, then current-head AUV capture plus evaluator, with UID-safe reset and no agent score.
 
 ## Related
 

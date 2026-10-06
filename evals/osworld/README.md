@@ -501,6 +501,9 @@ A missing `position.txt` is an upstream `0.0` result; a transport or evaluator
 cache failure exits without a score. The marker checks the same local endpoint
 string, but cannot prove a restarted port-forward still targets the original
 Pod. An operator must verify Pod UID, fresh qcow2 overlay, AUV evidence, and
-task-owned cleanup separately. Offline boundary tests have passed; this new
-entry has not yet been accepted against a fresh live V2.1 guest and is not a
-Kubernetes batch adapter or agent performance result.
+task-owned cleanup separately. Offline boundary tests and two fresh live V2.1
+no-answer controls have passed; the second used a source-pinned installed AUV
+to capture the desktop before evaluation. See the
+[acceptance record](../../docs/ai/references/ops/2026-10-07-osworld-v2-task099-bridge-acceptance.md).
+Neither control sent task-directed GUI input. This is not a Kubernetes batch
+adapter or agent performance result.
