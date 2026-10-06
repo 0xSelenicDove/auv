@@ -627,9 +627,18 @@ caller-declared action and capture budgets, and records sequential decisions.
 interactive process; fake-child tests cover the complete receipt sequence,
 explicit abort's expected nonzero exit, cancellation, timeout, and process
 reaping. The full 104-test Python OSWorld suite passes with 10 existing
-skips. Neither component is wired to a model or a Kubernetes episode, and
-neither can restrict other tools available to a Codex sub-agent. Model
-identity, tool isolation, and a live gateway-driven episode remain open.
+skips. Neither component is wired to a model, and neither can restrict other
+tools available to a Codex sub-agent. Model identity and tool isolation
+remain open.
+
+A subsequent fresh paired-remote Chrome V1 episode exercised both components
+on `liet-gpu-1`: one AUV Run completed `capture → MOVE_TO → capture → finish`,
+all gateway and Rust sidecars matched, the pinned evaluator returned the
+expected raw `0.0`, and UID-safe reset preserved the hot PVC/PV. This closes
+one live **non-solving** gateway/transport input path. There is still no model
+policy behind the gateway, enforced tool isolation, guest-local gateway
+episode, or predeclared agent-scored batch. See the
+[evidence note](2026-10-05-osworld-kubernetes-x11-evidence.md).
 
 ## Operating rules
 

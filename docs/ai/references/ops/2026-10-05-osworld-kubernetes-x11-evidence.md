@@ -1509,6 +1509,47 @@ successful **selected, exploratory Codex-agent canaries**, not an official
 OSWorld completion rate, reproducible model benchmark, proof of general VLC
 reasoning, or evidence about guest-local/V2.1 topology.
 
+### Live agent gateway/transport negative control
+
+At head `d20a2134`, a fresh Chrome V1 overlay on `liet-gpu-1` exercised
+`ForegroundActionTransport` and `AgentActionGateway` together, without a
+model. The task-owned [config](/private/tmp/auv-osworld-gateway-live-1006.6L9TUQ/config.json)
+SHA256 was `7d8ce85ae384b99572241864649ffaca5007991992ad4b3a9fd39911955388d1`;
+the temporary fixed [action harness](/private/tmp/auv-osworld-gateway-live-1006.6L9TUQ/live_gateway_control.py)
+SHA256 was `7cffb3ba8812ff8a59b5b7b6de3008f1221fc62f1d4410cfa3e7324394d47271`.
+The pinned base qcow2, live QEMU/KVM overlay, guest AUV install/pair, and
+official Chrome setup passed their existing identity checks. No OSWorld API,
+VNC, or non-AUV tool delivered task GUI input.
+
+One AUV Run `ec11dfc24f30b56594a906e2d1e269c1` completed four ordered
+requests: `capture → MOVE_TO(600,500) → capture → finish`. The action cited
+the first AUV checkpoint's exact Run ID and SHA256
+`9483f01dc196f6270b9303c56e7c89043294c112ed11c9df4cbc59020d952dfd`.
+The [decision trace](/private/tmp/auv-osworld-gateway-live-1006.6L9TUQ/chrome-gw-live-1006a/agent_decisions.json)
+SHA256 was `9c106572b2bc0f504d97ddfd3e278167fb7e57f260b132bd77780d6111ee6d46`:
+four matching receipts, one action, two captures, `status=finished`, and no
+pending forward. It matched Rust `checkpoints.json`,
+`input-action-results.json` (SHA256
+`1644250b7b98ef77a7ccc4b6440809cbf006fda817fafc96f2c7af88d8ffdea1`),
+and `action_evidence.json` (SHA256
+`80b36f1c9741b583938699657b41abb188c6f2451bfea3a61dc3408924cc712e`).
+The second and final AUV PNGs both had SHA256
+`4acba88072bfb3e384dab2d67aba958137b511812afb32b2961b64721ac813c7`.
+The original `InputActionResult` selected `foreground_system_events`, with
+`succeeded=true` and `verified=false`; no semantic effect was inferred from
+delivery alone. The pinned Chrome evaluator returned raw `0.0`, as expected
+from this non-solving pointer move.
+
+UID-preconditioned reset removed only proxy Pod
+`65039cdc-c4ab-4687-af8b-1d1750974c1f`, Service
+`dbbfa2ef-c39b-42c4-979e-be9e1b14abfc`, and QEMU Pod
+`d2da7a24-8035-45a2-a6a7-3d4cefbd663f`. An independent query found no
+matching Pods or Services. The hot V1 PVC/PV UIDs remained
+`34143535-4ac2-42f2-a443-08db3f6b49ff` and
+`8e8e46f1-0670-4a55-b06a-8caebb4d5a73`, both Bound. This closes one
+paired-remote **live gateway input/evidence path**, not a model/tool-sandbox
+test, agent task pass, guest-local gateway run, or benchmark rate.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve
