@@ -25,7 +25,7 @@ use auv_driver_common::error::{DriverError, DriverResult};
 use auv_driver_common::window::Window;
 use auv_driver_windows::desktop::ensure_input_desktop;
 use auv_driver_windows::media::{
-  AudioLookupStats, AudioVolumeController, MediaPlaybackStatus, ProcessAudioVolume, SmtcMediaManager, SmtcSession,
+  AudioLookupStats, AudioLookupStatus, AudioVolumeController, MediaPlaybackStatus, ProcessAudioVolume, SmtcMediaManager, SmtcSession,
 };
 use auv_driver_windows::playback_guard::{
   DEFAULT_PLAY_POLL_TIMEOUT, DEFAULT_TARGET_VOLUME, DEFAULT_VOLUME_TOLERANCE, Step2Options, execute_step2_real_with_prestate,
@@ -119,6 +119,10 @@ struct ReplayRecord {
   skipped_play_write: bool,
   volume_set_calls: usize,
   play_calls: usize,
+
+  // Audio lookup statistics
+  audio_lookup_status: Option<String>,
+  audio_endpoint_count: Option<usize>,
 
   success: bool,
   confirmed: bool,
@@ -546,6 +550,8 @@ fn execute_replay_baseline(
     skipped_play_write: false,
     volume_set_calls: vol_calls,
     play_calls,
+    audio_lookup_status: None,
+    audio_endpoint_count: None,
     success: overall_success,
     confirmed: s3_gate_passed,
     fault_injected: fault_injection.map(ToString::to_string),
@@ -607,6 +613,7 @@ fn execute_replay_optimized(
       "status": format!("{:?}", status),
       "volume": pre_vol,
       "audio_lookup_status": ctx.timings.audio_lookup_stats.as_ref().map(|s| s.status),
+      "audio_endpoint_count": ctx.timings.audio_lookup_stats.as_ref().map(|s| s.endpoint_count),
     }),
   });
 
@@ -924,6 +931,12 @@ fn execute_replay_optimized(
     skipped_play_write: s2_result.skipped_play_write,
     volume_set_calls: s2_result.command_counts.set_volume_calls,
     play_calls: s2_result.command_counts.play_calls,
+    audio_lookup_status: ctx.timings.audio_lookup_stats.as_ref().map(|s| match s.status {
+      AudioLookupStatus::Hit => "hit".to_string(),
+      AudioLookupStatus::Miss => "miss".to_string(),
+      AudioLookupStatus::Invalidated => "invalidated".to_string(),
+    }),
+    audio_endpoint_count: ctx.timings.audio_lookup_stats.as_ref().map(|s| s.endpoint_count),
     success: overall_success,
     confirmed,
     fault_injected: fault_injection.map(ToString::to_string),

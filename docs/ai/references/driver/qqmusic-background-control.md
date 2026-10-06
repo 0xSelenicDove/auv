@@ -186,61 +186,100 @@ Verified across 9 automated acceptance tests (`crates/auv-auto-loop/tests/accept
 
 Granular profiling across 10 non-overlapping execution metrics and 4 operational dimensions (Cache: Cold/Warm, Mode: Fast/Verified/Baseline, Window: Active/Minimized, Frame: Fresh/Stale/Error), validating driver-side hot-path optimizations and Step 2 idempotency command counts.
 
-### 1. Granular 10-Field Timing Benchmark (Standard Linear Interpolation)
+### 1. Granular Timing Benchmarks (Standard Linear Interpolation)
 
 Empirical measurements gathered across 80 real operational executions against QQ Music on Windows 11:
 - **Warm Suites** ($N=20$ each): Baseline, Fast, Verified (`2026-10-06-windows-verify-warm-*.jsonl`)
 - **Cold Suites** ($N=10$ independent processes each): Cold Fast, Cold Verified (`2026-10-06-windows-verify-cold-*.jsonl`)
 
-All percentiles computed using standard linear interpolation ($R$ type 7 / numpy default: $P_{50} = \frac{\text{sorted}[9] + \text{sorted}[10]}{2}$ for $N=20$):
+All percentiles computed using standard linear interpolation ($R$ type 7 / numpy default `method='linear'` without outlier trimming).
 
-| Stage / Metric | Baseline Warm P50 | Fast Warm P50 | Verified Warm P50 | Cold Fast P50 | Cold Verified P50 | Description |
-|---|---|---|---|---|---|---|
-| `manager_discovery_ms` | 3.32 ms | 3.29 ms | 3.30 ms | 14.79 ms | 15.17 ms | WinRT SMTC session manager acquisition |
-| `session_discovery_ms` | 0.00 ms | 0.00 ms | 0.00 ms | 0.01 ms | 0.01 ms | `GetCurrentSession()` fast-path vs `GetSessions()` |
-| `window_discovery_ms` | 0.61 ms | 0.53 ms | 0.54 ms | 0.76 ms | 0.80 ms | QQ Music HWND enumeration and resolution |
-| `audio_lookup_ms` | 2.33 ms | **0.53 ms** | 0.70 ms | 7.77 ms | 9.70 ms | CoreAudio endpoint + session lookup (cached) |
-| **`discovery_ms` (sum)** | 5.99 ms | **4.99 ms** | 4.73 ms | **23.77 ms** | 25.89 ms | Total resource discovery duration |
-| `volume_rw_ms` | 2.18 ms | **0.00 ms** | 151.50 ms | 0.00 ms | 0.00 ms | Step 2 volume read/write duration |
-| `dispatch_ms` | 2.52 ms | **0.37 ms** | 151.89 ms | 0.24 ms | 0.27 ms | WinRT / SMTC command dispatch latency |
-| `verification_ms` | 1174.07 ms | **0.44 ms** | **1112.18 ms** | 2.87 ms | 75.29 ms | Semantic title / identity verification |
-| `wgc_ms` | 7.13 ms | **3.17 ms** | 4.14 ms | 286.25 ms | 292.12 ms | WGC window health verification |
-| `serialization_ms` | 0.01 ms | 0.01 ms | 0.01 ms | 0.02 ms | 0.02 ms | In-memory JSON serialization |
-| `pacing_ms` (isolated) | 50.00 ms | 50.00 ms | 50.00 ms | 0.00 ms | 0.00 ms | Inter-iteration sleep (strictly excluded) |
-| **`total_duration_ms`** | **1189.18 ms** | **25.23 ms** | **1260.19 ms** | **321.25 ms** | **391.88 ms** | End-to-end operation execution latency |
+#### Table 1.1: Warm Runs ($N=20$) Benchmark: Baseline vs Verified vs Fast
 
-#### Key Performance Ratios & Observations:
-- **Warm Fast Mode Speedup**: **47.1x faster** than baseline ($1189.18\,\text{ms} \to 25.23\,\text{ms}$ P50).
-- **CoreAudio Lookup Speedup**: Cached endpoint lookups reduced warm `audio_lookup_ms` from $7.77\,\text{ms}$ cold down to **$0.53\,\text{ms}$ warm** ($14.7\times$ speedup), avoiding redundant device enumerations.
-- **WGC Health Check**: Active window warm WGC check is **$3.17\,\text{ms}$ P50** using memory subsampling. Cold first-frame D3D11 device creation is $\approx 286\,\text{ms}$.
-- **Verification Bottleneck**: In Verified mode, `verification_ms` P50 is $1112.18\,\text{ms}$, constituting **88.25%** of the total operation duration.
+| Metric (ms) | Baseline (P50 / P95 / Mean) | Verified (P50 / P95 / Mean) | Fast (P50 / P95 / Mean) | Fast vs Baseline (P50 / Mean) | Description |
+|---|---|---|---|---|---|
+| **Total Duration** | **1189.18 / 3273.47 / 1025.83** | **1260.19 / 3096.35 / 1036.34** | **25.23 / 1455.49 / 288.41** | **47.1x / 3.56x** | End-to-end operation execution latency |
+| `discovery_ms` (sum) | 5.99 / 9.52 / 7.13 | 4.73 / 34.45 / 7.98 | 4.99 / 14.19 / 6.35 | 1.2x / 1.12x | Total resource discovery duration |
+| `manager_discovery_ms` | 3.32 / 4.89 / 3.86 | 3.30 / 7.81 / 4.35 | 3.29 / 8.66 / 4.14 | 1.0x / 0.93x | WinRT SMTC session manager acquisition |
+| `session_discovery_ms` | 0.00 / 0.01 / 0.01 | 0.00 / 0.01 / 0.01 | 0.00 / 0.01 / 0.01 | 1.1x / 1.00x | `GetCurrentSession()` fast-path vs `GetSessions()` |
+| `window_discovery_ms` | 0.61 / 0.91 / 0.64 | 0.54 / 1.34 / 0.69 | 0.53 / 1.04 / 0.66 | 1.2x / 0.97x | QQ Music HWND enumeration and resolution |
+| `audio_lookup_ms` | 2.33 / 5.08 / 2.62 | 0.70 / 15.87 / 2.93 | **0.53 / 8.23 / 1.55** | **4.4x / 1.69x** | CoreAudio endpoint + session lookup (cached) |
+| `volume_rw_ms` | 2.18 / 3.97 / 2.72 | 151.50 / 237.90 / 152.00 | **0.00 / 1444.75 / 258.33** | — | Step 2 volume read/write duration |
+| `dispatch_ms` | 2.52 / 4.43 / 3.07 | 151.89 / 238.46 / 152.36 | **0.37 / 1445.12 / 258.64** | **6.8x / 0.01x** | WinRT / SMTC command dispatch latency |
+| `verification_ms` | 1174.07 / 3259.42 / 992.04 | 1112.18 / 3007.56 / 855.04 | **0.44 / 2.63 / 0.69** | **2672.3x / 1437.7x** | Semantic title / identity verification |
+| `wgc_ms` | 7.13 / 25.82 / 22.87 | 4.14 / 22.50 / 19.01 | **3.17 / 40.46 / 22.00** | **2.2x / 1.04x** | WGC window health verification |
+| `serialization_ms` | 0.01 / 0.02 / 0.01 | 0.01 / 0.02 / 0.01 | 0.01 / 0.02 / 0.01 | 1.0x / 1.00x | In-memory JSON serialization |
+| `pacing_ms` (isolated) | 50.00 / 50.00 / 50.00 | 50.00 / 50.00 / 50.00 | 50.00 / 50.00 / 50.00 | — | Inter-iteration pacing (strictly excluded) |
+
+#### Table 1.2: Cold Runs ($N=10$, Independent Processes) Benchmark
+
+| Metric (ms) | Cold Fast (P50 / P95 / Mean) | Cold Verified (P50 / P95 / Mean) | Description |
+|---|---|---|---|
+| **Total Duration** | **321.25 / 466.00 / 344.46** | **391.88 / 419.11 / 395.74** | End-to-end operation execution latency |
+| `discovery_ms` (sum) | 23.77 / 26.46 / 23.83 | 25.89 / 31.10 / 26.20 | Total cold discovery duration |
+| `manager_discovery_ms` | 14.79 / 18.01 / 15.20 | 15.17 / 16.75 / 15.09 | WinRT SMTC session manager acquisition |
+| `session_discovery_ms` | 0.01 / 0.02 / 0.01 | 0.01 / 0.02 / 0.01 | `GetCurrentSession()` fast-path |
+| `window_discovery_ms` | 0.76 / 1.02 / 0.81 | 0.80 / 1.07 / 0.86 | QQ Music HWND enumeration and resolution |
+| `audio_lookup_ms` | 7.77 / 8.53 / 7.82 | 9.70 / 14.50 / 10.22 | Cold CoreAudio endpoint enumeration (10/10 miss) |
+| `volume_rw_ms` | 0.00 / 127.26 / 23.14 | 0.00 / 0.00 / 0.00 | Step 2 volume read/write duration |
+| `dispatch_ms` | 0.24 / 127.59 / 23.39 | 0.27 / 0.46 / 0.31 | WinRT / SMTC command dispatch latency |
+| `verification_ms` | 2.87 / 6.38 / 3.50 | **75.29 / 92.39 / 77.07** | Step 3 verification (10/10 confirmed on fast path) |
+| `wgc_ms` | **286.25 / 332.18 / 292.86** | **292.12 / 301.07 / 291.30** | Cold first-frame D3D11 / WGC initialization |
+| `serialization_ms` | 0.02 / 0.03 / 0.02 | 0.02 / 0.03 / 0.02 | In-memory JSON serialization |
+| `pacing_ms` (isolated) | 0.00 / 0.00 / 0.00 | 0.00 / 0.00 / 0.00 | Independent process runs (0 pacing) |
+
+#### 2. Key Findings & Empirical Reality Disclosures
+
+1. **Verification Latency is Bimodal, NOT a "Fixed ~1.1s Ceiling"**:
+   - In Verified Warm mode ($N=20$), `verification_ms` exhibits a clear **bimodal distribution**:
+     - **Fast Path Peak (45%, 9/20 runs)**: Confirmed in **65.6ms ~ 92.8ms** (P50 72.0ms). When QQ Music's playback state is primed, SMTC change events fire promptly, verifying identity in <100ms.
+     - **Slow Path Peak (45%, 9/20 runs)**: Confirmed in **1105.7ms ~ 1185.9ms** (P50 1145.8ms). QQ Music internal audio buffering / SMTC event delay produces ~1.15s latency.
+     - **Timeout Tail (10%, 2/20 runs)**: Timed out at **3003.5ms and 3084.0ms** waiting for metadata changes.
+   - **Cold Verified Proof**: In Cold Verified mode ($N=10$, independent runs), **100% (10/10) of executions confirmed on the Fast Path** (P50 75.29ms, range 65.85ms ~ 98.28ms, zero occurrences of ~1.1s).
+   - **Correction**: We retract the assertion of a "fixed ~1.1s physical hardware/engine ceiling". The latency depends strictly on QQ Music's internal playback/buffering state and SMTC event scheduling. Future optimization can investigate the exact condition that triggers the ~70ms fast path.
+
+2. **Fast Mode 40% Tail Latency Disclosure**:
+   - Fast mode achieves a P50 of **25.23ms** (12/20 runs finished in 7.14ms ~ 30.8ms).
+   - However, **P95 is 1455.49ms, and Mean is 288.41ms**. 8 out of 20 runs (40%) exceeded 100ms (max 1606.66ms).
+   - **Root Cause**: In those 8 runs, QQ Music was not in `Playing` state, triggering `play_calls = 1`. Calling WinRT `session.play()` and waiting for playback status caused `volume_rw_ms` / `dispatch_ms` to block for ~1.4s–1.6s.
+   - **Narrative Clarification**: "Instantaneous command-like response (~25ms)" holds true when playback is already active and within volume tolerance; when player state recovery (`Play()`) is needed, tail latency is bounded by WinRT playback state transition.
+
+3. **CoreAudio Cached Lookup Hit Rate**:
+   - In Cold runs: 10/10 were `miss` (P50 7.77ms), requiring full device enumeration.
+   - In Warm runs: Run 1 was `miss` (initial resolution), runs 2–20 achieved **19/19 hits (100% cache hit rate)** with P50 **0.53ms** (14.7x speedup vs cold).
+   - `endpoint_count` was consistently 1. Both `audio_lookup_status` and `audio_endpoint_count` are now surfaced as top-level fields in `ReplayRecord`.
+
+4. **Track Identity Defensive Line Status**:
+   - Across all 80 empirical runs against live QQ Music, metadata was always complete (non-empty title, artist, and album), resulting in `identity_level = "full"` for all optimized runs (baseline only sampled title, so `"title_only"`).
+   - `indeterminate` (handling identical tracks in single-track loops, missing position reset, or empty metadata) was not triggered in live runs and is currently verified by 7 dedicated unit tests in `crates/auv-driver-windows/src/track_identity.rs`.
 
 ---
 
-### 2. Decision Record & Trigger Evaluations
+### 3. Decision Record & Trigger Evaluations
 
 #### Phase 1: Real Profiling & Granular Separation (Implemented)
 - Established a 10-field granular timing schema and captured 4 profiling dimensions across 80 execution records.
 - Isolated `pacing_ms` strictly from `total_duration_ms`.
-- Standardized linear interpolation percentiles with zero divergence from #230 disclosures.
+- Standardized linear interpolation percentiles across all benchmarks with zero outlier filtering.
 
-#### Phase 2: Verified Wait Refinement (Implemented Driver Components; QQ Music Ceiling Disclosed)
+#### Phase 2: Verified Wait Refinement (Implemented Driver Components; Bimodal Disclosed)
 - **Phase 2A (Track Identity)**:
   - Implemented `TrackIdentity` tuple `(title, artist, album_title, album_artist)` with normalization (whitespace collapsing, full-width ASCII conversion, unicode case-folding).
   - Implemented explicit degradation ladder: `full` $\to$ `partial` $\to$ `title_only` $\to$ `indeterminate`.
   - Enforced strict repeated-track invariant: Identical title and artist without external disambiguation (position reset) degrades to `indeterminate` and returns `confirmed: false` (never forced success).
-  - Added 7 comprehensive unit tests covering degradation, normalization, and disambiguation.
+  - Validated via 7 unit tests. Live runs observed 100% `full` identity.
 - **Phase 2B (Two-Stage Verification)**:
   - Added `PlaybackInfoChanged` auxiliary wakeup alongside `MediaPropertiesChanged`.
-  - Implemented two-stage waiting: lightweight event wakeups query metadata only upon change notifications rather than polling full metadata on a rigid interval.
-  - **Empirical Ceiling**: While cold metadata refresh completes in $75.29\,\text{ms}$, warm continuous track skips in QQ Music require $\approx 1.1\,\text{s}$ for the application's internal streaming pipeline to update SMTC metadata. The $\approx 1.1\,\text{s}$ P50 reflects QQ Music's intrinsic backend playback transition; external polling cannot safely force this lower without double-skipping.
+  - Step 3 waits for event signals before pulling full metadata, eliminating blind polling.
+  - Bimodal latency documented: fast path (~70ms) vs slow path (~1150ms).
 
 #### Phase 3: CoreAudio Cold Path (Implemented & Verified)
 - Implemented context-level endpoint caching (`AudioVolumeController::open_process_cached`) prioritizing the previously resolved endpoint.
 - Validates the endpoint's validity before reusing; falls back to default multimedia, communications, and active endpoints on invalidation.
 - Emits structured `AudioLookupStats` with `status: hit | miss | invalidated`, `endpoint_count`, and `session_count`.
+- Surfaced `audio_lookup_status` and `audio_endpoint_count` in top-level JSONL records.
 - **Zero Global COM Leaks**: Scoped strictly within `WindowsOperationContext`; zero process-global static COM state.
-- **Result**: Reduced warm audio resolution latency from $7.8\,\text{ms}$ cold to **$0.53\,\text{ms}$ warm** ($14.7\times$ speedup).
+- **Result**: Reduced warm audio resolution latency from $7.8\,\text{ms}$ cold to **$0.53\,\text{ms}$ warm** ($14.7\times$ speedup, 19/19 hits).
 
 #### Phase 4: Step 2 Idempotency Command Counting Proof (Implemented & Formally Proven)
 - Built `crates/auv-driver-windows/src/playback_guard.rs` with `Step2Executor`, `PlaybackActionSink`, and `RealPlaybackSink`.
@@ -250,22 +289,22 @@ All percentiles computed using standard linear interpolation ($R$ type 7 / numpy
   - 9 automated unit tests in `playback_guard::tests` assert exact invocation counts under tolerance boundary conditions ($0.43 \to 0$ calls, $0.46 \to 1$ call).
 
 #### Phase 5: WGC Three Paths (Evaluated & Active Window Verified)
-- Active window WGC health check latency is already **$3.17\,\text{ms}$ P50** under lightweight memory subsampling (`capture_window_health`).
-- Because $3.17\,\text{ms}$ is well within the 5ms budget, texture shader offloading is deferred.
+- Active window WGC health check latency is **$3.17\,\text{ms}$ P50** under lightweight memory subsampling (`capture_window_health`), well within the 5ms budget.
 - Minimized window paths cleanly emit `skipped_minimized` without window restores (`SW_RESTORE` redline strictly enforced).
 
 #### Phase 6: Batch Logging & Serialization (Implemented & Verified)
 - In-memory collection of `ReplayRecord` during execution loops; single batch flush to disk at run completion ($1.59\,\text{ms}$ for 20 records).
-- Serialization latency measured at **$0.01\,\text{ms}$ P50** ($0.04\%$ of Fast total), vastly below the 5% optimization threshold.
+- Serialization latency measured at **$0.01\,\text{ms}$ P50** ($0.04\%$ of Fast total).
 
 ---
 
-### 3. Archived Artifacts
-- `docs/ai/references/driver/2026-10-06-windows-verify-warm-fast-20x.jsonl`: 20x warm Fast mode records (P50 25.23ms, 100% success, 0 VLM).
-- `docs/ai/references/driver/2026-10-06-windows-verify-warm-verified-20x.jsonl`: 20x warm Verified mode records (P50 1260.19ms, 90% success, 100% full track identity).
-- `docs/ai/references/driver/2026-10-06-windows-verify-warm-baseline-20x.jsonl`: 20x warm Baseline mode records (P50 1189.18ms, 0/20 writes skipped).
-- `docs/ai/references/driver/2026-10-06-windows-verify-cold-fast-10x.jsonl`: 10x independent process cold Fast runs (P50 321.25ms).
-- `docs/ai/references/driver/2026-10-06-windows-verify-cold-verified-10x.jsonl`: 10x independent process cold Verified runs (P50 391.88ms).
+### 4. Archived Artifacts
+- `docs/ai/references/driver/2026-10-06-windows-verify-warm-fast-20x.jsonl`: 20x warm Fast mode records (P50 25.23ms, P95 1455.49ms, Mean 288.41ms, 100% success, 0 VLM).
+- `docs/ai/references/driver/2026-10-06-windows-verify-warm-verified-20x.jsonl`: 20x warm Verified mode records (P50 1260.19ms, P95 3096.35ms, Mean 1036.34ms, 90% success, 100% full track identity).
+- `docs/ai/references/driver/2026-10-06-windows-verify-warm-baseline-20x.jsonl`: 20x warm Baseline mode records (P50 1189.18ms, P95 3273.47ms, Mean 1025.83ms, 0/20 writes skipped).
+- `docs/ai/references/driver/2026-10-06-windows-verify-cold-fast-10x.jsonl`: 10x independent process cold Fast runs (P50 321.25ms, P95 466.00ms, Mean 344.46ms).
+- `docs/ai/references/driver/2026-10-06-windows-verify-cold-verified-10x.jsonl`: 10x independent process cold Verified runs (P50 391.88ms, P95 419.11ms, Mean 395.74ms).
+
 
 
 
