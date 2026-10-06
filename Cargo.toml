@@ -45,6 +45,7 @@ members = [
   "supported/apps/auv-steam",
   "crates/auv-view",
   "evals/auv-base",
+  "evals/osworld",
 ]
 default-members = [ "crates/auv-cli" ]
 resolver = "2"

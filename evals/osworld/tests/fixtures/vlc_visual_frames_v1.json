@@ -1,0 +1,55 @@
+{
+  "description": "Spatial OCR and 11x11 ROI observations from pinned AUV VLC checkpoints; coordinates are original 1920x1080 pixels.",
+  "frames": [
+    {
+      "name": "red_stale_1006c",
+      "source_sha256": "f42125b07bda2b962daff7a0a47fd3239ea73a065e203d2a4fed1706affd5585",
+      "verdict": "RED_STALE",
+      "words": [["Advanced", 866, 200, 83], ["Preferences", 940, 200, 87], ["Interface", 560, 322, 96], ["Settings", 655, 322, 96]]
+    },
+    {
+      "name": "mixed_ambiguous_1006d",
+      "source_sha256": "4032054ccd6be8b2b87d114af4539e9ceabf6bc0a1a31befc1975427cffe47e8",
+      "verdict": "AMBIGUOUS",
+      "words": [["Advanced", 866, 200, 83], ["Preferences", 940, 200, 87]]
+    },
+    {
+      "name": "advanced_1006e",
+      "source_sha256": "3c6a8f863fa42d8033301695a30f93ee12e238a51249b3fe735c8856a826483b",
+      "verdict": "GREEN_ADVANCED",
+      "words": [["Advanced", 866, 200, 83], ["Preferences", 940, 200, 87], ["Advanced", 890, 239, 95], ["settings", 996, 239, 96]]
+    },
+    {
+      "name": "target_initial_off_1006e",
+      "source_sha256": "ed353ea25eb640af81af251e9cf8ce9cc57310f0e6faf8db1de6d032db758f7b",
+      "verdict": "GREEN_TARGET",
+      "words": [["Advanced", 866, 200, 83], ["Preferences", 940, 200, 87], ["Playlist", 892, 239, 96], ["Play", 919, 390, 94], ["and", 947, 390, 94], ["exit", 974, 391, 96]],
+      "dark_lt_100": { "target": 0, "checked_control": 20, "unchecked_control": 0 },
+      "state": "unchecked"
+    },
+    {
+      "name": "target_on_1006e",
+      "source_sha256": "102acabb798d281d9c6dc36bc998c27d4d049224b83672946db85726c20ede7c",
+      "verdict": "GREEN_TARGET",
+      "words": [["Advanced", 866, 200, 83], ["Preferences", 940, 200, 87], ["Playlist", 892, 239, 96], ["Play", 919, 390, 94], ["and", 947, 390, 94], ["exit", 974, 391, 96]],
+      "dark_lt_100": { "target": 20, "checked_control": 20, "unchecked_control": 0 },
+      "state": "checked"
+    },
+    {
+      "name": "target_final_off_1006e",
+      "source_sha256": "0c27c2e8c3507ad06991b9ab612af8a605f78237a694983e44e9c614bd35a025",
+      "verdict": "GREEN_TARGET",
+      "words": [["Advanced", 866, 200, 83], ["Preferences", 940, 200, 87], ["Playlist", 892, 239, 96], ["Play", 919, 390, 94], ["and", 947, 390, 94], ["exit", 974, 391, 96]],
+      "dark_lt_100": { "target": 0, "checked_control": 20, "unchecked_control": 0 },
+      "state": "unchecked"
+    },
+    {
+      "name": "target_failed_on_1006f",
+      "source_sha256": "43f0fe3551cf2acb6cdf51f19367db3c2b02bf4600959db54fbbea0c2c079c5b",
+      "verdict": "GREEN_TARGET",
+      "words": [["Advanced", 866, 200, 83], ["Preferences", 940, 200, 87], ["Playlist", 892, 239, 96], ["Play", 919, 390, 94], ["and", 947, 390, 94], ["exit", 974, 391, 96]],
+      "dark_lt_100": { "target": 0, "checked_control": 20, "unchecked_control": 0 },
+      "state": "unchecked"
+    }
+  ]
+}
