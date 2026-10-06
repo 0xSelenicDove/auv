@@ -258,6 +258,15 @@ AUV-only GUI delivery, stop detached or remote processes, pin a Pod UID, or
 prove a fresh qcow2 overlay and task-owned reset. Those belong to the next
 audited Kubernetes phase adapter before any unattended batch claim.
 
+An experimental V1 Chrome paired-remote adapter now fixes the six phase
+commands around a capture-only negative control. Its local tests cover pinned
+task/binary configuration, guest and overlay identity checks, AUV-only pixel
+observation, task-owned port-forward lifetimes, and UID-preconditioned reset.
+It has **not** run a Kubernetes episode. The V1 hot qcow2 digest and proxy
+image still require measured, audited inputs; a create-to-ownership-journal
+crash gap also requires manual recovery. A capture-only `0.0` is a scheduler
+negative control, not an agent attempt or AUV GUI-input capability result.
+
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires
 approval.` After the owner approved access, read-only dry-runs at revision

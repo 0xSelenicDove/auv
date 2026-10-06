@@ -525,6 +525,78 @@ scope and hashes. VLC and V2.1 are not supported by this bridge.
 
 ## 10. What remains manual
 
+### Experimental single-episode phase adapter (local tests only)
+
+`evals/osworld/k8s_phase_adapter.py` now builds a six-phase manifest for
+`batch_runner.py` around the pinned V1 Chrome bookmark-folder task. Its fixed
+action is **one paired-AUV `display.capture` negative control**. It sends no
+GUI input and does not measure agent ability or an AUV task-solving attempt;
+the expected evaluator value is `0.0`. This adapter has local boundary tests,
+but has **not** booted a cluster guest or produced a live score. Do not use it
+to claim an official benchmark run.
+
+The operator supplies a JSON configuration with exactly these fields:
+`batch_id`, `episode_id`, `namespace`, `kubeconfig`, `context`, `node`, `runtime_pod`,
+`runtime_service`, `proxy_pod`, `proxy_image`, `base_pvc`,
+`base_qcow_sha256`, `guest_auv_binary`, `host_auv_binary`,
+`upstream_checkout`, `setup_local_port`, and `auv_local_port`. The three
+resource names must be distinct and task-owned; `proxy_image` must be an
+audited digest-pinned image containing `/bin/sh` and `socat`. The V1 hot qcow2
+SHA256 has **not** been measured in the retained evidence, so
+`base_qcow_sha256` must come from a fresh read of the mounted file. No
+placeholder hash or image is supplied. The binary paths must contain the
+specific validated guest and paired-Mac artifacts pinned in the adapter;
+this is not a current-PR-head build. Configuration or manifest generation
+fails when any of those checks is absent. The adapter also requires the
+pinned clean V1 source checkout and audited Chrome task bytes.
+
+After the operator has measured and reviewed those inputs, generate a
+manifest and run it into a **new** output directory:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 evals/osworld/k8s_phase_adapter.py manifest --config /absolute/path/to/reviewed-config.json > /absolute/path/to/reviewed-manifest.json
+PYTHONDONTWRITEBYTECODE=1 python3 evals/osworld/batch_runner.py --manifest /absolute/path/to/reviewed-manifest.json --output-dir /absolute/path/to/new-batch-dir
+```
+
+Boot records the fresh runtime/proxy Pod UIDs, container IDs, restart counts,
+actual image digests, Service UID, and retained PVC/PV identities. It checks
+the read-only base mount, exact base hash, and a live QEMU command containing
+`-enable-kvm` and `-snapshot`; if the pinned runtime uses a different overlay
+mechanism, the adapter will stop rather than infer freshness. Its Pod probes
+check TCP availability, then the adapter requires four successful non-GUI
+`/terminal` responses across at least 15 seconds. It does not use the
+OSWorld `/screenshot` endpoint to observe pixels. Every later
+phase checks the pinned identities. Each guest API phase owns its loopback
+port-forward and closes it on normal/error exit; the forward remains in the
+runner's process group so its hard timeout also removes that route. The
+installer uses `/setup/upload` and a small allowlist of non-GUI
+`/setup/execute` calls; it never invokes AUV GUI operations through the setup
+server. AUV capture runs through the paired Device and its task-owned profile
+file. The evaluator uses the existing Chrome-only pinned method-body bridge,
+not the complete upstream provider. Reset checks ownership UIDs before
+deleting only recorded resources, verifies their absence and the hot PVC/PV
+identity, then removes the task-owned pairing profile. Deletion goes through a
+loopback `kubectl proxy` with Kubernetes `DeleteOptions.preconditions.uid`,
+so the API refuses to delete a replacement object even if it appears after
+the adapter's initial GET.
+
+This local-tested slice is **not unattended-ready**. If boot fails between
+Kubernetes creation and ownership-journal persistence, reset intentionally
+refuses an unrecorded resource. An operator must inspect the episode labels,
+compare the live UID with the task transcript, and decide manual cleanup.
+If the journal or Pod identity changes, automatic reset also fails closed;
+do not delete names blindly to recover. Verify the exact DELETE behavior in
+a task-owned live probe before permitting unattended batches.
+The runbook's section 6A examples that launch AUV `invoke` via
+`/setup/execute` reproduce older manual infrastructure checks, **not** this
+adapter's AUV-only action route. Do not copy them into an action phase.
+
+Local tests, with no cluster access, are:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals/osworld/tests -p 'test_k8s_phase_adapter.py' -v
+```
+
 This runbook reproduces the infrastructure and both AUV control topologies. It
 does not yet provide:
 
