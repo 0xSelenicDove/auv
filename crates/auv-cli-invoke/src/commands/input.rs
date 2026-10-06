@@ -1602,22 +1602,46 @@ async fn execute_scroll_until(input: &InvokeCommandInput, plan: ScrollUntilPlan)
     return scroll_until_output(output).map_err(Into::into);
   }
   input.cancellation.check().map_err(|error| error.to_string())?;
-  let (request, options) = (plan.request.clone(), plan.options.clone());
-  let result = run_cancellable_input(&input.cancellation, move || {
+  let (mut request, options) = (plan.request.clone(), plan.options.clone());
+  // Read tracing state before entering the blocking pool: Context is thread-local.
+  request.observe.capture = auv_tracing::Context::current().can_publish_artifacts();
+  let (result, capture) = run_cancellable_input(&input.cancellation, move || {
     let mut surface = auv_scan::WindowScrollUntilSurface::new(&session, window, point, options);
-    auv_scan::scroll_until(&mut surface, &request, &mut |_| Ok(auv_scan::ScrollUntilDecision::Continue))
+    scroll_until_capture(&mut surface, request)
   })
   .await?;
   if let Some(action) = &result.action {
     emit_input_action_result(action);
   }
   output.result = Some(result);
-  scroll_until_output(output).map_err(Into::into)
+  scroll_until_recorded_output(output, capture).await.map_err(Into::into)
+}
+
+async fn scroll_until_recorded_output(output: ScrollUntilOutput, capture: Option<auv_driver::Capture>) -> InvokeCommandResult {
+  let artifact = match capture {
+    Some(capture) => crate::artifact::emit_png_with_receipt("auv.scan.scroll_until_final_capture", &capture.image).await,
+    None => None,
+  };
+  scroll_until_output(output).map(|output| output.with_artifacts(artifact))
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 async fn execute_scroll_until(_input: &InvokeCommandInput, _plan: ScrollUntilPlan) -> crate::InvokeExecutionResult {
   Err(crate::InvokeFailure::new(crate::FailureCode::Unsupported, "input.scrollUntil is unavailable on this platform"))
+}
+
+/// Retains the last observation for run evidence without cloning its pixels or
+/// taking another capture. Recording is optional, as for other invoke artifacts.
+fn scroll_until_capture(
+  surface: &mut impl auv_scan::ScrollUntilSurface,
+  request: auv_scan::ScrollUntilRequest,
+) -> auv_driver::DriverResult<(auv_scan::ScrollUntilResult, Option<auv_driver::Capture>)> {
+  let mut capture = None;
+  let result = auv_scan::scroll_until(surface, &request, &mut |observation| {
+    capture = observation.capture;
+    Ok(auv_scan::ScrollUntilDecision::Continue)
+  })?;
+  Ok((result, capture))
 }
 
 pub fn scroll_until_output(output: ScrollUntilOutput) -> InvokeCommandResult {
@@ -1634,6 +1658,12 @@ pub fn scroll_until_output(output: ScrollUntilOutput) -> InvokeCommandResult {
   };
   if let Some(result) = &output.result {
     fields.push(InvokeReportField::new("Stop reason", format!("{:?}", result.reason)));
+    if result.reason == auv_scan::ScrollUntilStopReason::EndByNoVisualProgress {
+      fields.push(InvokeReportField::new(
+        "Boundary",
+        "unconfirmed: unchanged pixels can mean ineffective input, a boundary, or delayed content",
+      ));
+    }
     fields.push(InvokeReportField::new("Steps", result.steps.to_string()));
     fields.push(InvokeReportField::new("Delivered", format!("dx={} dy={}", result.delivered.delta_x, result.delivered.delta_y)));
     if let Some(matched) = &result.text_match {

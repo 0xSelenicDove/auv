@@ -711,6 +711,8 @@ async fn execute_scroll_until(input: crate::InvokeCommandInput, context: auv::Au
     crate::emit_input_action_result(action);
   }
   output.result = Some(result);
+  // TODO: retain the final Runner capture once ScrollUntil provides a capture
+  // reference; do not transfer every frame's pixels just to record one artifact.
   crate::commands::input::scroll_until_output(output).map_err(Into::into)
 }
 

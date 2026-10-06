@@ -1165,3 +1165,105 @@ fn scroll_until_plan_rejects_invalid_requests_before_io() {
   let error = crate::command::decode_args::<ScrollUntilArgs>(&input).unwrap().plan(None).unwrap_err();
   assert_eq!(error, "input.scrollUntil requires --target app: or window:");
 }
+
+// ROOT CAUSE:
+// Local scrollUntil discarded every observation capture, so callers needed a
+// second capture that could show a different viewport from the matched result.
+// Retain and persist the final observation without another capture or OCR pass.
+#[test]
+fn scroll_until_records_the_exact_final_observation_without_recapturing() {
+  struct Surface {
+    captures: u8,
+  }
+  impl auv_scan::ScrollUntilSurface for Surface {
+    fn scroll(&mut self, step: &auv_scan::ScrollUntilStep) -> auv_driver::DriverResult<(InputActionResult, auv_driver::Scroll)> {
+      Ok((
+        InputActionResult {
+          selected_path: InputDeliveryPath::WindowTargetedWheel,
+          attempts: Vec::new(),
+          verified: false,
+          mouse_disturbance: Default::default(),
+          focus_disturbance: Default::default(),
+          clipboard_disturbance: Default::default(),
+        },
+        step.delta(),
+      ))
+    }
+    fn capture(&mut self) -> auv_driver::DriverResult<auv_driver::Capture> {
+      self.captures += 1;
+      Ok(auv_driver::Capture {
+        origin: None,
+        image: image::RgbaImage::from_pixel(8, 8, image::Rgba([self.captures * 50, 0, 0, 255])),
+        bounds: auv_driver::Rect::new(0.0, 0.0, 8.0, 8.0),
+        scale_factor: 1.0,
+        backend: "fixture".into(),
+        fallback_reason: None,
+      })
+    }
+    fn recognize_text(&mut self, _: &auv_driver::Capture) -> auv_driver::DriverResult<auv_driver::TextRecognition> {
+      panic!("end condition with text opted out must not run OCR");
+    }
+    fn wait(&mut self, _: std::time::Duration) -> auv_driver::DriverResult<()> {
+      Ok(())
+    }
+  }
+  let input = scroll_until_input(
+    &[
+      ("x", "1"),
+      ("y", "1"),
+      ("dy", "4"),
+      ("until", "end"),
+      ("max-steps", "2"),
+    ],
+    scroll_window_target(),
+  );
+  let plan = decode_scroll_until(&input).unwrap();
+  let store = Arc::new(MemoryTracingStore::new());
+  let dispatch = configure().tracing_store(store.clone()).build().unwrap();
+  let root = dispatcher::with_default(&dispatch, || Context::root(RunId::new()));
+  let mut surface = Surface { captures: 0 };
+  let mut request = plan.request.clone();
+  request.observe.capture = root.in_scope(|| Context::current().can_publish_artifacts());
+  let (result, capture) = scroll_until_capture(&mut surface, request).unwrap();
+  assert_eq!(surface.captures, 3);
+  assert_eq!(result.reason, auv_scan::ScrollUntilStopReason::BudgetExhausted);
+  let mut output = plan.output(test_window(), auv_driver::WindowPoint::new(1.0, 1.0));
+  output.result = Some(result);
+  let output = futures_executor::block_on(root.instrument(scroll_until_recorded_output(output, capture))).unwrap();
+  assert_eq!(output.artifacts().len(), 1);
+  let artifact = &output.artifacts()[0];
+  assert_eq!(artifact.purpose().as_str(), "auv.scan.scroll_until_final_capture");
+  let png = store.artifact(artifact.uri()).unwrap();
+  let decoded = image::load_from_memory(&png).unwrap().into_rgba8();
+  assert_eq!(decoded, image::RgbaImage::from_pixel(8, 8, image::Rgba([150, 0, 0, 255])));
+  assert_eq!(surface.captures, 3);
+  assert!(output.result().unwrap().get("capture").is_none(), "pixels stay out of JSON");
+}
+
+#[test]
+fn scroll_until_dry_run_emits_no_capture_artifact() {
+  let input = scroll_until_input(&[("x", "1"), ("y", "1"), ("dy", "4"), ("until", "end")], scroll_window_target());
+  let plan = decode_scroll_until(&input).unwrap();
+  let output = plan.output(test_window(), auv_driver::WindowPoint::new(1.0, 1.0));
+  let output = futures_executor::block_on(scroll_until_recorded_output(output, None)).unwrap();
+  assert!(output.artifacts().is_empty());
+}
+
+#[test]
+fn scroll_until_no_progress_report_does_not_claim_a_confirmed_boundary() {
+  let input = scroll_until_input(&[("x", "1"), ("y", "1"), ("dy", "4"), ("until", "end")], scroll_window_target());
+  let plan = decode_scroll_until(&input).unwrap();
+  let mut output = plan.output(test_window(), auv_driver::WindowPoint::new(1.0, 1.0));
+  output.result = Some(auv_scan::ScrollUntilResult {
+    reason: auv_scan::ScrollUntilStopReason::EndByNoVisualProgress,
+    steps: 2,
+    delivered: auv_driver::Scroll::new(0.0, 8.0),
+    action: None,
+    text_match: None,
+    last_motion: None,
+  });
+  let result =
+    InvokeResult::from_command_result(RunId::new(), &scroll_until_invoke_command(), scroll_until_output(output).map_err(Into::into));
+  let rendered = result.render_to_string(InvokeOutputOptions::default()).unwrap();
+  assert!(rendered.contains("unconfirmed: unchanged pixels can mean ineffective input"), "{rendered}");
+}

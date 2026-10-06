@@ -203,9 +203,10 @@ pub trait ScrollUntilSurface {
   fn wait(&mut self, duration: Duration) -> DriverResult<()>;
 }
 
-// TODO(scroll-until-artifacts): the final capture and per-step motion are
-// reported in the result but not persisted as run artifacts; add artifact
-// emission when an inspector consumer needs scroll-until evidence.
+// NOTICE: local invoke persists its final observation capture. The loop itself
+// stays independent of run storage; observers own evidence persistence.
+// TODO(scroll-until-artifacts): Runner capture references and per-step motion
+// artifacts remain deferred until their transport/inspector contract is defined.
 // TODO(scroll-until-ax-boundary): accessibility scrollbar values (as NetEase
 // uses) could confirm the end with one observation; add when a platform-neutral
 // scrollbar read exists.
