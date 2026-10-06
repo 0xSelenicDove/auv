@@ -388,7 +388,10 @@ class AdapterTest(unittest.TestCase):
              patch.object(adapter, "_run", return_value=json.dumps(capture)) as run:
             self.episode.action()
         argv = run.call_args.args[0]
-        self.assertEqual(argv[1:6], ["--device", "canonical-device", "invoke", "display.capture", "--json"])
+        # ROOT CAUSE:
+        # --device selects an exact display name, while pair connect returns a
+        # canonical Device ID. The old argv could not resolve its own profile.
+        self.assertEqual(argv[1:6], ["--device-id", "canonical-device", "invoke", "display.capture", "--json"])
         self.assertFalse(any("input." in value for value in argv))
         evidence = json.loads(sidecar.read_text())
         self.assertEqual(evidence["run_ids"], ["run-123"])

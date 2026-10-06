@@ -548,7 +548,7 @@ class Episode:
         env = {**os.environ, "AUV_CONFIG_PROFILES_FILE": str(profile_path),
                "AUV_DISCOVERY_FILE": str(self.directory / "no-local-discovery.json")}
         with self.forward(auv=True):
-            raw = _run([self.config["host_auv_binary"], "--device", paired["device_id"], "invoke",
+            raw = _run([self.config["host_auv_binary"], "--device-id", paired["device_id"], "invoke",
                         "display.capture", "--json", "--store-root", str(self.directory / "auv-runs")], env=env)
             capture = json.loads(raw)
             if not isinstance(capture.get("run_id"), str) or not capture["run_id"]:

@@ -302,8 +302,16 @@ fresh episode before claiming installation or evaluator success.
 
 The adapter now installs only the three packages previously validated in the
 runbook, using the public V1 image sudo password, before `auv --version`.
-That bounded install call and its ordering have local regression coverage;
-the changed path has not yet passed a live guest.
+That bounded install call and its ordering have local regression coverage.
+
+The fifth gate passed guest installation, pairing, and official Chrome
+setup. Action failed before AUV capture because the adapter supplied the
+canonical ID to CLI `--device`, whose contract is name selection. The
+unchanged desktop's evaluator-only score was `0.0`; no AUV Run or artifact
+exists, so this is not a valid capture negative control. Reset again removed
+the task-owned resources and preserved the hot PVC/PV. A test-first change
+switches the adapter to `--device-id`; the six-phase path remains unverified
+live.
 
 The access preflight on 2026-10-06 authenticated `hf` as `nekomeowww`.
 Initially the task dataset returned `Access denied. This repository requires

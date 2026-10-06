@@ -543,9 +543,13 @@ and SHA256 exactly match the dynamic loader's missing `libtesseract.so.4`
 message. The third gate's symptom was obscured by the ignored child exit code.
 Each task-owned VM was cleaned up; none produced an AUV Run or batch score.
 The adapter now checks the guest exit code and installs the runbook-validated
-Tesseract packages in the disposable guest before its AUV version check. That
-new prerequisite path has passed local tests but has not been rechecked live.
-Do not use these gates to claim a benchmark score.
+Tesseract packages in the disposable guest before its AUV version check.
+The fifth live gate passed that path, pairing, and setup, then exposed a
+host-side selector bug: it passed the canonical ID to `--device` (name
+selector). The evaluator returned `0.0` without an AUV Run or screenshot;
+this is not a completed capture control. The adapter now uses `--device-id`,
+which still needs live verification. Do not use these gates to claim a
+benchmark score.
 
 The operator supplies a JSON configuration with exactly these fields:
 `batch_id`, `episode_id`, `namespace`, `kubeconfig`, `context`, `node`, `runtime_pod`,

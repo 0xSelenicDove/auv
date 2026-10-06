@@ -903,6 +903,21 @@ task-owned resources were absent on an independent check, and the hot PVC/PV
 UIDs and Bound status were unchanged. This does not revalidate installation
 after adding the missing guest library.
 
+A fifth independent episode, `osw-v1-neg-1006e`, ran at
+03:04:54–03:07:50 UTC. Boot, the fixed apt prerequisite, guest AUV
+`--version`, pairing, and official Chrome setup all passed. The paired-host
+capture then failed in 3.0 seconds before reaching the guest: the adapter
+passed the canonical Device ID to CLI `--device`, which selects an exact
+Device **name**, not an ID. The host reported `Device selection does not match
+the local daemon or a paired Device profile`. The original evaluator returned
+`0.0` on the unchanged desktop, but AUV evidence was absent: no Run ID or
+PNG. This is an evaluator-only negative observation, **not** a complete
+capture control or an agent result. The [fifth ledger](/private/tmp/auv-osworld-v1-negative-live5.8x8Fxy/run/ledger.json)
+records every phase and its status. Reset succeeded; the three task-owned
+resources were independently absent, the pairing profile was removed, and
+the hot PVC/PV retained their original UIDs and Bound status. A test-first
+adapter fix now uses `--device-id`; that change has not been rechecked live.
+
 ## Operational checklist
 
 1. Select `liet-gpu-1` for the official QEMU/KubeVirt lane; reserve
