@@ -17,7 +17,7 @@ together.
 
 ## Evidence
 
-The evidence comes from building `devtools/repl-playground` (#249, #250)
+The evidence comes from building `apps/repl-playground` (#249, #250; then `devtools/repl-playground`)
 against a local daemon, with read-only measurements on macOS.
 
 - **Captures are large.**
