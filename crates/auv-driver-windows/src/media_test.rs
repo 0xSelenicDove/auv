@@ -113,3 +113,30 @@ fn test_audio_volume_controller_not_found_handling() {
   let set_mute_res = AudioVolumeController::set_process_mute(bogus_pid, true);
   assert!(set_mute_res.is_err(), "Expected error for set_process_mute on nonexistent PID");
 }
+
+#[cfg(target_os = "windows")]
+#[test]
+fn test_audio_volume_controller_cached_lookup_not_found() {
+  let bogus_pid = 999_999_998;
+  let bogus_ep = "{0.0.0.00000000}.{00000000-0000-0000-0000-000000000000}";
+
+  let res = AudioVolumeController::open_process_cached(bogus_pid, Some(bogus_ep));
+  assert!(res.is_err(), "Expected error for nonexistent PID even with cached endpoint");
+  let err_msg = res.unwrap_err().to_string();
+  assert!(err_msg.contains("No active audio session found for PID 999999998"));
+}
+
+#[test]
+fn test_audio_lookup_stats_serialization() {
+  let stats = AudioLookupStats {
+    status: AudioLookupStatus::Hit,
+    endpoint_id: Some("{0.0.0.00000000}.{12345678}".to_string()),
+    endpoint_count: 1,
+    session_count: 3,
+  };
+  let json = serde_json::to_string(&stats).expect("Serialize failed");
+  assert!(json.contains("\"hit\""));
+  assert!(json.contains("12345678"));
+  let deser: AudioLookupStats = serde_json::from_str(&json).expect("Deserialize failed");
+  assert_eq!(stats, deser);
+}
