@@ -84,6 +84,12 @@ impl ActionExecutor {
     }
   }
 
+  /// Capture the final display through this episode's routed Runner, after
+  /// the last typed action and before finishing its Run.
+  pub async fn capture_final(&self) -> Result<auv_driver::DisplayCapture, ExecuteError> {
+    Ok(self.runner.displays().capture(None).await?)
+  }
+
   /// Submit one validated action. On a delivery error, actively release all
   /// holds, poison this episode, and preserve both primary and cleanup errors.
   pub async fn execute(&mut self, action: Action) -> Result<ActionOutcome, ExecuteError> {

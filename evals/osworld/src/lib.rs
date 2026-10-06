@@ -3,6 +3,7 @@
 //! This is a benchmark harness boundary, not an AUV driver or agent policy.
 
 mod action;
+pub mod entry;
 mod executor;
 
 pub use action::{Action, ActionError, Button, ClickCount, Key, Point, parse_action};

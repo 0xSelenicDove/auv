@@ -82,6 +82,59 @@ JSON object on its final stdout line:
 
 The screenshot file must be inside the episode directory. The runner verifies
 its bytes against the digest and compares terminal stdout with the sidecar.
+
+### Local typed-action entry (not wired to Kubernetes)
+
+`auv-osworld-action` is a separate foreground entry for an operator-audited,
+predeclared sequence. It is **not** the fixed K8s adapter action; both Chrome
+and VLC six-phase controls above remain capture-only negative controls. The
+entry accepts only `--plan /absolute/path/to/plan.json` and the two runner
+environment paths. One paired-context plan is:
+
+```json
+{
+  "version": 1,
+  "context": {
+    "kind": "paired",
+    "device_id": "full-canonical-device-id",
+    "config_profile": "episode-profile",
+    "profiles_file": "/absolute/path/to/paired-profiles.json"
+  },
+  "actions": [
+    {"action_type": "CLICK", "x": 420, "y": 300},
+    {"action_type": "TYPING", "text": "example"},
+    "DONE"
+  ]
+}
+```
+
+For an AUV binary running inside the guest, replace `context` with
+`{"kind":"guest-local","device_id":"full-canonical-device-id","daemon_endpoint":"unix:///absolute/path/to/auv.sock"}`.
+The context and action plan reject extra fields; actions use `parse_action`'s
+enumerated structured schema, not shell, Python, or OSWorld `/execute` GUI
+relay. The profile file is a credential store, not copied into the plan or
+stdout. An operator can invoke the local entry with:
+
+```bash
+AUV_OSWORLD_EPISODE_DIR=/absolute/episode \
+AUV_OSWORLD_ACTION_EVIDENCE=/absolute/episode/action_evidence.json \
+  cargo run -p auv-osworld-evals --bin auv-osworld-action -- --plan /absolute/plan.json
+```
+
+It creates one new AUV Run/Runner, atomically records its Run ID in
+`action_evidence.json` before GUI delivery, executes the typed sequence, and
+captures `final-screenshot.png` through that same Runner only on successful
+sequence completion. `input-action-results.json` stores an array per step of
+the original serialized `InputActionResult` values. Normal termination prints
+the final sidecar object as the final stdout line; failure or interruption
+returns nonzero, may leave `final_artifact: null`, and still attempts to release
+held input and finish the Run. Neither delivery nor screenshot is an OSWorld
+task score. The local schema, artifact, and sidecar tests are automated; the
+entry's real Runner/cancellation gate is ignored until run on an isolated
+Xorg guest with a live AUV daemon.
+
+### Batch runner outcome
+
 An action timeout is still a failed action phase, but if setup succeeded and
 the process group stopped, the evaluator runs against the deadline state.
 The evaluator must print an upstream result JSON object with a finite numeric
