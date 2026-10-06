@@ -83,11 +83,78 @@ JSON object on its final stdout line:
 The screenshot file must be inside the episode directory. The runner verifies
 its bytes against the digest and compares terminal stdout with the sidecar.
 
-## Local typed-action entry (not wired to Kubernetes)
+## Fixed paired-remote typed-action infrastructure trial
+
+`k8s_typed_action_adapter.py` is a separate, fail-closed manifest and action
+entry for exactly two OSWorld V1 episodes: pinned Chrome
+`2ad9387a-65d8-4e33-ad5b-7580065a27ca` and pinned VLC
+`5ac2891a-eacd-4954-b339-98abba077adb`. Its checked-in template files
+contain only a typed pointer move followed by `DONE`. They exercise the
+delivery/Run/evidence path; they are **not task-solving scripts** and their
+scores must not be reported as AUV capability. The capture-only adapter and
+its existing manifests remain unchanged negative controls.
+The pointer move is deliberately non-activating: this slice has not audited
+Chrome/VLC focus and shortcut spelling after setup, so a bookmark-manager or
+preferences shortcut would silently assume unproven app state. The trial
+establishes input transport and evidence plumbing only.
+
+The batch input has exactly `batch_id`, `episodes` (two distinct absolute
+paths to existing per-episode capture-adapter config JSON files), and
+`action_binary` (absolute path to the pinned host `auv-osworld-action` binary).
+The current host binary SHA256 is
+`48eedb94c99f7296060aa88d55a9da0a41e2bac36b6c02bad307aa5d54bcd9e9`;
+the two template SHA256s are embedded in the adapter, not selected by config.
+Each episode config must explicitly select one of the two task IDs, have the
+same batch ID, and use unique episode IDs, Pod/Service/proxy names, and local
+ports. The existing config validator verifies upstream task bytes/revision,
+base and AUV binary pins, and the manifest interpreter's `requests` import.
+The separate adapter also verifies the action binary and template byte hashes.
+Each typed phase checks the predeclared config SHA256/task ID before
+delegating. Boot, install, setup, action, and evaluate also check the
+action-binary SHA256; reset intentionally does not, because it never uses that
+binary and must still clean up UID-matched resources if it disappears after a
+timeout. The fixed action phase runs for at most 600 seconds;
+boot/install/setup, pinned evaluation, and UID-safe reset use the existing
+adapter's Episode methods. If config drift precedes reset, cleanup fails
+closed and is recorded as a separate failure layer; it cannot safely delete
+unknown resources.
+Each boot creates a fresh disposable qcow2 overlay.
+
+After inspecting both configs, their binary hashes, and the two static
+templates, generate and inspect a manifest locally:
+
+```bash
+/path/to/python-with-requests evals/osworld/k8s_typed_action_adapter.py manifest \
+  --batch /absolute/path/to/typed-batch.json > /absolute/path/to/typed-manifest.json
+```
+
+Only after operator approval, pass that manifest to `batch_runner.py` using
+the invocation above. The action wrapper binds the Device ID observed by the
+existing install phase to that episode's paired profile path, writes the
+fixed plan, then runs the pinned host action binary as a foreground child in
+the runner's process group. The action binary owns atomic sidecar updates and
+identical final stdout; the runner validates both plus the PNG digest. No
+arbitrary action argv, shell/Python GUI source, or OSWorld GUI relay is
+accepted. The host must be able to reach the guest AUV daemon through the
+existing paired port-forward. No live typed-action batch has passed yet.
+The manifest records the action-entry implementation commit
+`349e5c18812337ac9ee7088418eed9ecce53bde4` separately from the measured
+binary SHA256. This identifies reviewed source; it does not prove a
+reproducible build from that commit. The persisted plan's action array is
+re-read and compared with the audited template before launching the binary.
+Paired-RPC held-input release/Run finish on hard timeout remains unproven:
+`batch_runner.py` currently gives TERM only a 0.2-second grace before KILL.
+
+TODO: Real Chrome/VLC solution scripts remain deferred until their typed AUV
+sequences are independently audited and approved; the fixed infrastructure
+templates must not silently be repurposed as benchmark attempts.
+
+## Local typed-action entry
 
 `auv-osworld-action` is a separate foreground entry for an operator-audited,
-predeclared sequence. It is **not** the fixed K8s adapter action; both Chrome
-and VLC six-phase controls above remain capture-only negative controls. The
+predeclared sequence. The fixed paired-remote adapter above invokes this
+binary with only its audited template plan. The original Chrome and VLC
+capture-only controls remain negative controls. The
 entry accepts only `--plan /absolute/path/to/plan.json` and the two runner
 environment paths. One paired-context plan is:
 
