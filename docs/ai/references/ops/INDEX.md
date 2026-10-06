@@ -2,7 +2,7 @@
 
 Setup, tooling, feature gates, cross-cutting notes
 
-Count: **26**
+Count: **27**
 
 - [`2026-05-12-setup.md`](2026-05-12-setup.md)
 - [`2026-05-13-airi-desktop-reuse.md`](2026-05-13-airi-desktop-reuse.md)
@@ -30,6 +30,7 @@ Count: **26**
 - [`2026-07-03-qodana-operating-model.md`](2026-07-03-qodana-operating-model.md)
 - [`2026-07-07-inference-task-object-detection-simplification-plan.md`](2026-07-07-inference-task-object-detection-simplification-plan.md)
 - [`2026-09-23-crates-io-publication-reference.md`](2026-09-23-crates-io-publication-reference.md)
+- [`2026-10-05-osworld-kubernetes-runbook.md`](2026-10-05-osworld-kubernetes-runbook.md): Operator runbook for booting retained OSWorld V1/V2.1 qcow2 images on ihome, installing AUV, exercising both control topologies, and rerunning fixed V1 scripted tasks.
 
 ## Related
 
