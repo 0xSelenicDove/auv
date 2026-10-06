@@ -195,7 +195,9 @@ fn foreground_runner_cancellation_preserves_run_and_releases_input() {
   fs::create_dir(&first).unwrap();
   let first_plan = root.path().join("first-plan.json");
   let mut actions = vec![json!({"action_type":"MOUSE_DOWN"})];
-  actions.extend((0..1000).map(|_| json!({"action_type":"MOVE_TO","x":300,"y":300})));
+  // The hold counts toward the plan's 1,000-action limit. At 1,001 actions,
+  // validation rejects the plan before a Run exists, so cancellation is untested.
+  actions.extend((0..999).map(|_| json!({"action_type":"MOVE_TO","x":300,"y":300})));
   plan(&first_plan, &endpoint, actions);
   let sidecar = first.join("action_evidence.json");
   let child = Command::new(env!("CARGO_BIN_EXE_auv-osworld-action"))
