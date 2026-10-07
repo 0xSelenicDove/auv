@@ -1,0 +1,294 @@
+{
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "codex_cli_version": "0.150.1",
+  "timeout_seconds": 600,
+  "auv_revision": "fc9b64c1",
+  "auv_binary_sha256": "32c5b99eab3b869be91a6fd8723c4159440e698e1639dc44ec4b098748eb3e03",
+  "variants": {
+    "before": {
+      "SKILL.md": {
+        "sha256": "abe6019287f847d7e750775acc440323c0145cb6fde02ed5b8e86b5ae365058a",
+        "bytes": 4055,
+        "words": 570
+      },
+      "references/operations.md": {
+        "sha256": "6ea34a76b650cc94b394643b83ed0bbd83a03937f07549d714765a613bd9cbed",
+        "bytes": 5451,
+        "words": 644
+      }
+    },
+    "after": {
+      "SKILL.md": {
+        "sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+        "bytes": 4365,
+        "words": 618
+      },
+      "references/operations.md": {
+        "sha256": "6ea34a76b650cc94b394643b83ed0bbd83a03937f07549d714765a613bd9cbed",
+        "bytes": 5451,
+        "words": 644
+      }
+    }
+  },
+  "all_trials_retained": true,
+  "candidate_promoted": true,
+  "installed_version": "after",
+  "decision": "Retain candidate: both tasks succeeded with lower total input-plus-output in this pilot.",
+  "summary": {
+    "before": {
+      "trials": 2,
+      "successes": 2,
+      "all_usage_complete": true,
+      "processed_tokens": 321012,
+      "uncached_input_plus_output": 27124,
+      "seconds": 100.41521304193884,
+      "shell_calls": 14,
+      "help_calls": 6,
+      "runtime_probe_shell_calls": 0,
+      "compact_json_shell_calls": 6,
+      "multiple_help_flags_shell_calls": 0,
+      "captures_after_search": 2
+    },
+    "after": {
+      "trials": 2,
+      "successes": 2,
+      "all_usage_complete": true,
+      "processed_tokens": 312056,
+      "uncached_input_plus_output": 49016,
+      "seconds": 115.71080587501638,
+      "shell_calls": 13,
+      "help_calls": 4,
+      "runtime_probe_shell_calls": 0,
+      "compact_json_shell_calls": 7,
+      "multiple_help_flags_shell_calls": 1,
+      "captures_after_search": 2
+    }
+  },
+  "rows": [
+    {
+      "trial": 1,
+      "version": "before",
+      "skill_sha256": "abe6019287f847d7e750775acc440323c0145cb6fde02ed5b8e86b5ae365058a",
+      "arm": "auv_with_skill",
+      "task": "Archive record 012",
+      "seconds": 50.21430812496692,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 166863,
+        "cached_input_tokens": 154496,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1651,
+        "reasoning_output_tokens": 264
+      },
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "b5df244f772cf88e9dd862bf7d42fa718b35019b5a5c683736ab5eed5846c385",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 7,
+      "shell_errors": 0,
+      "compact_json_shell_calls": 3,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 3,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 1,
+      "first_operation": "window.capture",
+      "activation_before_observation": false,
+      "failed_observations": 0,
+      "operation_counts": {
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "failure_messages": [],
+      "processed_tokens": 168514,
+      "uncached_input_plus_output": 14018,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-01.webp",
+      "evidence_sha256": "15499041b141a59af25fbfb2fda7704cd7683ea345271341832b751bb518c490"
+    },
+    {
+      "trial": 2,
+      "version": "after",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "arm": "auv_with_skill",
+      "task": "Archive record 012",
+      "seconds": 53.52746499993373,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 146756,
+        "cached_input_tokens": 112640,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1814,
+        "reasoning_output_tokens": 356
+      },
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "0174a76d7f8d2b6d99700c6f33b312765abcfb858c2cb7e77fb89df6c7fdb4af",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 5,
+      "shell_errors": 0,
+      "compact_json_shell_calls": 3,
+      "help_batch_detected": true,
+      "multiple_help_flags_shell_calls": 1,
+      "help_calls": 1,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 1,
+      "first_operation": "app.activate",
+      "activation_before_observation": true,
+      "failed_observations": 0,
+      "operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "failure_messages": [],
+      "processed_tokens": 148570,
+      "uncached_input_plus_output": 35930,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-02.webp",
+      "evidence_sha256": "671d41e049cc0ac9a5a7e0d3768462b6a29da839313e2b3b03136fdd1f721e0d"
+    },
+    {
+      "trial": 3,
+      "version": "after",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "arm": "auv_with_skill",
+      "task": "Kestrel handoff",
+      "seconds": 62.18334087508265,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 161823,
+        "cached_input_tokens": 150400,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1663,
+        "reasoning_output_tokens": 241
+      },
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "57c3ea484ad5199f852dbfa2143115d11613f0d9abde105ce597fd0f0c6d1e21",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 8,
+      "shell_errors": 0,
+      "compact_json_shell_calls": 4,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 3,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 1,
+      "first_operation": "app.activate",
+      "activation_before_observation": true,
+      "failed_observations": 0,
+      "operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "failure_messages": [],
+      "processed_tokens": 163486,
+      "uncached_input_plus_output": 13086,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-03.webp",
+      "evidence_sha256": "f4c10d7803b30bbef95d5f891e9df69716d1b7c6bcd83a26082989e37dad4a0a"
+    },
+    {
+      "trial": 4,
+      "version": "before",
+      "skill_sha256": "abe6019287f847d7e750775acc440323c0145cb6fde02ed5b8e86b5ae365058a",
+      "arm": "auv_with_skill",
+      "task": "Kestrel handoff",
+      "seconds": 50.20090491697192,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 151138,
+        "cached_input_tokens": 139392,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1360,
+        "reasoning_output_tokens": 259
+      },
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "ee84f89b8943a1671256fd122f743295aac6e9029a02250dca0857136dfd3e2c",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 7,
+      "shell_errors": 0,
+      "compact_json_shell_calls": 3,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 3,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 1,
+      "first_operation": "window.capture",
+      "activation_before_observation": false,
+      "failed_observations": 0,
+      "operation_counts": {
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "failure_messages": [],
+      "processed_tokens": 152498,
+      "uncached_input_plus_output": 13106,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-04.webp",
+      "evidence_sha256": "5e1f9ccb6181a6e52bc511cfd981404b5eaf80bcf9a5d6c70dcfe2f0361eff3c"
+    }
+  ]
+}

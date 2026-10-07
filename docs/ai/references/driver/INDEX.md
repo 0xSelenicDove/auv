@@ -107,3 +107,5 @@ Count: **64**
 - [AUV skill startup and total-token benchmark](2026-10-06-skill-token-benchmark.md) — shorter installed guidance, conditional readiness checks, compact responses, four verified before/after sessions and cached/uncached totals.
 
 - [Final-frame reuse and help-batching experiment](2026-10-06-skill-reuse-benchmark.md) — four successful sessions but higher total tokens; retained candidate snapshots, recovery costs and restored installed skill.
+
+- [Known covered-app activation skill pilot](2026-10-06-skill-visibility-benchmark.md) — four verified sessions, 2.8% fewer total tokens but more uncached tokens; activation adopted, lookup failure not reproduced.
