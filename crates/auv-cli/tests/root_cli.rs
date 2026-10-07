@@ -1080,3 +1080,134 @@ fn selected_global_text_dry_run_returns_validation_without_delivery() {
   assert_eq!(response["status"], "completed", "{response}");
   assert!(response["result"].is_null(), "dry-run returned delivery evidence: {response}");
 }
+
+/// Offline timing probe through the existing owner-only daemon and local Runner.
+#[cfg(target_os = "macos")]
+#[test]
+#[ignore = "offline runner reuse profile; requires AUV_OCR_RUNNER_PROFILE_ROOT"]
+fn local_runner_ocr_reuse_profile() {
+  use auv_api_proto::auv::api::{driver::v1 as proto, image::v1::RgbaFrame};
+  let root = std::path::PathBuf::from(std::env::var_os("AUV_OCR_RUNNER_PROFILE_ROOT").expect("fixture/output directory"));
+  let fixture: serde_json::Value = serde_json::from_slice(&std::fs::read(root.join("small-mixed.json")).unwrap()).unwrap();
+  let image = image::open(root.join(fixture["path"].as_str().unwrap())).unwrap().to_rgba8();
+  let request = proto::RecognizeTextRequest {
+    source: Some(proto::recognize_text_request::Source::Image(proto::ImageFrame {
+      image: Some(RgbaFrame {
+        width: image.width(),
+        height: image.height(),
+        data: image.into_raw(),
+      }),
+      bounds: Some(proto::ScreenRect {
+        x: 0.0,
+        y: 0.0,
+        width: 700.0,
+        height: 480.0,
+      }),
+      scale_factor: 2.0,
+      backend: "offline.fixture".into(),
+      ..Default::default()
+    })),
+    ..Default::default()
+  };
+  let runtime = tokio::runtime::Runtime::new().unwrap();
+  let mut cohorts = Vec::new();
+  let mut all_correct = true;
+  // ABBA, three identical calls per cohort. Fresh means one daemon/Runner per
+  // call; reused means one daemon/Runner for all three. No OCR prewarming.
+  for reuse in [false, true, true, false] {
+    let mut sessions = Vec::new();
+    for _ in 0..if reuse { 1 } else { 3 } {
+      let directory = tempfile::tempdir().unwrap();
+      let socket = directory.path().join("auv.sock");
+      let endpoint = format!("unix://{}", socket.display());
+      let store = directory.path().join("store");
+      let start = Instant::now();
+      let mut daemon = ChildGuard(
+        Command::new(env!("CARGO_BIN_EXE_auv"))
+          .args([
+            "serve",
+            "--listen",
+            &endpoint,
+            "--store-root",
+            store.to_str().unwrap(),
+            "--no-register",
+          ])
+          .stdin(Stdio::null())
+          .stdout(Stdio::null())
+          .stderr(Stdio::inherit())
+          .spawn()
+          .unwrap(),
+      );
+      wait_for_path(&mut daemon.0, &socket);
+      let (startup_ms, calls, runner_id, runner_pid) = runtime.block_on(async {
+        let client = auv_api_client::protocol::grpc::Client::connect(endpoint.parse().unwrap()).await.unwrap();
+        let transport = client
+          .routed_transport(auv_api_client::RunnerRoute {
+            device_id: None,
+            run_id: None,
+            runner_class: "auv.core.local".into(),
+          })
+          .unwrap();
+        tonic_health::pb::health_client::HealthClient::new(transport.clone())
+          .check(tonic_health::pb::HealthCheckRequest {
+            service: String::new(),
+          })
+          .await
+          .unwrap();
+        let before = client.runners().list_runners().await.unwrap();
+        assert_eq!(before.len(), 1);
+        let startup_ms = start.elapsed().as_secs_f64() * 1000.0;
+        let mut ocr = proto::text_recognition_service_client::TextRecognitionServiceClient::new(transport);
+        let mut calls = Vec::new();
+        for _ in 0..if reuse { 3 } else { 1 } {
+          let call_start = Instant::now();
+          let response = ocr.recognize_text(request.clone()).await.unwrap().into_inner();
+          let rpc_ms = call_start.elapsed().as_secs_f64() * 1000.0;
+          let compact = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+          let checks: Vec<_> = fixture["expected"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|expected| {
+              let found = response.regions.iter().find(|r| compact(&r.text) == compact(expected["text"].as_str().unwrap()));
+              let correct = found.and_then(|r| r.bounds.as_ref()).is_some_and(|bounds| {
+                let top = expected["top"].as_f64().unwrap();
+                (bounds.x - expected["left"].as_f64().unwrap()).abs() <= 3.0
+                  && bounds.y >= top - 3.0
+                  && bounds.y + bounds.height <= top + expected["height"].as_f64().unwrap() + 3.0
+                  && (bounds.width - expected["width"].as_f64().unwrap()).abs() <= 6.0
+              });
+              all_correct &= correct;
+              serde_json::json!({"expected": expected["text"], "text_and_bounds_verified": correct})
+            })
+            .collect();
+          let regions: Vec<_> = response
+            .regions
+            .iter()
+            .map(|r| {
+              let bounds = r.bounds.as_ref().map(|b| serde_json::json!({"x": b.x, "y": b.y, "width": b.width, "height": b.height}));
+              serde_json::json!({"text": r.text, "bounds": bounds, "confidence": r.confidence})
+            })
+            .collect();
+          calls.push(serde_json::json!({"rpc_ms": rpc_ms, "text": response.text, "regions": regions, "checks": checks}));
+        }
+        let after = client.runners().list_runners().await.unwrap();
+        assert_eq!(after.len(), 1);
+        assert_eq!(before[0].r#ref, after[0].r#ref, "Runner identity must survive the calls");
+        assert_eq!(before[0].process_id, after[0].process_id);
+        assert_eq!(after[0].phase, auv_api_proto::auv::api::daemon::v1::RunnerPhase::Ready as i32, "Runner must remain ready");
+        (startup_ms, calls, after[0].r#ref.clone().unwrap().runner_id, after[0].process_id)
+      });
+      let completion_ms = start.elapsed().as_secs_f64() * 1000.0;
+      let teardown_start = Instant::now();
+      interrupt(&daemon.0);
+      assert!(daemon.0.wait().unwrap().success());
+      let teardown_ms = teardown_start.elapsed().as_secs_f64() * 1000.0;
+      sessions.push(serde_json::json!({"startup_ms": startup_ms, "completion_ms": completion_ms,
+        "teardown_ms": teardown_ms, "daemon_pid": daemon.0.id(), "runner_id": runner_id, "runner_pid": runner_pid, "calls": calls}));
+    }
+    cohorts.push(serde_json::json!({"reuse": reuse, "sessions": sessions}));
+    std::fs::write(root.join("runner-reuse-results.json"), serde_json::to_vec_pretty(&cohorts).unwrap()).unwrap();
+  }
+  assert!(all_correct, "every call must retain all fixture text and logical bounds");
+}

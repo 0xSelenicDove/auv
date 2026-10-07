@@ -7,7 +7,7 @@ Executable GUI evaluations live in
 test objects, tasks, and cases. Rust runs evaluations; shared desktop receivers
 use TypeScript. Raw run output stays local.
 
-Count: **70**
+Count: **71**
 
 - [`2026-05-20-macos-driver-namespace-after-window-screen-design.md`](2026-05-20-macos-driver-namespace-after-window-screen-design.md)
 - [`2026-05-20-macos-osascript-backend-design.md`](2026-05-20-macos-osascript-backend-design.md)
@@ -121,3 +121,5 @@ Count: **70**
 - [Scroll-until stage profile](2026-10-06-scroll-stage-profile.md) — opt-in test, four verified searches; recognition explains most slow-run cost and variation, with per-call timings.
 
 - [Rejected Retina OCR resolution experiment](2026-10-06-retina-ocr-resolution.md) — native-resolution recognition lost mixed small text; unchanged production behavior and retained first-call timing evidence.
+
+- [Existing Runner OCR reuse pilot](2026-10-06-runner-ocr-reuse.md): Startup-inclusive offline comparison, unchanged eight-row accuracy, retained first-call stall and model-token limits.

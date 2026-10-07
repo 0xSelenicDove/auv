@@ -1,0 +1,1542 @@
+[
+  {
+    "reuse": false,
+    "sessions": [
+      {
+        "calls": [
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 444.96816700000005,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          }
+        ],
+        "completion_ms": 874.578917,
+        "daemon_pid": 51449,
+        "runner_id": "f36ba5103488f25e0597dd6309394ff9c00c042385bbe2725a04524ffd32837e",
+        "runner_pid": 51451,
+        "startup_ms": 429.418583,
+        "teardown_ms": 4.690042
+      },
+      {
+        "calls": [
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 417.621042,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          }
+        ],
+        "completion_ms": 460.707292,
+        "daemon_pid": 51453,
+        "runner_id": "a6567b8ffe711ec36ff33a878c721a6df833774826b3e4935afb2b8c2f70db80",
+        "runner_pid": 51454,
+        "startup_ms": 42.922334,
+        "teardown_ms": 4.463458
+      },
+      {
+        "calls": [
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 403.645834,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          }
+        ],
+        "completion_ms": 446.13550000000004,
+        "daemon_pid": 51456,
+        "runner_id": "3454f96ffce8b788e39faaec75a1b6306a85ce519f4f66d74f0d7cd911598593",
+        "runner_pid": 51457,
+        "startup_ms": 42.348583000000005,
+        "teardown_ms": 4.284
+      }
+    ]
+  },
+  {
+    "reuse": true,
+    "sessions": [
+      {
+        "calls": [
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 440.734334,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          },
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 280.957042,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          },
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 286.073042,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          }
+        ],
+        "completion_ms": 1051.059834,
+        "daemon_pid": 51459,
+        "runner_id": "952c65c8661afaed850e186e02322e1d9cff9808414110a369e952c033a0a2be",
+        "runner_pid": 51460,
+        "startup_ms": 43.096292,
+        "teardown_ms": 4.683750000000001
+      }
+    ]
+  },
+  {
+    "reuse": true,
+    "sessions": [
+      {
+        "calls": [
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 423.70525,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          },
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 310.749167,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          },
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 305.621667,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          }
+        ],
+        "completion_ms": 1082.476375,
+        "daemon_pid": 51463,
+        "runner_id": "71a099f0deb0aa767e8c000d37fe502b13d7ff4e843ce4de3d0c10d5dab6cecd",
+        "runner_pid": 51464,
+        "startup_ms": 42.1805,
+        "teardown_ms": 7.612333
+      }
+    ]
+  },
+  {
+    "reuse": false,
+    "sessions": [
+      {
+        "calls": [
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 424.674333,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          }
+        ],
+        "completion_ms": 467.418292,
+        "daemon_pid": 51466,
+        "runner_id": "3ffad8533e29e60a5219383783cd922dc3dd97bb135314871960becbc5dd7432",
+        "runner_pid": 51467,
+        "startup_ms": 42.593709,
+        "teardown_ms": 4.940917000000001
+      },
+      {
+        "calls": [
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 410.69570799999997,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          }
+        ],
+        "completion_ms": 453.898167,
+        "daemon_pid": 51469,
+        "runner_id": "210babbd1e932617e7b92c8aafa6483a46b1061dbfe3fc749ac95ca0be9fb7aa",
+        "runner_pid": 51470,
+        "startup_ms": 43.038459,
+        "teardown_ms": 4.420999999999999
+      },
+      {
+        "calls": [
+          {
+            "checks": [
+              {
+                "expected": "Small ledger EN8001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH8001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN10001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH10001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN12001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH12001 已完成",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "Small ledger EN14001 Ready for review",
+                "text_and_bounds_verified": true
+              },
+              {
+                "expected": "中文交接 ZH14001 已完成",
+                "text_and_bounds_verified": true
+              }
+            ],
+            "regions": [
+              {
+                "bounds": {
+                  "height": 13.5,
+                  "width": 154.0,
+                  "x": 23.5,
+                  "y": 29.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN8001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 94.5,
+                  "x": 23.5,
+                  "y": 77.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH8001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 15.0,
+                  "width": 191.5,
+                  "x": 23.5,
+                  "y": 126.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN10001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 120.0,
+                  "x": 24.5,
+                  "y": 174.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接ZH10001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 223.0,
+                  "x": 23.5,
+                  "y": 224.0
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN12001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 12.5,
+                  "width": 141.5,
+                  "x": 24.5,
+                  "y": 271.5
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH12001已完成"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 252.5,
+                  "x": 24.5,
+                  "y": 321.5
+                },
+                "confidence": 1.0,
+                "text": "Small ledger EN14001 Ready for review"
+              },
+              {
+                "bounds": {
+                  "height": 14.5,
+                  "width": 163.0,
+                  "x": 25.5,
+                  "y": 367.0
+                },
+                "confidence": 0.5,
+                "text": "中文交接 ZH14001已完成"
+              }
+            ],
+            "rpc_ms": 430.26975,
+            "text": "Small ledger EN8001 Ready for review\n中文交接 ZH8001已完成\nSmall ledger EN10001 Ready for review\n中文交接ZH10001已完成\nSmall ledger EN12001 Ready for review\n中文交接 ZH12001已完成\nSmall ledger EN14001 Ready for review\n中文交接 ZH14001已完成"
+          }
+        ],
+        "completion_ms": 473.265375,
+        "daemon_pid": 51472,
+        "runner_id": "217d82338cbb2ba9d8ccdfa7bd6f188d904bd7d326aaa719a57b8ee77a8445dc",
+        "runner_pid": 51473,
+        "startup_ms": 42.845042,
+        "teardown_ms": 4.8045
+      }
+    ]
+  }
+]

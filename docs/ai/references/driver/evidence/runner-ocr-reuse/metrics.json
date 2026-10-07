@@ -1,0 +1,125 @@
+{
+  "base_revision": "127e6f5b",
+  "evidence_level": "offline existing macOS local Runner RPC pilot, release build",
+  "production_changed": false,
+  "model_tokens_measured": false,
+  "fixture": "../retina-ocr-resolution/small-mixed.png",
+  "attempts": [
+    {
+      "path": "attempt-1-results.json",
+      "cohorts": [
+        {
+          "reuse": false,
+          "completion_ms": 26805.981042,
+          "startup_ms": 486.069,
+          "teardown_ms": 14.077874999999999,
+          "rpc_ms": [
+            25471.410125,
+            428.81791699999997,
+            419.144625
+          ],
+          "verified_rows": 24
+        },
+        {
+          "reuse": true,
+          "completion_ms": 1063.3063750000001,
+          "startup_ms": 43.059542,
+          "teardown_ms": 4.777375,
+          "rpc_ms": [
+            415.557416,
+            304.693209,
+            299.78083399999997
+          ],
+          "verified_rows": 24
+        },
+        {
+          "reuse": true,
+          "completion_ms": 1080.4650840000002,
+          "startup_ms": 43.164125,
+          "teardown_ms": 4.996916,
+          "rpc_ms": [
+            426.337458,
+            308.18149999999997,
+            302.57491699999997
+          ],
+          "verified_rows": 24
+        },
+        {
+          "reuse": false,
+          "completion_ms": 1410.0606659999999,
+          "startup_ms": 126.051917,
+          "teardown_ms": 14.306833000000001,
+          "rpc_ms": [
+            426.42975,
+            427.030166,
+            430.1265
+          ],
+          "verified_rows": 24
+        }
+      ],
+      "fresh_mean_completion_ms": 14108.020854,
+      "reused_mean_completion_ms": 1071.8857295000003,
+      "mean_reduction_percent": 92.40229554100713
+    },
+    {
+      "path": "repeat-results.json",
+      "cohorts": [
+        {
+          "reuse": false,
+          "completion_ms": 1781.4217090000002,
+          "startup_ms": 514.6895000000001,
+          "teardown_ms": 13.4375,
+          "rpc_ms": [
+            444.96816700000005,
+            417.621042,
+            403.645834
+          ],
+          "verified_rows": 24
+        },
+        {
+          "reuse": true,
+          "completion_ms": 1051.059834,
+          "startup_ms": 43.096292,
+          "teardown_ms": 4.683750000000001,
+          "rpc_ms": [
+            440.734334,
+            280.957042,
+            286.073042
+          ],
+          "verified_rows": 24
+        },
+        {
+          "reuse": true,
+          "completion_ms": 1082.476375,
+          "startup_ms": 42.1805,
+          "teardown_ms": 7.612333,
+          "rpc_ms": [
+            423.70525,
+            310.749167,
+            305.621667
+          ],
+          "verified_rows": 24
+        },
+        {
+          "reuse": false,
+          "completion_ms": 1394.581834,
+          "startup_ms": 128.47721,
+          "teardown_ms": 14.166417,
+          "rpc_ms": [
+            424.674333,
+            410.69570799999997,
+            430.26975
+          ],
+          "verified_rows": 24
+        }
+      ],
+      "fresh_mean_completion_ms": 1588.0017715000001,
+      "reused_mean_completion_ms": 1066.7681045,
+      "mean_reduction_percent": 32.82324216223332
+    }
+  ],
+  "measured_cli_sha256": "de261e0336f89868220c817a538183c20dc8707be8804f7dc7e3352784d2133a",
+  "measured_test_executable_sha256": "30668f9b2750f7a2244ecb9ef7eabb38174227456e3471095331c0e72589ef78",
+  "measurement_source_sha256": "4b667f26499185f24adb2a4ec772da7c2c375fae7983b0bfbdfeb4028d7dc529",
+  "source_after_format_and_equivalent_phase_enum_sha256": "b52478f663a885edd17d15363049055219b052ce60a170e5e21cf886f170c951"
+}
