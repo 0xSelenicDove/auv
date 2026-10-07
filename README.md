@@ -28,8 +28,7 @@ This repository is [0xSelenicDove/auv](https://github.com/0xSelenicDove/auv), a
 fork of [moeru-ai/AUV](https://github.com/moeru-ai/auv). The fork retains upstream
 AUV's architecture and maintains scroll-targeting fixes, agent-skill guidance
 and reproducible optimization evidence. The [AUV Computer Control skill](.agents/skills/auv-computer-control/SKILL.md)
-is maintained in this fork alongside the runtime. The earlier standalone skill
-repository is private and is no longer the recommended installation source.
+is maintained in this fork alongside the runtime.
 
 [Why AUV?](#why-auv) ·
 [Compare this fork with upstream](#this-fork-compared-with-upstream-auv) ·
@@ -196,12 +195,11 @@ new live application test. For OCR, inspect `window.findText --help` before use.
 
 The [versioned skill in this fork](.agents/skills/auv-computer-control/SKILL.md)
 guides operation discovery, targeting, verification and reuse. Use this bundled
-copy so the instructions match the fork; the earlier standalone distribution
-is private. Install the entire `.agents/skills/auv-computer-control` directory,
+copy so the instructions match the fork. Install the entire
+`.agents/skills/auv-computer-control` directory,
 including its references, into your host's supported skill location. For Codex,
 copy it to `~/.codex/skills/auv-computer-control`; for Claude Code, copy it to
-`~/.claude/skills/auv-computer-control`. Replace an older installed copy rather
-than keeping competing versions in the same host.
+`~/.claude/skills/auv-computer-control`.
 
 Invoke `$auv-computer-control` in Codex or `/auv-computer-control` in Claude
 Code. A skill supplies instructions; AUV supplies the execution runtime. The
