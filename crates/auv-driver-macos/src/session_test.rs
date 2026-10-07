@@ -2,6 +2,81 @@ use auv_driver_common::selector::{App, Window as SelectWindow};
 
 use super::*;
 
+#[cfg(target_os = "macos")]
+#[test]
+#[ignore = "offline OCR comparison; requires AUV_RETINA_OCR_FIXTURE_ROOT"]
+fn retina_ocr_enlargement_keeps_small_mixed_text_readable() {
+  let root = std::path::PathBuf::from(std::env::var_os("AUV_RETINA_OCR_FIXTURE_ROOT").expect("set fixture/output directory"));
+  let fixture: serde_json::Value = serde_json::from_slice(&std::fs::read(root.join("small-mixed.json")).unwrap()).unwrap();
+  let capture = Capture {
+    origin: None,
+    image: image::open(root.join(fixture["path"].as_str().unwrap())).unwrap().to_rgba8(),
+    bounds: Rect::new(100.0, 200.0, fixture["logical_width"].as_f64().unwrap(), fixture["logical_height"].as_f64().unwrap()),
+    scale_factor: fixture["scale"].as_f64().unwrap(),
+    backend: "offline.fixture".into(),
+    fallback_reason: None,
+  };
+  let crop = ratio_rect_to_observed(&capture, RatioRect::new(0.0, 0.0, 1.0, 1.0));
+  let mut rows = Vec::new();
+  let mut baseline_expected_found = true;
+  let mut candidate_expected_found = true;
+  // ABBA retains the first-call cost and reduces order bias without changing
+  // Vision settings. Both paths use the same pixels, languages and correction.
+  for enlarged in [true, false, false, true] {
+    let start = std::time::Instant::now();
+    let native = crate::native::ocr::find_text_in_rgba(
+      capture.image.clone().into_raw(),
+      i64::from(capture.image.width()),
+      i64::from(capture.image.height()),
+      "",
+      false,
+      false,
+      256,
+      &[],
+      None,
+      if enlarged { Some(&crop) } else { None },
+    )
+    .unwrap();
+    let milliseconds = start.elapsed().as_secs_f64() * 1000.0;
+    let recognition = text_recognition_from_native(&native, &capture);
+    let checks: Vec<_> = fixture["expected"]
+      .as_array()
+      .unwrap()
+      .iter()
+      .map(|expected| {
+        let text = expected["text"].as_str().unwrap();
+        let compact = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+        let found = recognition.regions.iter().find(|region| compact(&region.text) == compact(text));
+        let correct = found.is_some_and(|region| {
+          let top = 200.0 + expected["top"].as_f64().unwrap();
+          (region.bounds.origin.x - 124.0).abs() <= 3.0
+            && region.bounds.origin.y >= top - 3.0
+            && region.bounds.origin.y + region.bounds.size.height <= top + expected["height"].as_f64().unwrap() + 3.0
+            && (region.bounds.size.width - expected["width"].as_f64().unwrap()).abs() <= 6.0
+        });
+        if enlarged {
+          baseline_expected_found &= correct;
+        } else {
+          candidate_expected_found &= correct;
+        }
+        serde_json::json!({"expected": text, "found": found, "text_and_bounds_verified": correct})
+      })
+      .collect();
+    rows.push(serde_json::json!({"enlarged": enlarged, "milliseconds": milliseconds, "ocr_scale_factor": native.ocr_scale_factor, "recognition": recognition, "checks": checks}));
+  }
+  let metrics = serde_json::json!({
+    "rows": rows,
+    "baseline_text_and_bounds_verified": baseline_expected_found,
+    "candidate_text_and_bounds_verified": candidate_expected_found,
+  });
+  std::fs::write(root.join("small-mixed-results.json"), serde_json::to_vec_pretty(&metrics).unwrap()).unwrap();
+  // ROOT CAUSE:
+  // Removing the full-capture enlargement lost a 10-point mixed Chinese/English
+  // row in both candidate calls. Production still enlarges it; the candidate
+  // remains a diagnostic comparison, not an adopted recognition policy.
+  assert!(baseline_expected_found, "production OCR must preserve the fixture text and logical bounds");
+}
+
 #[test]
 fn main_visible_picks_visible_window_without_requiring_main_flag() {
   let snapshot = observed_windows(vec![

@@ -68,7 +68,10 @@ matched text and coordinate accuracy on small text and mixed-language fixtures
 before adopting a change. Preserve subregion behavior and independent final
 screenshot verification. Do not assume the English canvas validates a global
 language restriction or a lower-accuracy recognition mode. This candidate is
-not implemented in the profiling slice.
+not implemented in the profiling slice. The subsequent
+[resolution experiment](2026-10-06-retina-ocr-resolution.md) rejected that
+candidate after mixed small text failed recognition. Its per-call analysis also
+locates most timing variation in the first recognition call.
 
 [Per-call timings, results, executable hashes and checksums](evidence/scroll-stage-profile/metrics.json)
 retain every outcome. The measured base revision was `a98dbe14` plus the test-only

@@ -1,0 +1,89 @@
+{
+  "base_revision": "c319056c",
+  "adopted": false,
+  "production_changed": false,
+  "candidate_text_and_bounds_verified": false,
+  "baseline_text_and_bounds_verified": true,
+  "rows": [
+    {
+      "enlarged": true,
+      "milliseconds": 25384.049959,
+      "ocr_scale_factor": 2.0,
+      "verified_rows": 8,
+      "expected_rows": 8
+    },
+    {
+      "enlarged": false,
+      "milliseconds": 266.28779099999997,
+      "ocr_scale_factor": 1.0,
+      "verified_rows": 7,
+      "expected_rows": 8
+    },
+    {
+      "enlarged": false,
+      "milliseconds": 247.241917,
+      "ocr_scale_factor": 1.0,
+      "verified_rows": 7,
+      "expected_rows": 8
+    },
+    {
+      "enlarged": true,
+      "milliseconds": 272.81687500000004,
+      "ocr_scale_factor": 2.0,
+      "verified_rows": 8,
+      "expected_rows": 8
+    },
+    {
+      "enlarged": true,
+      "milliseconds": 855.2807919999999,
+      "ocr_scale_factor": 2.0,
+      "verified_rows": 8,
+      "expected_rows": 8
+    },
+    {
+      "enlarged": false,
+      "milliseconds": 259.357,
+      "ocr_scale_factor": 1.0,
+      "verified_rows": 7,
+      "expected_rows": 8
+    },
+    {
+      "enlarged": false,
+      "milliseconds": 244.53033299999998,
+      "ocr_scale_factor": 1.0,
+      "verified_rows": 7,
+      "expected_rows": 8
+    },
+    {
+      "enlarged": true,
+      "milliseconds": 273.5275,
+      "ocr_scale_factor": 2.0,
+      "verified_rows": 8,
+      "expected_rows": 8
+    }
+  ],
+  "model_tokens_measured": false,
+  "test_source_sha256": "71b116577dc980ea106c4beb2a620e016d4d5e95e51c3c1f83136f8538e07f0e",
+  "previous_profile_first_call_ms": [
+    {
+      "run": 1,
+      "first_ocr_ms": 24982.900375,
+      "later_ocr_total_ms": 4638.486253
+    },
+    {
+      "run": 2,
+      "first_ocr_ms": 24897.722167,
+      "later_ocr_total_ms": 4393.418043
+    },
+    {
+      "run": 3,
+      "first_ocr_ms": 267.861417,
+      "later_ocr_total_ms": 4391.881665
+    },
+    {
+      "run": 4,
+      "first_ocr_ms": 276.882417,
+      "later_ocr_total_ms": 4788.388706
+    }
+  ]
+}

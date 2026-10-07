@@ -1,0 +1,72 @@
+{
+  "expected" : [
+    {
+      "font_points" : 8,
+      "height" : 10,
+      "left" : 24,
+      "text" : "Small ledger EN8001 Ready for review",
+      "top" : 30,
+      "width" : 151.02734375
+    },
+    {
+      "font_points" : 8,
+      "height" : 10,
+      "left" : 24,
+      "text" : "中文交接 ZH8001 已完成",
+      "top" : 78,
+      "width" : 91.927058000972764
+    },
+    {
+      "font_points" : 10,
+      "height" : 13,
+      "left" : 24,
+      "text" : "Small ledger EN10001 Ready for review",
+      "top" : 126,
+      "width" : 188.5302734375
+    },
+    {
+      "font_points" : 10,
+      "height" : 13,
+      "left" : 24,
+      "text" : "中文交接 ZH10001 已完成",
+      "top" : 174,
+      "width" : 118.48304125121595
+    },
+    {
+      "font_points" : 12,
+      "height" : 15,
+      "left" : 24,
+      "text" : "Small ledger EN12001 Ready for review",
+      "top" : 222,
+      "width" : 220.716796875
+    },
+    {
+      "font_points" : 12,
+      "height" : 15,
+      "left" : 24,
+      "text" : "中文交接 ZH12001 已完成",
+      "top" : 270,
+      "width" : 140.51590618920233
+    },
+    {
+      "font_points" : 14,
+      "height" : 17,
+      "left" : 24,
+      "text" : "Small ledger EN14001 Ready for review",
+      "top" : 318,
+      "width" : 252.4990234375
+    },
+    {
+      "font_points" : 14,
+      "height" : 17,
+      "left" : 24,
+      "text" : "中文交接 ZH14001 已完成",
+      "top" : 366,
+      "width" : 163.0469243981031
+    }
+  ],
+  "logical_height" : 480,
+  "logical_width" : 700,
+  "path" : "small-mixed.png",
+  "scale" : 2
+}
