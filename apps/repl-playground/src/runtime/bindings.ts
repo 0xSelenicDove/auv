@@ -7,16 +7,6 @@ import { actions, nowMs, usePlayground } from '../store'
 
 let nextHandle = 1
 
-// NOTICE(raw-frame-budget): raw RGBA is only needed to send a frame back to
-// OCR (`auv.text.recognize`). A Retina window capture is ~25 MB and a display
-// ~80 MB, so only the newest ~256 MB stay raw; older frames keep a display
-// bitmap. The last live run's replay recording still holds its own frames.
-const RAW_FRAME_BUDGET = 256 * 1024 * 1024
-
-// TODO(auv-resource-handles): resources (including full RGBA frames) are held
-// in the browser because AUV returns pixels inline. Switch to daemon-side
-// handles plus a resource fetch API once AUV exposes one.
-
 interface Binding {
   effect: Effect
   run: (backend: Backend, scope: CallScope, args: WireValue[], context: CallContext) => Promise<WireValue>
@@ -34,7 +24,7 @@ type ResourceBody = Resource extends infer R ? R extends unknown ? Omit<R, 'call
 class CallScope {
   readonly refs: string[] = []
 
-  constructor(readonly callId: number, readonly seq: number) {}
+  constructor(readonly callId: number, readonly seq: number, readonly backend: Backend | null) {}
 
   display(info: DisplayInfo): DisplayHandle {
     const handle: DisplayHandle = { $ref: `display:${info.id}`, frame: info.frame, id: info.id, kind: 'display', name: info.name, primary: info.primary, scale: info.scale }
@@ -53,14 +43,15 @@ class CallScope {
       width: frame.width,
     }
     this.#put(handle.$ref, { capturedAt: nowMs(), frame, handle, kind: 'frame' })
-    actions.releaseRawFrames(RAW_FRAME_BUDGET)
-    void decodeBitmap(frame).then((bitmap) => {
-      const current = usePlayground.getState().resources[handle.$ref]
-      if (current?.kind === 'frame')
-        actions.putResource(handle.$ref, { ...current, bitmap })
-      else
-        bitmap.close()
-    })
+    if (this.backend) {
+      void decodeBitmap(this.backend, frame).then((bitmap) => {
+        const current = usePlayground.getState().resources[handle.$ref]
+        if (current?.kind === 'frame')
+          actions.putResource(handle.$ref, { ...current, bitmap })
+        else
+          bitmap.close()
+      }, error => console.warn(`Loading ${handle.$ref} pixels failed`, error))
+    }
     return handle
   }
 
@@ -169,24 +160,17 @@ export interface CallContext {
 
 /**
  * Display bitmap for a capture at logical resolution (pixels ÷ `scale`): the
- * canvas and previews draw in logical points, and a Retina capture decoded at
- * full size costs 4× the memory and a slow high-quality downscale per redraw.
+ * canvas and previews draw in logical points, and a Retina capture at full
+ * size costs 4× the transfer, memory and a slow downscale per redraw. The
+ * backend encodes the bounded image; `createImageBitmap` decodes it off the
+ * main thread. OCR keeps reading the full-resolution capture by reference.
  * NOTICE(bitmap-logical-resolution): magnifiers (ClickLoupe, zoomed canvas)
- * show logical-resolution detail; the raw frame stays available for OCR.
+ * show logical-resolution detail.
  */
-export async function decodeBitmap(frame: CapturedFrame): Promise<ImageBitmap> {
-  // NOTICE(rgba-copy): ImageData needs a Uint8ClampedArray over a non-shared
-  // ArrayBuffer whose length is exactly width*height*4; copy when the view is
-  // offset into a larger protobuf buffer.
-  const exact = frame.rgba.byteOffset === 0 && frame.rgba.byteLength === frame.rgba.buffer.byteLength
-  const bytes = exact ? frame.rgba : frame.rgba.slice()
-  const pixels = new Uint8ClampedArray(bytes.buffer as ArrayBuffer, bytes.byteOffset, frame.width * frame.height * 4)
+export async function decodeBitmap(backend: Backend, frame: CapturedFrame): Promise<ImageBitmap> {
   const scale = frame.scale > 1 ? frame.scale : 1
-  return await createImageBitmap(new ImageData(pixels, frame.width, frame.height), {
-    resizeHeight: Math.max(1, Math.round(frame.height / scale)),
-    resizeQuality: 'high',
-    resizeWidth: Math.max(1, Math.round(frame.width / scale)),
-  })
+  const maxSize = { height: Math.max(1, Math.round(frame.height / scale)), width: Math.max(1, Math.round(frame.width / scale)) }
+  return await createImageBitmap(await backend.captureImage(frame, maxSize))
 }
 
 /** Executes one script binding call and records it in the event log. */
@@ -194,7 +178,7 @@ export async function invokeBinding(backend: Backend | null, method: string, arg
   const binding = BINDINGS[method]
   const seq = context.nextSeq()
   const callId = actions.beginCall({ args, effect: binding?.effect ?? 'read', hit: context.hit, line: context.line, method, seq, startedAt: nowMs() })
-  const scope = new CallScope(callId, seq)
+  const scope = new CallScope(callId, seq, backend)
   try {
     if (!backend)
       throw new Error('No device connected. Connect to an AUV daemon or use the mock desktop.')
@@ -255,8 +239,6 @@ function resolveFrame(value: WireValue): { frame: CapturedFrame, handle: FrameHa
   const resource = ref ? usePlayground.getState().resources[ref] : undefined
   if (resource?.kind !== 'frame')
     throw new TypeError('Expected a frame handle from capture()')
-  if (resource.released)
-    throw new RangeError(`${resource.handle.$ref} is an older capture whose pixels were released to save memory; capture again`)
   return { frame: resource.frame, handle: resource.handle }
 }
 

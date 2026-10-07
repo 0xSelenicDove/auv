@@ -96,9 +96,11 @@ fn display_capture_result_keeps_pixels_out_of_json() {
     },
   };
 
-  let output = InvokeCommandOutput::from_result(&super::super::display_capture_result(&capture.display, &capture.capture))
+  let facts = super::super::capture_result(&capture.capture);
+  let report = display_capture_report(&capture.display, &facts);
+  let output = InvokeCommandOutput::from_result(&super::super::display_capture_result(&capture.display, facts))
     .expect("capture result should serialize")
-    .with_report(display_capture_report(&capture));
+    .with_report(report);
   let result = output.result().expect("capture should have a result");
 
   assert_eq!(result["display"]["id"], "display_0");
@@ -106,4 +108,46 @@ fn display_capture_result_keeps_pixels_out_of_json() {
   assert_eq!(result["capture"]["pixel_dimensions"]["height"], 1800);
   assert_eq!(result["capture"]["backend"], "fixture-capture");
   assert!(result.get("image").is_none());
+}
+
+#[tokio::test]
+async fn runner_display_capture_reports_metadata_without_pixels() {
+  // ROOT CAUSE:
+  //
+  // If a Runner display capture was projected while no artifact could be
+  // recorded, invoke still fetched the full RGBA frame (~80 MB) because the
+  // output read pixel size from the pixels.
+  //
+  // The fix projects results from the capture reference's metadata; pixels
+  // are fetched only to write an artifact.
+  let display = Display {
+    id: "display_0".to_string(),
+    name: Some("Fixture Display".to_string()),
+    frame: Rect::new(0.0, 0.0, 1440.0, 900.0),
+    coordinate_space: CoordinateSpace::Screen,
+    scale_factor: 2.0,
+    is_primary: true,
+    is_builtin: Some(true),
+  };
+  let capture = auv::client::runner::RunnerCapture {
+    reference: auv::client::runner::CaptureRef::new("cap-1-1"),
+    bounds: Rect::new(0.0, 0.0, 1440.0, 900.0),
+    origin: None,
+    scale_factor: 2.0,
+    pixel_size: auv_driver::PixelSize::new(2880, 1800),
+    backend: "fixture-runner".to_string(),
+    fallback_reason: None,
+  };
+
+  let output = recorded_display_capture_output(&display, super::super::runner_capture_result(&capture), None)
+    .await
+    .expect("metadata-only capture should project");
+  let result = output.result().expect("capture should have a result");
+
+  assert_eq!(result["capture"]["pixel_dimensions"]["width"], 2880);
+  assert_eq!(result["capture"]["pixel_dimensions"]["height"], 1800);
+  assert_eq!(result["capture"]["backend"], "fixture-runner");
+  assert!(output.artifacts().is_empty(), "no artifact without pixels");
+  let report = output.report.expect("capture output has a report");
+  assert!(report.fields.iter().any(|field| field.label == "Pixel size" && field.value == "2880x1800"), "{report:?}");
 }

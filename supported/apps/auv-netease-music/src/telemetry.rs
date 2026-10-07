@@ -3,7 +3,6 @@
 use auv_driver::InputActionResult;
 use auv_tracing::{Attributes, ByteLength};
 use auv_view::ViewBounds;
-use image::{ExtendedColorType, ImageEncoder, codecs::png::PngEncoder};
 use serde::Serialize;
 
 use crate::scroll::policies::detection_motion::MotionEvidence;
@@ -214,20 +213,18 @@ pub(crate) fn json_artifact<T: Serialize>(purpose: &'static str, value: &T) {
   }
 }
 
-pub(crate) fn png_artifact(purpose: &'static str, image: &image::RgbaImage) {
+/// Records a window capture as evidence at logical resolution.
+pub(crate) fn capture_artifact(purpose: &'static str, capture: &auv_driver::Capture) {
+  image_artifact(purpose, &capture.image, auv_tracing::ImageResolution::Logical(capture.scale_factor));
+}
+
+pub(crate) fn image_artifact(purpose: &'static str, image: &image::RgbaImage, resolution: auv_tracing::ImageResolution) {
   if !auv_tracing::Context::current().can_publish_artifacts() {
     return;
   }
-  let mut body = Vec::new();
-  let result = PngEncoder::new(&mut body)
-    .write_image(image.as_raw(), image.width(), image.height(), ExtendedColorType::Rgba8)
-    .map_err(|error| format!("encode PNG artifact failed: {error}"))
-    .and_then(|()| {
-      let options = auv_tracing::EmitBytesOptions::new().with_purpose(purpose).with_content_type("image/png").with_file_extension("png");
-      auv_tracing::emit_bytes_artifact(options, body).map(drop).map_err(|error| error.to_string())
-    });
-  if let Err(error) = result {
-    preparation_failed(purpose, error);
+  match auv_tracing::image_artifact(auv_tracing::EmitBytesOptions::new().with_purpose(purpose), image, resolution) {
+    Ok(artifact) => drop(auv_tracing::emit_artifact(artifact)),
+    Err(error) => preparation_failed(purpose, error.to_string()),
   }
 }
 

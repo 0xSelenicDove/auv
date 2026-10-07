@@ -308,7 +308,7 @@ async fn press_keys_named(input: InvokeCommandInput, args: PressKeysArgs) -> cra
 }
 
 #[derive(Clone, Debug, Args, serde::Serialize, serde::Deserialize)]
-#[command(after_long_help = "Example:\n  auv invoke input.holdKeys shift --duration-ms 800")]
+#[command(after_long_help = "Examples:\n  auv invoke input.holdKeys shift --duration-ms 800")]
 struct HoldKeysArgs {
   /// One key combination. Modifiers precede ordinary keys.
   #[arg(value_name = "KEY", num_args = 1..)]
@@ -1509,11 +1509,8 @@ impl ScrollUntilArgs {
       settle: std::time::Duration::from_millis(self.settle_ms),
       no_motion_confirmations: self.confirmations,
       motion_region: self.region.as_deref().map(parse_normalized_region).transpose()?,
-      // The command reports only the result, so observations carry no payload.
-      observe: auv_scan::ScrollUntilObserve {
-        capture: false,
-        text: false,
-      },
+      // The command reports only the result, so observations skip OCR.
+      observe: auv_scan::ScrollUntilObserve { text: false },
     };
     request.validate().map_err(|error| format!("input.scrollUntil: {error}"))?;
     Ok(ScrollUntilPlan {
@@ -1602,9 +1599,7 @@ async fn execute_scroll_until(input: &InvokeCommandInput, plan: ScrollUntilPlan)
     return scroll_until_output(output).map_err(Into::into);
   }
   input.cancellation.check().map_err(|error| error.to_string())?;
-  let (mut request, options) = (plan.request.clone(), plan.options.clone());
-  // Read tracing state before entering the blocking pool: Context is thread-local.
-  request.observe.capture = auv_tracing::Context::current().can_publish_artifacts();
+  let (request, options) = (plan.request.clone(), plan.options.clone());
   let (result, capture) = run_cancellable_input(&input.cancellation, move || {
     let mut surface = auv_scan::WindowScrollUntilSurface::new(&session, window, point, options);
     scroll_until_capture(&mut surface, request)
@@ -1619,7 +1614,7 @@ async fn execute_scroll_until(input: &InvokeCommandInput, plan: ScrollUntilPlan)
 
 async fn scroll_until_recorded_output(output: ScrollUntilOutput, capture: Option<auv_driver::Capture>) -> InvokeCommandResult {
   let artifact = match capture {
-    Some(capture) => crate::artifact::emit_png_with_receipt("auv.scan.scroll_until_final_capture", &capture.image).await,
+    Some(capture) => crate::artifact::emit_capture_with_receipt("auv.scan.scroll_until_final_capture", &capture).await,
     None => None,
   };
   scroll_until_output(output).map(|output| output.with_artifacts(artifact))
@@ -1638,7 +1633,7 @@ fn scroll_until_capture(
 ) -> auv_driver::DriverResult<(auv_scan::ScrollUntilResult, Option<auv_driver::Capture>)> {
   let mut capture = None;
   let result = auv_scan::scroll_until(surface, &request, &mut |observation| {
-    capture = observation.capture;
+    capture = Some(observation.capture);
     Ok(auv_scan::ScrollUntilDecision::Continue)
   })?;
   Ok((result, capture))

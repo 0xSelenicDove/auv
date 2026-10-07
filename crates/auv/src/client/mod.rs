@@ -561,15 +561,20 @@ impl RunnerExecution {
     self.runner.macos()
   }
 
-  /// Runs OCR on an existing capture through this Runner.
+  /// Returns explicit pixel access for captures this Runner holds.
+  pub fn captures(&self) -> runner::CapturesClient {
+    self.runner.captures()
+  }
+
+  /// Runs OCR on a capture this Runner holds, or on a caller-owned image.
   pub async fn recognize_text(
     &self,
-    capture: auv_driver::Capture,
+    source: impl Into<runner::RecognitionSource>,
     region: Option<runner::NormalizedRegion>,
     custom_words: Vec<String>,
     recognition_languages: Vec<String>,
   ) -> Result<auv_driver::TextRecognition, runner::CapabilityError> {
-    self.runner.recognize_text(capture, region, custom_words, recognition_languages).await
+    self.runner.recognize_text(source, region, custom_words, recognition_languages).await
   }
 
   /// Completes an implicitly owned Run and returns its terminal resource.

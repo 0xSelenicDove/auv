@@ -1222,8 +1222,7 @@ fn scroll_until_records_the_exact_final_observation_without_recapturing() {
   let dispatch = configure().tracing_store(store.clone()).build().unwrap();
   let root = dispatcher::with_default(&dispatch, || Context::root(RunId::new()));
   let mut surface = Surface { captures: 0 };
-  let mut request = plan.request.clone();
-  request.observe.capture = root.in_scope(|| Context::current().can_publish_artifacts());
+  let request = plan.request.clone();
   let (result, capture) = scroll_until_capture(&mut surface, request).unwrap();
   assert_eq!(surface.captures, 3);
   assert_eq!(result.reason, auv_scan::ScrollUntilStopReason::BudgetExhausted);
@@ -1233,8 +1232,9 @@ fn scroll_until_records_the_exact_final_observation_without_recapturing() {
   assert_eq!(output.artifacts().len(), 1);
   let artifact = &output.artifacts()[0];
   assert_eq!(artifact.purpose().as_str(), "auv.scan.scroll_until_final_capture");
-  let png = store.artifact(artifact.uri()).unwrap();
-  let decoded = image::load_from_memory(&png).unwrap().into_rgba8();
+  let bytes = store.artifact(artifact.uri()).unwrap();
+  assert_eq!(image::guess_format(&bytes).unwrap(), image::ImageFormat::WebP);
+  let decoded = image::load_from_memory(&bytes).unwrap().into_rgba8();
   assert_eq!(decoded, image::RgbaImage::from_pixel(8, 8, image::Rgba([150, 0, 0, 255])));
   assert_eq!(surface.captures, 3);
   assert!(output.result().unwrap().get("capture").is_none(), "pixels stay out of JSON");

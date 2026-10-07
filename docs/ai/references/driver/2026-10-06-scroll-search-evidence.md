@@ -12,15 +12,17 @@ pixel thresholds, stop conditions, or the Runner protocol.
 ## Behavior
 
 Local invoke retains the capture from the final observation and publishes it
-through the existing tracing PNG writer with purpose
+through the shared tracing capture writer with purpose
 `auv.scan.scroll_until_final_capture`. The invoke result carries the artifact
 receipt, including the file path when the frontend store supplies one. Pixels
 are not added to JSON. The capture is moved rather than cloned; no extra capture
 or OCR call is made. Only the latest observation is retained.
 
-Recording availability is checked before entering the blocking input pool,
-because tracing context is thread-local. Without recording, observation captures
-remain opted out. Dry runs produce no screenshot. Artifact publication follows
+After syncing upstream through `e3301554`, observations always include their
+capture. The final capture is retained without copying and recording availability
+is checked by the artifact writer outside the blocking input pool. Evidence is
+lossless WebP at logical resolution, following upstream's shared image policy.
+Dry runs produce no screenshot. Artifact publication follows
 the existing best-effort invoke policy: a storage failure does not turn completed
 scroll delivery into a failure.
 
@@ -50,11 +52,20 @@ The fresh checkout required `git submodule update --init --recursive` and CMake
 for the macOS media build. CMake was installed through Homebrew; no project
 dependency was added.
 
+Upstream sync through `e3301554` was validated with `cargo fmt --check`,
+`cargo check`, `cargo test --no-fail-fast`, and focused tests for
+`auv-cli-invoke`, `auv-scan`, `auv-tracing`, and `auv-driver-macos`, plus
+`git diff --check` and `cargo run --quiet -- invoke --help`. All passed;
+existing live tests remained ignored. The integration suite exposed an existing
+`input.holdKeys` help-heading typo, corrected from `Example:` to `Examples:`.
+The session token benchmark describes its original revisions; it has not been
+rerun on this upstream sync.
+
 ## Next Slices
 
-- Runner final screenshots need capture references rather than transferring every
-  observation's pixels to the invoke client. The current protocol cannot provide
-  a final artifact reference; this remains explicitly deferred at the call site.
+- Upstream now returns Runner capture references instead of observation pixels.
+  Publishing the final Runner capture as an invoke artifact remains a separate
+  slice; the local final-evidence integration is preserved by this sync.
 - Lossless `--compact-json` now removes formatting whitespace; see
   [compact JSON measurements](../invoke-cli/2026-10-06-compact-json.md).
   Command-specific field projection remains deferred.

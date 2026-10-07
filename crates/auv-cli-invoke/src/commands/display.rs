@@ -7,7 +7,7 @@ use clap::Args;
 
 use auv_tracing::ArtifactMetadata;
 
-use crate::artifact::emit_png_with_receipt;
+use crate::artifact::emit_capture_with_receipt;
 #[cfg(target_os = "macos")]
 use auv_driver::overlay::{Overlay, components::CaptureFrame};
 #[cfg(target_os = "macos")]
@@ -49,7 +49,7 @@ async fn capture_display(input: InvokeCommandInput, _args: CaptureDisplayArgs) -
         .with_motion_ease(Duration::from_millis(120), auv_driver::overlay::Easing::EaseInOutExpo)
         .with_auto_removal_after(Duration::from_millis(180)),
     )?;
-    let mut output = display_capture_output(&result, artifact)?;
+    let mut output = display_capture_output(&result.display, super::capture_result(&result.capture), artifact)?;
     output.report.as_mut().expect("display capture output always has a report").fields.push(overlay.report_field());
     Ok(output)
   }
@@ -57,7 +57,7 @@ async fn capture_display(input: InvokeCommandInput, _args: CaptureDisplayArgs) -
   {
     let session = auv::local::open().map_err(|error| error.to_string())?;
     let (result, artifact) = capture_primary_display_recorded_with_session(&session).await?;
-    display_capture_output(&result, artifact)
+    display_capture_output(&result.display, super::capture_result(&result.capture), artifact)
   }
   #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
   {
@@ -65,18 +65,27 @@ async fn capture_display(input: InvokeCommandInput, _args: CaptureDisplayArgs) -
   }
 }
 
-/// Records and projects a capture returned by either a local or remote Driver.
-pub async fn recorded_display_capture_output(result: &auv_driver::DisplayCapture) -> InvokeCommandResult {
-  let artifact = emit_png_with_receipt("auv.driver.display_capture", &result.capture.image).await;
-  display_capture_output(result, artifact)
+/// Records and projects a Runner-held capture. `evidence` is its pixels when
+/// this call records artifacts; without them the result reports metadata only.
+pub async fn recorded_display_capture_output(
+  display: &auv_driver::Display,
+  capture: super::CaptureResult<'_>,
+  evidence: Option<&auv_driver::Capture>,
+) -> InvokeCommandResult {
+  let artifact = match evidence {
+    Some(capture) => emit_capture_with_receipt("auv.driver.display_capture", capture).await,
+    None => None,
+  };
+  display_capture_output(display, capture, artifact)
 }
 
-fn display_capture_output(result: &auv_driver::DisplayCapture, artifact: Option<ArtifactMetadata>) -> InvokeCommandResult {
-  Ok(
-    InvokeCommandOutput::from_result(&super::display_capture_result(&result.display, &result.capture))?
-      .with_report(display_capture_report(result))
-      .with_artifacts(artifact),
-  )
+fn display_capture_output(
+  display: &auv_driver::Display,
+  capture: super::CaptureResult<'_>,
+  artifact: Option<ArtifactMetadata>,
+) -> InvokeCommandResult {
+  let report = display_capture_report(display, &capture);
+  Ok(InvokeCommandOutput::from_result(&super::display_capture_result(display, capture))?.with_report(report).with_artifacts(artifact))
 }
 
 pub async fn capture_primary_display() -> Result<auv_driver::DisplayCapture, String> {
@@ -100,7 +109,7 @@ async fn capture_primary_display_recorded_with_session(
   session: &auv_driver::LocalDriverSession,
 ) -> Result<(auv_driver::DisplayCapture, Option<ArtifactMetadata>), String> {
   let result = session.display().capture(auv_driver::CaptureOptions::default()).map_err(|error| error.to_string())?;
-  let artifact = emit_png_with_receipt("auv.driver.display_capture", &result.capture.image).await;
+  let artifact = emit_capture_with_receipt("auv.driver.display_capture", &result.capture).await;
   Ok((result, artifact))
 }
 
@@ -142,16 +151,16 @@ pub async fn observe_displays() -> Result<auv_driver::ObservedDisplays, String> 
   }
 }
 
-fn display_capture_report(result: &auv_driver::DisplayCapture) -> InvokeReport {
+fn display_capture_report(display: &auv_driver::Display, capture: &super::CaptureResult<'_>) -> InvokeReport {
   let mut fields = vec![
-    InvokeReportField::new("Display", result.display.name.clone().unwrap_or_else(|| format!("display {}", result.display.id))),
-    InvokeReportField::new("Display ID", result.display.id.clone()),
-    InvokeReportField::new("Display frame", result.display.frame.report_value()),
-    InvokeReportField::new("Capture bounds", result.capture.bounds.report_value()),
-    InvokeReportField::new("Pixel size", format!("{}x{}", result.capture.image.width(), result.capture.image.height())),
-    InvokeReportField::new("Scale factor", format!("{:.3}", result.capture.scale_factor)),
+    InvokeReportField::new("Display", display.name.clone().unwrap_or_else(|| format!("display {}", display.id))),
+    InvokeReportField::new("Display ID", display.id.clone()),
+    InvokeReportField::new("Display frame", display.frame.report_value()),
+    InvokeReportField::new("Capture bounds", capture.bounds.report_value()),
+    InvokeReportField::new("Pixel size", capture.pixel_size_report()),
+    InvokeReportField::new("Scale factor", format!("{:.3}", capture.scale_factor)),
   ];
-  if let Some(reason) = result.capture.fallback_reason.as_deref() {
+  if let Some(reason) = capture.fallback_reason {
     fields.push(InvokeReportField::new("Fallback reason", reason));
   }
   InvokeReport::new(fields, Vec::new())

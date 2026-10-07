@@ -38,9 +38,14 @@ message TextMatch {
 }
 
 message RecognizeTextRequest {
-  reserved 1;
-  reserved "lease";
-  CapturedFrame capture = 2;
+  reserved 1, 2;
+  reserved "lease", "capture";
+  oneof source {
+    // A capture this Runner produced; no pixels travel.
+    CaptureRef capture_ref = 6;
+    // A caller-owned image, with pixels.
+    ImageFrame image = 7;
+  }
   optional auv.api.image.v1.NormalizedRect region = 3;
   repeated string custom_words = 4;
   repeated string recognition_languages = 5;
@@ -66,8 +71,8 @@ message FindWindowTextRequest {
 message FindWindowTextResponse {
   Window window = 1;
   repeated TextMatch matches = 2;
-  // Source evidence used to produce matches. Clients may persist it as an
-  // artifact without repeating a possibly different capture.
+  // The capture the matches came from, by reference and without pixels. Fetch
+  // its pixels with CaptureService/GetCaptureImage, e.g. to persist evidence.
   CapturedFrame capture = 3;
 }
 
@@ -85,5 +90,6 @@ message FindDisplayTextRequest {
 message FindDisplayTextResponse {
   Display display = 1;
   repeated TextMatch matches = 2;
+  // The capture the matches came from, by reference and without pixels.
   CapturedFrame capture = 3;
 }

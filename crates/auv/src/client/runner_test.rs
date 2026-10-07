@@ -3,6 +3,29 @@ use super::*;
 #[derive(Debug)]
 struct LargeCaptureService;
 
+const LARGE_CAPTURE_ID: &str = "cap-test-1";
+
+fn large_capture_metadata() -> proto::CapturedFrame {
+  proto::CapturedFrame {
+    r#ref: Some(proto::CaptureRef {
+      capture_id: LARGE_CAPTURE_ID.to_string(),
+    }),
+    origin: None,
+    pixel_size: Some(auv_api_proto::auv::api::image::v1::PixelSize {
+      width: 1280,
+      height: 1024,
+    }),
+    bounds: Some(proto::ScreenRect {
+      width: 1280.0,
+      height: 1024.0,
+      ..Default::default()
+    }),
+    scale_factor: 1.0,
+    backend: "fixture".to_string(),
+    fallback_reason: None,
+  }
+}
+
 #[tonic::async_trait]
 impl proto::capture_service_server::CaptureService for LargeCaptureService {
   async fn capture_window(
@@ -26,21 +49,7 @@ impl proto::capture_service_server::CaptureService for LargeCaptureService {
         }),
         ..Default::default()
       }),
-      capture: Some(proto::CapturedFrame {
-        origin: None,
-        image: Some(auv_api_proto::auv::api::image::v1::RgbaFrame {
-          width: 1280,
-          height: 1024,
-          data: vec![0; 1280 * 1024 * 4],
-        }),
-        bounds: Some(proto::ScreenRect {
-          width: 1280.0,
-          height: 1024.0,
-          ..Default::default()
-        }),
-        ..Default::default()
-      }),
-      ..Default::default()
+      capture: Some(large_capture_metadata()),
     }))
   }
 
@@ -49,6 +58,24 @@ impl proto::capture_service_server::CaptureService for LargeCaptureService {
     _request: tonic::Request<proto::CaptureRegionRequest>,
   ) -> Result<tonic::Response<proto::CaptureRegionResponse>, tonic::Status> {
     Err(tonic::Status::unimplemented("not used by this regression"))
+  }
+
+  async fn get_capture_image(
+    &self,
+    request: tonic::Request<proto::GetCaptureImageRequest>,
+  ) -> Result<tonic::Response<proto::GetCaptureImageResponse>, tonic::Status> {
+    let request = request.into_inner();
+    if request.capture.map(|capture| capture.capture_id).as_deref() != Some(LARGE_CAPTURE_ID) {
+      return Err(tonic::Status::not_found("capture was not found"));
+    }
+    Ok(tonic::Response::new(proto::GetCaptureImageResponse {
+      image: Some(auv_api_proto::auv::api::image::v1::EncodedImage {
+        encoding: auv_api_proto::auv::api::image::v1::ImageEncoding::Rgba as i32,
+        width: 1280,
+        height: 1024,
+        data: vec![0; 1280 * 1024 * 4],
+      }),
+    }))
   }
 }
 
@@ -79,13 +106,7 @@ async fn runner_hierarchy_rejects_an_empty_class_before_any_transport_call() {
   assert!(matches!(error, CapabilityError::InvalidArgument(_)));
 }
 
-#[tokio::test]
-async fn capture_client_accepts_desktop_frames_larger_than_tonic_default() {
-  // ROOT CAUSE:
-  //
-  // If a desktop capture exceeded tonic's 4 MiB decoded-message default, the
-  // routed client rejected the valid frame before the extension could inspect
-  // it. Runner image clients must share the server's image-message policy.
+async fn serve_large_capture_fixture() -> (RunnerClient, tokio::task::JoinHandle<Result<(), tonic::transport::Error>>) {
   let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind capture fixture");
   let address = listener.local_addr().expect("capture fixture address");
   drop(listener);
@@ -99,12 +120,40 @@ async fn capture_client_accepts_desktop_frames_larger_than_tonic_default() {
       .await
   });
   tokio::task::yield_now().await;
-
   let grpc = GrpcClient::connect(format!("http://{address}").parse().expect("fixture URI")).await.expect("connect capture fixture");
-  let response =
-    RunnerClient::new(grpc, route()).expect("runner client").displays().capture(None).await.expect("decode capture larger than 4 MiB");
-  assert!(response.capture.image.as_raw().len() > 4 * 1024 * 1024);
+  (RunnerClient::new(grpc, route()).expect("runner client"), server)
+}
 
+#[tokio::test]
+async fn capture_returns_a_reference_and_metadata_without_pixels() {
+  let (runner, server) = serve_large_capture_fixture().await;
+  let response = runner.displays().capture(None).await.expect("capture metadata");
+  assert_eq!(response.capture.reference, CaptureRef::new(LARGE_CAPTURE_ID));
+  assert_eq!(response.capture.pixel_size, auv_driver::PixelSize::new(1280, 1024));
+  assert_eq!(response.capture.bounds, auv_driver::Rect::new(0.0, 0.0, 1280.0, 1024.0));
+  server.abort();
+}
+
+#[tokio::test]
+async fn capture_pixels_accept_desktop_frames_larger_than_tonic_default() {
+  // ROOT CAUSE:
+  //
+  // If a desktop capture exceeded tonic's 4 MiB decoded-message default, the
+  // routed client rejected the valid frame before the extension could inspect
+  // it. Runner image clients must share the server's image-message policy.
+  let (runner, server) = serve_large_capture_fixture().await;
+  let capture = runner.displays().capture(None).await.expect("capture metadata").capture;
+  let pixels = runner.captures().pixels(&capture).await.expect("decode capture larger than 4 MiB");
+  assert!(pixels.image.as_raw().len() > 4 * 1024 * 1024);
+  assert_eq!(pixels.bounds, capture.bounds);
+  assert_eq!(pixels.backend, "fixture");
+
+  let missing = runner
+    .captures()
+    .image(&CaptureRef::new("cap-evicted"), CaptureImageOptions::default())
+    .await
+    .expect_err("an unknown capture must fail");
+  assert_eq!(missing.client_kind(), Some(crate::error::ClientErrorKind::NotFound));
   server.abort();
 }
 
@@ -195,29 +244,61 @@ fn input_action_projection_rejects_unspecified_wire_enums() {
 }
 
 #[test]
-fn capture_projection_preserves_rgba_and_screen_contract() {
-  let capture = capture_from_proto(proto::CapturedFrame {
+fn runner_capture_projection_requires_a_reference_and_keeps_screen_contract() {
+  let mut frame = large_capture_metadata();
+  frame.bounds = Some(proto::ScreenRect {
+    x: -10.0,
+    y: 4.0,
+    width: 2.0,
+    height: 1.0,
+  });
+  let capture = capture::runner_capture_from_proto(frame.clone()).expect("valid capture metadata");
+  assert_eq!(capture.reference.id(), LARGE_CAPTURE_ID);
+  assert_eq!(capture.bounds, auv_driver::Rect::new(-10.0, 4.0, 2.0, 1.0));
+  assert_eq!(capture.backend, "fixture");
+
+  frame.r#ref = None;
+  let error = capture::runner_capture_from_proto(frame).expect_err("a Runner capture without a reference is malformed");
+  assert!(matches!(error, CapabilityError::InvalidResponse(_)));
+}
+
+#[test]
+fn recognition_source_sends_references_without_pixels() {
+  let frame = image_frame_to_proto(auv_driver::Capture {
     origin: None,
-    image: Some(auv_api_proto::auv::api::image::v1::RgbaFrame {
-      width: 2,
-      height: 1,
-      data: vec![1, 2, 3, 4, 5, 6, 7, 8],
-    }),
-    bounds: Some(proto::ScreenRect {
-      x: -10.0,
-      y: 4.0,
-      width: 2.0,
-      height: 1.0,
-    }),
+    image: image::RgbaImage::from_raw(2, 1, vec![1, 2, 3, 4, 5, 6, 7, 8]).expect("valid RGBA fixture"),
+    bounds: auv_driver::Rect::new(0.0, 0.0, 2.0, 1.0),
     scale_factor: 1.0,
     backend: "fixture".to_string(),
     fallback_reason: None,
-  })
-  .expect("valid RGBA capture");
+  });
+  assert_eq!(frame.image.map(|image| image.data.len()), Some(8), "a caller-owned image carries its pixels");
+  assert!(matches!(
+    RecognitionSource::from(CaptureRef::new("cap-1")),
+    RecognitionSource::Capture(reference) if reference.id() == "cap-1"
+  ));
+}
 
-  assert_eq!(capture.image.as_raw(), &[1, 2, 3, 4, 5, 6, 7, 8]);
-  assert_eq!(capture.bounds, auv_driver::Rect::new(-10.0, 4.0, 2.0, 1.0));
-  assert_eq!(capture.backend, "fixture");
+#[test]
+fn capture_image_converts_to_rgba_only_when_it_is_rgba() {
+  let rgba = CaptureImage {
+    encoding: CaptureImageEncoding::Rgba,
+    size: auv_driver::PixelSize::new(2, 1),
+    data: vec![1, 2, 3, 4, 5, 6, 7, 8],
+  };
+  assert_eq!(rgba.clone().into_rgba_image().expect("RGBA rows").dimensions(), (2, 1));
+
+  let png = CaptureImage {
+    encoding: CaptureImageEncoding::Png,
+    ..rgba.clone()
+  };
+  assert!(matches!(png.into_rgba_image(), Err(CapabilityError::InvalidResponse(_))));
+
+  let truncated = CaptureImage {
+    data: vec![0; 7],
+    ..rgba
+  };
+  assert!(matches!(truncated.into_rgba_image(), Err(CapabilityError::InvalidResponse(_))));
 }
 
 #[test]
@@ -613,10 +694,7 @@ fn scroll_until_begin_projection_keeps_step_condition_region_and_opt_outs() {
       settle: std::time::Duration::from_millis(500),
       no_motion_confirmations: 3,
       motion_region: Some(auv_driver::RatioRect::new(0.0, 0.2, 1.0, 0.6)),
-      observe: auv_scan::ScrollUntilObserve {
-        capture: false,
-        text: true,
-      },
+      observe: auv_scan::ScrollUntilObserve { text: false },
     },
     auv_driver::ScrollOptions::default(),
     true,
@@ -637,18 +715,12 @@ fn scroll_until_begin_projection_keeps_step_condition_region_and_opt_outs() {
   );
   assert_eq!((begin.max_steps, begin.no_motion_confirmations), (30, 3));
   assert_eq!(begin.motion_region.unwrap().height, 0.6);
-  assert_eq!(
-    begin.observe,
-    Some(proto::ScrollUntilObserve {
-      omit_capture: true,
-      omit_text: false
-    })
-  );
+  assert_eq!(begin.observe, Some(proto::ScrollUntilObserve { omit_text: true }));
   assert!(begin.await_decisions);
 }
 
 #[test]
-fn scroll_until_observation_event_decodes_capture_text_and_decision_flag() {
+fn scroll_until_observation_event_decodes_capture_ref_text_and_decision_flag() {
   let event = scroll_until_event_from_proto(proto::ScrollUntilResponse {
     event: Some(proto::scroll_until_response::Event::Observation(proto::ScrollUntilObservation {
       steps: 2,
@@ -662,21 +734,7 @@ fn scroll_until_observation_event_decodes_capture_text_and_decision_flag() {
         no_motion: false,
       }),
       no_motion_streak: 0,
-      capture: Some(proto::CapturedFrame {
-        image: Some(auv_api_proto::auv::api::image::v1::RgbaFrame {
-          width: 2,
-          height: 1,
-          data: vec![0; 8],
-        }),
-        bounds: Some(proto::ScreenRect {
-          x: 0.0,
-          y: 0.0,
-          width: 2.0,
-          height: 1.0,
-        }),
-        scale_factor: 1.0,
-        ..Default::default()
-      }),
+      capture: Some(large_capture_metadata()),
       text: Some(proto::RecognizeTextResponse {
         text: "row".to_string(),
         ..Default::default()
@@ -695,7 +753,7 @@ fn scroll_until_observation_event_decodes_capture_text_and_decision_flag() {
   };
   assert!(awaiting_decision);
   assert_eq!((observation.steps, observation.stop), (2, None));
-  assert_eq!(observation.capture.expect("capture").image.dimensions(), (2, 1));
+  assert_eq!(observation.capture.reference.id(), LARGE_CAPTURE_ID);
   assert_eq!(observation.text.expect("text").text, "row");
 
   let completed = scroll_until_event_from_proto(proto::ScrollUntilResponse {
