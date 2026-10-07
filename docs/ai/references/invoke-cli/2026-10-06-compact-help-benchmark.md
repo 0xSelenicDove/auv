@@ -40,7 +40,8 @@ the ordinary syntax and defaults.
 Combined: **5,965 → 5,644 bytes (5.4% smaller)** and **173 → 97 lines**.
 These are output-size measurements, not tokenizer counts or billing savings.
 All operation guidance words remain; the generated hint accounts for the word
-count differences. Frozen help output is retained in the evidence directory.
+count differences. Frozen help output and the source patch are stored as JSON strings to preserve
+their exact whitespace without introducing trailing whitespace in evidence files.
 
 ## Model-session pilot
 
@@ -79,7 +80,7 @@ and its failed status remain visible in metrics; no trial was replaced.
 The [protocol](evidence/help-layout-benchmark/protocol.md) was registered before
 trial 01: before/after nearby, then after/before deep. Both binaries were built
 in the same debug profile from `14a3b9ea`; only the after binary includes the
-[help-layout patch](evidence/help-layout-benchmark/help-layout.patch). Binary
+[help-layout patch](evidence/help-layout-benchmark/help-layout.patch.json). Binary
 hashes are recorded, with an immutable executable copied into each trial. Skill
 snapshots are identical, matching the installed 618-word guidance. Paired prompts
 match after normalizing trial paths; no additional strategy hint was introduced.

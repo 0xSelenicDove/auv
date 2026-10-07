@@ -362,13 +362,15 @@
         "bytes": 947,
         "lines": 34,
         "words": 103,
-        "sha256": "cce967d8b3d6bb834c77e8e9f5fe6ef93af5247272409dd6f8065a40815f828a"
+        "sha256": "cce967d8b3d6bb834c77e8e9f5fe6ef93af5247272409dd6f8065a40815f828a",
+        "evidence_file": "before-app.activate.json"
       },
       "after": {
         "bytes": 906,
         "lines": 17,
         "words": 98,
-        "sha256": "621b351d6a0335d69ba8eb9a032fd06493b7ed3486d2528ebee14620cbe70a74"
+        "sha256": "621b351d6a0335d69ba8eb9a032fd06493b7ed3486d2528ebee14620cbe70a74",
+        "evidence_file": "after-app.activate.json"
       }
     },
     {
@@ -377,13 +379,15 @@
         "bytes": 1370,
         "lines": 40,
         "words": 164,
-        "sha256": "87574a8437d96574e21905e8325423f7aac421759ff07964f05038544f751e53"
+        "sha256": "87574a8437d96574e21905e8325423f7aac421759ff07964f05038544f751e53",
+        "evidence_file": "before-window.capture.json"
       },
       "after": {
         "bytes": 1324,
         "lines": 21,
         "words": 159,
-        "sha256": "64e50bb494c0c5a40cf444a6d952515b7cdbc81d39f93504ed75fdd2e71c0ec5"
+        "sha256": "64e50bb494c0c5a40cf444a6d952515b7cdbc81d39f93504ed75fdd2e71c0ec5",
+        "evidence_file": "after-window.capture.json"
       }
     },
     {
@@ -392,18 +396,21 @@
         "bytes": 3648,
         "lines": 99,
         "words": 407,
-        "sha256": "7be35da64319e5060780bdacc70020019dde3f585c7d4d2ec3aebf2d29c7ecca"
+        "sha256": "7be35da64319e5060780bdacc70020019dde3f585c7d4d2ec3aebf2d29c7ecca",
+        "evidence_file": "before-input.scrollUntil.json"
       },
       "after": {
         "bytes": 3414,
         "lines": 59,
         "words": 402,
-        "sha256": "d86d094506f3ab2dcad4d3a0c96fd4fd6646fe6774bb280261fdab71297fb84d"
+        "sha256": "d86d094506f3ab2dcad4d3a0c96fd4fd6646fe6774bb280261fdab71297fb84d",
+        "evidence_file": "after-input.scrollUntil.json"
       }
     }
   ],
   "help_contract_validation": "Every registered command retains all expanded-help contract words, excluding only the generated short/long-help hint; compact help has fewer lines.",
   "build_profile": "debug",
   "base_commit": "14a3b9eaf9d2e100505c15f972885952c667e0bf",
-  "patch_sha256": "b3051d2553e8de9348f5a97535cfeb82d23b82d07068224dd4f1c023f4d72cd0"
+  "patch_sha256": "b3051d2553e8de9348f5a97535cfeb82d23b82d07068224dd4f1c023f4d72cd0",
+  "patch_file": "help-layout.patch.json"
 }
