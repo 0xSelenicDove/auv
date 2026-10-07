@@ -18,6 +18,10 @@
 
 [![License](https://badgen.net/github/license/moeru-ai/auv)](LICENSE.md)
 
+<p align="center">
+  <b>English</b> | <a href="./README.zh.md">简体中文</a>
+</p>
+
 AUV means **Application Use Via ...**.
 
 - Apple Music Application Use Via [`auv-apple-music`](https://github.com/moeru-ai/auv/tree/main/supported/apps/auv-apple-music)...
@@ -613,7 +617,7 @@ pnpm typecheck
 ### Documentation
 
 After you change headings in the root or package READMEs, run `pnpm docs:update`.
-This command updates all three tables of contents.
+This command updates all README tables of contents.
 
 Useful entrypoints:
 
