@@ -103,3 +103,5 @@ Count: **64**
 - [Model-session benchmark for filtered window discovery](2026-10-06-scroll-session-filter-benchmark.md) — six verified sessions, natural filter adoption, cached and uncached totals.
 
 - [Three-arm computer-use session benchmark](2026-10-06-three-arm-session-benchmark.md) — corrected native/AUV-without/AUV-with-skill model sessions, cached and uncached usage, retained failure and preliminary isolation audit.
+
+- [AUV skill startup and total-token benchmark](2026-10-06-skill-token-benchmark.md) — shorter installed guidance, conditional readiness checks, compact responses, four verified before/after sessions and cached/uncached totals.
