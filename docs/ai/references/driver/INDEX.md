@@ -7,7 +7,7 @@ Executable GUI evaluations live in
 test objects, tasks, and cases. Rust runs evaluations; shared desktop receivers
 use TypeScript. Raw run output stays local.
 
-Count: **65**
+Count: **66**
 
 - [`2026-05-20-macos-driver-namespace-after-window-screen-design.md`](2026-05-20-macos-driver-namespace-after-window-screen-design.md)
 - [`2026-05-20-macos-osascript-backend-design.md`](2026-05-20-macos-osascript-backend-design.md)
@@ -97,6 +97,7 @@ Count: **65**
 - [macOS foreground scroll preparation](2026-10-06-foreground-scroll-preparation.md): Reproduced inactive-window stall, shared preparation fix, before/after receiver test, background-only preservation, and timing limits.
 - [Foreground scroll focus fast path](2026-10-06-scroll-focus-fast-path.md): Fresh exact-focus checks skip repeated activation, with focus-change receiver coverage and limited CLI latency evidence.
 - [Foreground wheel event location](2026-10-06-scroll-event-location.md): Reproduced header-pointer stalls, explicit event-location correction, repeated receiver checks, and remaining baseline focus-switch failure.
+- [Foreground scroll focus ordering](2026-10-06-scroll-focus-ordering.md): Reproduced AX/WindowServer readiness mismatch, shared predicate correction, focus-switch receiver coverage, and disturbance limits.
 - [Scroll-search model-session benchmark](2026-10-06-scroll-session-benchmark.md): Actual provider token usage, independent synthetic receiver verification, cached-input accounting, setup correction, and retained failures/missing usage.
 
 - [Scroll-search session benchmark after upstream sync](2026-10-06-scroll-session-sync-benchmark.md) — six complete verified sessions comparing pre-sync optimizations with the combined revision.

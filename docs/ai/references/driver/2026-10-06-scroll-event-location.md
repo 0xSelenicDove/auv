@@ -48,6 +48,11 @@ failed during setup; the cover was launched and the test rerun.
 
 ## Remaining failures and limits
 
+Update: the focus-switch mismatch below was subsequently reproduced and
+corrected in [foreground scroll focus ordering](2026-10-06-scroll-focus-ordering.md).
+The following records the results at the event-location change, not a current
+claim that its separate ordering failure remains unfixed.
+
 `timed_foreground_scroll_rechecks_focus_between_samples` failed with both the
 correction and the original wheel code. In each run the cover consumed 375 px
 after the first consumed target sample and a deliberate focus switch. Cover

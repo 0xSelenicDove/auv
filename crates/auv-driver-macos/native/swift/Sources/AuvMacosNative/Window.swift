@@ -597,15 +597,30 @@ func validate_input_target(pid: Int64, window_number: Int64, require_window_focu
   return nativeActionOk()
 }
 
-// A fresh AX read avoids repeating activation for timed wheel samples. Missing
-// AX state is false, so the caller uses its existing preparation/error path.
+// Fresh focus and WindowServer ordering avoid repeating activation for timed
+// wheel samples. AX can report focus before the window finishes coming forward.
+// Missing state is false, so the caller uses its preparation/error path.
 func input_target_is_focused(pid: Int64, window_number: Int64) -> Bool {
   guard inputProcessIsRunning(pid) else { return false }
   let appElement = AXUIElementCreateApplication(pid_t(pid))
   guard windowAxBoolAttribute(appElement, kAXFrontmostAttribute as String) else { return false }
   if window_number == 0 { return true }
   guard let focused = windowAxElementAttribute(appElement, kAXFocusedWindowAttribute as String) else { return false }
-  return windowAxCgWindowId(focused) == window_number
+  guard windowAxCgWindowId(focused) == window_number else { return false }
+  guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+    return false
+  }
+  // HID hit testing follows WindowServer order, not AX's earlier focus update.
+  // Ignore other floating overlays and fully transparent windows in this check;
+  // the target itself may be a floating window.
+  // NOTICE: This readiness check does not prevent focus changes after posting.
+  let front = windows.first {
+    (($0[kCGWindowNumber as String] as? NSNumber)?.int64Value == window_number ||
+      ($0[kCGWindowLayer as String] as? NSNumber)?.intValue == 0) &&
+    (($0[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1) > 0
+  }
+  return (front?[kCGWindowNumber as String] as? NSNumber)?.int64Value == window_number &&
+    (front?[kCGWindowOwnerPID as String] as? NSNumber)?.int64Value == pid
 }
 
 // Activation is owned by the existing Rust input preparation lifecycle. Raise
@@ -628,12 +643,8 @@ func confirm_input_focus(pid: Int64, window_number: Int64) -> NativeActionRespon
   let deadline = ProcessInfo.processInfo.systemUptime + 1.0
   repeat {
     if !inputProcessIsRunning(pid) { break }
-    // Read current focus from AX rather than the workspace's cached frontmost app.
-    if windowAxBoolAttribute(appElement, kAXFrontmostAttribute as String) {
-      if window_number == 0 { return nativeActionOk() }
-      if let focused = windowAxElementAttribute(appElement, kAXFocusedWindowAttribute as String),
-         windowAxCgWindowId(focused) == window_number { return nativeActionOk() }
-    }
+    // Observe both focus and ordering rather than the workspace's cached app.
+    if input_target_is_focused(pid: pid, window_number: window_number) { return nativeActionOk() }
     // Observe until ready; never repeatedly activate or assume a fixed sleep proves focus.
     RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.01))
   } while ProcessInfo.processInfo.systemUptime < deadline

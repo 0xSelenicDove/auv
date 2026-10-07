@@ -1249,8 +1249,11 @@ fn foreground_scroll_from_header_moves_each_sample() {
   }
 }
 
-// Re-reading exact focus must recover when another app takes it between timed
-// samples. A cached "prepared" bit would send later wheel input to the cover.
+// ROOT CAUSE:
+//
+// After the cover took focus, AX reported the target focused before WindowServer
+// brought it forward. Later HID samples reached the cover despite fresh AX reads.
+// Preparation and the fast path must agree on both focus and window ordering.
 #[test]
 #[ignore = "requires CanvasFixture, ScrollCover fixture, and macOS Accessibility"]
 fn timed_foreground_scroll_rechecks_focus_between_samples() {
@@ -1303,6 +1306,12 @@ fn timed_foreground_scroll_rechecks_focus_between_samples() {
           return;
         }
         assert!(crate::native::window::input_target_is_focused(pid, number));
+        let windows = crate::native::window::list_windows(crate::native::window::ListWindowsOptions::all_visible(128)).unwrap();
+        assert_eq!(
+          windows.windows.iter().find(|window| window.layer == 0).unwrap().window_number,
+          number,
+          "AX focus must not get ahead of WindowServer ordering"
+        );
         // Same application identity is insufficient: the exact window must match.
         assert!(!crate::native::window::input_target_is_focused(pid, cover_number));
         if interrupted {
