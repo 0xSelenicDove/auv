@@ -1,0 +1,308 @@
+{
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "codex_cli_version": "0.150.1",
+  "timeout_seconds": 600,
+  "auv_revision": "fc9b64c1",
+  "auv_binary_sha256": "32c5b99eab3b869be91a6fd8723c4159440e698e1639dc44ec4b098748eb3e03",
+  "variants": {
+    "before": {
+      "SKILL.md": {
+        "sha256": "abe6019287f847d7e750775acc440323c0145cb6fde02ed5b8e86b5ae365058a",
+        "bytes": 4055,
+        "words": 570
+      },
+      "references/operations.md": {
+        "sha256": "6ea34a76b650cc94b394643b83ed0bbd83a03937f07549d714765a613bd9cbed",
+        "bytes": 5451,
+        "words": 644
+      }
+    },
+    "after": {
+      "SKILL.md": {
+        "sha256": "0aeb7f5c2c2ebbab188711025b9c73afdaba70fe11a291b594bea5d9e40b1cff",
+        "bytes": 4533,
+        "words": 641
+      },
+      "references/operations.md": {
+        "sha256": "6ea34a76b650cc94b394643b83ed0bbd83a03937f07549d714765a613bd9cbed",
+        "bytes": 5451,
+        "words": 644
+      }
+    }
+  },
+  "all_trials_retained": true,
+  "candidate_promoted": false,
+  "installed_version": "before",
+  "decision": "Registered pilot did not reduce total input-plus-output tokens; restore incumbent skill.",
+  "summary": {
+    "before": {
+      "trials": 2,
+      "successes": 2,
+      "all_usage_complete": true,
+      "processed_tokens": 566436,
+      "uncached_input_plus_output": 45732,
+      "seconds": 165.7220007920405,
+      "shell_calls": 28,
+      "help_calls": 10,
+      "runtime_probe_shell_calls": 0,
+      "compact_json_shell_calls": 16,
+      "multiple_help_flags_shell_calls": 0,
+      "captures_after_search": 3
+    },
+    "after": {
+      "trials": 2,
+      "successes": 2,
+      "all_usage_complete": true,
+      "processed_tokens": 577557,
+      "uncached_input_plus_output": 84629,
+      "seconds": 130.43748195806984,
+      "shell_calls": 25,
+      "help_calls": 7,
+      "runtime_probe_shell_calls": 0,
+      "compact_json_shell_calls": 15,
+      "multiple_help_flags_shell_calls": 1,
+      "captures_after_search": 2
+    }
+  },
+  "rows": [
+    {
+      "trial": 1,
+      "version": "before",
+      "skill_sha256": "abe6019287f847d7e750775acc440323c0145cb6fde02ed5b8e86b5ae365058a",
+      "arm": "auv_with_skill",
+      "task": "Archive record 012",
+      "seconds": 58.09876762505155,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 261215,
+        "cached_input_tokens": 236032,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2387,
+        "reasoning_output_tokens": 629
+      },
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "406739db6a2395eaf8afb9331e245cf5f5bea3de80be68ea578ff575318af7e5",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 12,
+      "shell_errors": 1,
+      "compact_json_shell_calls": 6,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 5,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "window.list": 1,
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 1,
+      "operation_counts": {
+        "window.capture": 3,
+        "window.list": 1,
+        "app.activate": 1,
+        "input.scrollUntil": 1
+      },
+      "failure_messages": [
+        "visible application \"local.auv.CanvasFixture\" was not found"
+      ],
+      "processed_tokens": 263602,
+      "uncached_input_plus_output": 27570,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-01.webp",
+      "evidence_sha256": "6807da00fa4fa065bb43574ecefe9fe8d94d84db2408be58bc44f741b4e946fa"
+    },
+    {
+      "trial": 2,
+      "version": "after",
+      "skill_sha256": "0aeb7f5c2c2ebbab188711025b9c73afdaba70fe11a291b594bea5d9e40b1cff",
+      "arm": "auv_with_skill",
+      "task": "Archive record 012",
+      "seconds": 48.64938420802355,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 244833,
+        "cached_input_tokens": 209920,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2242,
+        "reasoning_output_tokens": 561
+      },
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "2cebc6c3f9e75dfca01e04eb767989e88a7832830d2bd41f44e517b7f7569e95",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 11,
+      "shell_errors": 2,
+      "compact_json_shell_calls": 6,
+      "help_batch_detected": true,
+      "multiple_help_flags_shell_calls": 1,
+      "help_calls": 4,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "window.list": 1,
+        "app.activate": 1,
+        "window.capture": 1,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 0,
+      "operation_counts": {
+        "window.capture": 3,
+        "window.list": 1,
+        "app.activate": 1,
+        "input.scrollUntil": 1
+      },
+      "failure_messages": [
+        "visible application \"local.auv.CanvasFixture\" was not found",
+        "main visible window was not found"
+      ],
+      "processed_tokens": 247075,
+      "uncached_input_plus_output": 37155,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": true,
+      "evidence_file": "trial-02.webp",
+      "evidence_sha256": "04639eb85a66c902c5d682d507678975acd64e82fee666f20a9e8ef2ae10a92c"
+    },
+    {
+      "trial": 3,
+      "version": "after",
+      "skill_sha256": "0aeb7f5c2c2ebbab188711025b9c73afdaba70fe11a291b594bea5d9e40b1cff",
+      "arm": "auv_with_skill",
+      "task": "Kestrel handoff",
+      "seconds": 81.78809775004629,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 327302,
+        "cached_input_tokens": 283008,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 3180,
+        "reasoning_output_tokens": 602
+      },
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "4603fe26e4cc4b77a86e13684db6136610db1a7450b2a5f73225d2cbb0c2a794",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 14,
+      "shell_errors": 3,
+      "compact_json_shell_calls": 9,
+      "help_batch_detected": true,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 3,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "window.list": 2,
+        "app.activate": 2,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 2,
+      "operation_counts": {
+        "window.list": 2,
+        "window.capture": 4,
+        "app.activate": 2,
+        "input.scrollUntil": 1
+      },
+      "failure_messages": [
+        "visible application \"local.auv.CanvasFixture\" was not found",
+        "visible application \"local.auv.CanvasFixture\" was not found"
+      ],
+      "processed_tokens": 330482,
+      "uncached_input_plus_output": 47474,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-03.webp",
+      "evidence_sha256": "5e1f9ccb6181a6e52bc511cfd981404b5eaf80bcf9a5d6c70dcfe2f0361eff3c"
+    },
+    {
+      "trial": 4,
+      "version": "before",
+      "skill_sha256": "abe6019287f847d7e750775acc440323c0145cb6fde02ed5b8e86b5ae365058a",
+      "arm": "auv_with_skill",
+      "task": "Kestrel handoff",
+      "seconds": 107.62323316698894,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 299768,
+        "cached_input_tokens": 284672,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 3066,
+        "reasoning_output_tokens": 880
+      },
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "52cea1ce2f6af7bb9a8b79159eca8fa929cfe0af9245a73f7d063e4a9f97fb71",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 16,
+      "shell_errors": 5,
+      "compact_json_shell_calls": 10,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 5,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "window.list": 1,
+        "app.activate": 2,
+        "window.capture": 1,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 2,
+      "operation_counts": {
+        "window.capture": 5,
+        "window.list": 1,
+        "app.activate": 2,
+        "input.scrollUntil": 2
+      },
+      "failure_messages": [
+        "visible application \"local.auv.CanvasFixture\" was not found",
+        "main visible window was not found",
+        "visible application \"local.auv.CanvasFixture\" was not found",
+        "main visible window was not found",
+        "visible application \"local.auv.CanvasFixture\" was not found"
+      ],
+      "processed_tokens": 302834,
+      "uncached_input_plus_output": 18162,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": true,
+      "evidence_file": "trial-04.webp",
+      "evidence_sha256": "5e1f9ccb6181a6e52bc511cfd981404b5eaf80bcf9a5d6c70dcfe2f0361eff3c"
+    }
+  ]
+}
