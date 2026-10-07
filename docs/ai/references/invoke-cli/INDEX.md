@@ -37,3 +37,5 @@ Count: **23**
 - [Compact invoke JSON](2026-10-06-compact-json.md): Opt-in lossless single-line output, regression coverage, and response-text token counts.
 
 - [Filtered window discovery](2026-10-06-window-list-filters.md) — app/title filters reuse existing targets and preserve complete matching records across local and Runner invoke.
+
+- [Compact command help and session pilot](2026-10-06-compact-help-benchmark.md) — shared compact layout retains full contract text; measured help sizes, four sessions and failed-control limit.

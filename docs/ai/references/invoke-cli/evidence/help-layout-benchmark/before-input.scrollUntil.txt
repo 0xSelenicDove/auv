@@ -1,0 +1,99 @@
+Scroll a target window in steps until no visual motion remains, target text appears, or a step budget runs out.
+
+Usage: auv invoke input.scrollUntil [OPTIONS] --until <CONDITION> <X> <Y>
+
+Arguments:
+  <X>
+          X coordinate inside the target window
+
+  <Y>
+          Y coordinate inside the target window
+
+Options:
+      --dx <DX>
+          Horizontal step in logical pixels; positive scrolls right
+          
+          [default: 0]
+
+      --dy <DY>
+          Vertical step in logical pixels; positive scrolls down
+          
+          [default: 0]
+
+      --until <CONDITION>
+          Stop condition: end, or text:<query>
+
+      --max-steps <MAX_STEPS>
+          Step budget (1..=1000)
+          
+          [default: 50]
+
+      --settle-ms <SETTLE_MS>
+          Wait after each step before observing, in milliseconds (0..=10000)
+          
+          [default: 400]
+
+      --confirmations <CONFIRMATIONS>
+          Consecutive no-motion steps that count as the end (1..=10)
+          
+          [default: 2]
+
+      --region <X,Y,W,H>
+          Normalized window region x,y,width,height compared for motion
+
+      --normalized
+          Interpret X and Y as normalized values in 0..=1
+
+      --title <TEXT>
+          Window title text used with an app target
+
+      --input-policy <INPUT_POLICY>
+          Window input delivery policy. Defaults to background-preferred
+          
+          [possible values: background-only, background-preferred, foreground-preferred]
+
+      --step-duration-ms <STEP_DURATION_MS>
+          Spread each step over this many milliseconds (0 scrolls each step at once)
+          
+          [default: 0]
+
+      --easing <FUNCTION>
+          Timing function for --step-duration-ms (see input.scroll --easing)
+
+      --sample-rate-hz <SAMPLE_RATE_HZ>
+          Samples per second for --step-duration-ms (1..=1000)
+          
+          [default: 60]
+
+      --target <TARGET>
+          Required app:<bundle-id> (its main visible window; bare ids accepted) or window:<window-id>; coordinates are window-local. Display targets are unsupported.
+
+      --dry-run
+          Validate the operation without performing it.
+
+      --no-overlay
+          Disable live visual overlay presentation.
+
+      --store-root <PATH>
+          Directory used to persist the recorded run and artifacts.
+
+      --json
+          Render machine-readable JSON output.
+
+      --compact-json
+          Render single-line JSON with all result, verification, failure, and artifact fields preserved.
+
+      --detail
+          Include diagnostic detail in human output.
+
+      --wide
+          Include extra columns in human table output.
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  auv invoke input.scrollUntil 200 300 --dy 600 --until end --target app:com.google.Chrome
+  auv invoke input.scrollUntil 0.5 0.5 --normalized --dy 800 --until 'text:Load more' --settle-ms 600 --target window:12345
+  auv invoke input.scrollUntil 200 300 --dy 900 --step-duration-ms 500 --easing ease-in-out --until end --region 0,0.1,1,0.8 --target app:com.google.Chrome
+Each step scrolls --dx/--dy logical pixels (one axis; positive is down/right), waits --settle-ms so lazy content can load, then captures the window once. --until end stops after --confirmations consecutive steps without visual motion in --region; --until text:<query> stops when recognized text contains the query, or at the end; keep the step well below the visible height (for example 60-70%) so each line appears whole in at least one observation. --max-steps bounds the loop. An end stop means no visual progress was observed, not proof that no more content exists.

@@ -1,0 +1,55 @@
+diff --git a/crates/auv-cli-invoke/src/help.rs b/crates/auv-cli-invoke/src/help.rs
+index 7b06567e..8247078a 100644
+--- a/crates/auv-cli-invoke/src/help.rs
++++ b/crates/auv-cli-invoke/src/help.rs
+@@ -33,5 +33,49 @@ fn collect_commands<'a>(group: &'a CommandGroup, commands: &mut Vec<&'a InvokeCo
+ 
+ pub fn render_command_help(command: &InvokeCommand) -> String {
+   let mut clap_command = crate::command::with_invoke_context(command.clap_command(), command.target);
+-  clap_command.render_long_help().to_string()
++  // Use Clap's inline layout, retaining the expanded documentation rather than
++  // dropping examples or target/platform constraints for the sake of brevity.
++  if let Some(about) = clap_command.get_long_about().cloned() {
++    clap_command = clap_command.about(about).long_about(None::<&str>);
++  }
++  if let Some(help) = clap_command.get_before_long_help().cloned() {
++    clap_command = clap_command.before_help(help).before_long_help(None::<&str>);
++  }
++  if let Some(help) = clap_command.get_after_long_help().cloned() {
++    clap_command = clap_command.after_help(help).after_long_help(None::<&str>);
++  }
++  clap_command = clap_command.mut_args(|arg| {
++    if let Some(help) = arg.get_long_help().cloned() {
++      arg.help(help).long_help(None::<&str>)
++    } else {
++      arg
++    }
++  });
++  clap_command.render_help().to_string()
++}
++
++#[cfg(test)]
++mod tests {
++  use super::*;
++
++  #[test]
++  fn command_help_uses_compact_rows_without_losing_long_documentation() {
++    for command in crate::default_registry().all() {
++      let mut expanded = crate::command::with_invoke_context(command.clap_command(), command.target);
++      let expanded = expanded.render_long_help().to_string();
++      let compact = render_command_help(command);
++      // Ignore Clap's generated short/long-help hint; compare every contract word,
++      // including examples, defaults, possible values and platform constraints.
++      let words = |text: &str| {
++        text
++          .lines()
++          .filter(|line| !line.contains("Print help") && !line.trim_start().starts_with("-h, --help"))
++          .flat_map(str::split_whitespace)
++          .map(str::to_owned)
++          .collect::<Vec<_>>()
++      };
++      assert_eq!(words(&compact), words(&expanded), "{} lost help content", command.id);
++      assert!(compact.lines().count() < expanded.lines().count(), "{} still uses expanded rows", command.id);
++    }
++  }
+ }

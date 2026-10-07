@@ -1,0 +1,409 @@
+{
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "codex_cli_version": "0.150.1",
+  "timeout_seconds": 600,
+  "auv_revision": "14a3b9ea + help-layout patch",
+  "binaries": {
+    "before": "32c5b99eab3b869be91a6fd8723c4159440e698e1639dc44ec4b098748eb3e03",
+    "after": "bd9ddbd28e57eca5dfbfdc019bda3f8f996bcc686ab72f1237e7cb858bae61e3"
+  },
+  "auv_binary_sha256": "bd9ddbd28e57eca5dfbfdc019bda3f8f996bcc686ab72f1237e7cb858bae61e3",
+  "variants": {
+    "before": {
+      "SKILL.md": {
+        "sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+        "bytes": 4365,
+        "words": 618
+      },
+      "references/operations.md": {
+        "sha256": "6ea34a76b650cc94b394643b83ed0bbd83a03937f07549d714765a613bd9cbed",
+        "bytes": 5451,
+        "words": 644
+      }
+    },
+    "after": {
+      "SKILL.md": {
+        "sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+        "bytes": 4365,
+        "words": 618
+      },
+      "references/operations.md": {
+        "sha256": "6ea34a76b650cc94b394643b83ed0bbd83a03937f07549d714765a613bd9cbed",
+        "bytes": 5451,
+        "words": 644
+      }
+    }
+  },
+  "all_trials_retained": true,
+  "full_session_improvement_criterion_met": false,
+  "help_layout_retained": true,
+  "installed_binary_version": "after",
+  "skill_changed": false,
+  "decision": "Retain the contract-preserving smaller help layout; report full-session results separately, retaining all failures.",
+  "summary": {
+    "before": {
+      "trials": 2,
+      "successes": 1,
+      "all_usage_complete": true,
+      "processed_tokens": 406322,
+      "uncached_input_plus_output": 85298,
+      "seconds": 153.98859070800245,
+      "shell_calls": 19,
+      "help_calls": 8,
+      "runtime_probe_shell_calls": 0,
+      "compact_json_shell_calls": 9,
+      "multiple_help_flags_shell_calls": 0,
+      "captures_after_search": 2,
+      "root_help_shell_calls": 0,
+      "catalog_help_shell_calls": 1
+    },
+    "after": {
+      "trials": 2,
+      "successes": 2,
+      "all_usage_complete": true,
+      "processed_tokens": 349275,
+      "uncached_input_plus_output": 37979,
+      "seconds": 109.34824070800096,
+      "shell_calls": 19,
+      "help_calls": 7,
+      "runtime_probe_shell_calls": 0,
+      "compact_json_shell_calls": 10,
+      "multiple_help_flags_shell_calls": 0,
+      "captures_after_search": 3,
+      "root_help_shell_calls": 0,
+      "catalog_help_shell_calls": 1
+    }
+  },
+  "rows": [
+    {
+      "trial": 1,
+      "version": "before",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "binary_sha256": "32c5b99eab3b869be91a6fd8723c4159440e698e1639dc44ec4b098748eb3e03",
+      "arm": "auv_with_skill",
+      "task": "Archive record 012",
+      "seconds": 63.20469404209871,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 224562,
+        "cached_input_tokens": 183552,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1899,
+        "reasoning_output_tokens": 414
+      },
+      "answer": {
+        "found": false,
+        "code": null,
+        "status": null,
+        "screenshot_verified": false
+      },
+      "prompt_sha256": "3eb567c52b4f29b6c41df8b5dca2688760ef82a8866e06d0087e34a2d946887d",
+      "coordinator_verified": false,
+      "coordinator_failure": "Fixture stayed at top; Archive record 012 was not visible; subject reported found=false.",
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 11,
+      "shell_errors": 0,
+      "compact_json_shell_calls": 5,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 5,
+      "root_help_shell_calls": 0,
+      "catalog_help_shell_calls": 1,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1,
+        "input.key": 1
+      },
+      "captures_after_search": 1,
+      "first_operation": "app.activate",
+      "activation_before_observation": true,
+      "failed_observations": 0,
+      "operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1,
+        "input.key": 1
+      },
+      "search_outcomes": [
+        {
+          "run_id": "01a114a3-b92e-7777-bbbd-f2054ab0ff17",
+          "reason": "end_by_no_visual_progress",
+          "steps": 2,
+          "max_steps": 5
+        }
+      ],
+      "failure_messages": [],
+      "processed_tokens": 226461,
+      "uncached_input_plus_output": 42909,
+      "success": false,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-01.webp",
+      "evidence_sha256": "c3ba95de423039433919612bcada5e9dccb1b5ad0c47f587da56596928956ba0"
+    },
+    {
+      "trial": 2,
+      "version": "after",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "binary_sha256": "bd9ddbd28e57eca5dfbfdc019bda3f8f996bcc686ab72f1237e7cb858bae61e3",
+      "arm": "auv_with_skill",
+      "task": "Archive record 012",
+      "seconds": 42.74808004195802,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 144069,
+        "cached_input_tokens": 132608,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2011,
+        "reasoning_output_tokens": 557
+      },
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "d95d5ff3244608d7170dfa308c91cee7047e80c738e9d509832083885f8f7074",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 10,
+      "shell_errors": 2,
+      "compact_json_shell_calls": 6,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 3,
+      "root_help_shell_calls": 0,
+      "catalog_help_shell_calls": 0,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "app.activate": 2,
+        "window.capture": 1,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 2,
+      "first_operation": "app.activate",
+      "activation_before_observation": true,
+      "failed_observations": 2,
+      "operation_counts": {
+        "app.activate": 2,
+        "window.capture": 3,
+        "input.scrollUntil": 1
+      },
+      "search_outcomes": [
+        {
+          "run_id": "01a114a5-680a-7554-9b2e-87d01a196712",
+          "reason": "text_visible",
+          "steps": 1,
+          "max_steps": 4
+        }
+      ],
+      "failure_messages": [
+        "visible application \"local.auv.CanvasFixture\" was not found",
+        "visible application \"local.auv.CanvasFixture\" was not found"
+      ],
+      "processed_tokens": 146080,
+      "uncached_input_plus_output": 13472,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": true,
+      "evidence_file": "trial-02.webp",
+      "evidence_sha256": "0316bf2ffac742c52ad19e54bb14a8c9f63e5791caf54f8ba9d7f7764b2af548"
+    },
+    {
+      "trial": 3,
+      "version": "after",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "binary_sha256": "bd9ddbd28e57eca5dfbfdc019bda3f8f996bcc686ab72f1237e7cb858bae61e3",
+      "arm": "auv_with_skill",
+      "task": "Kestrel handoff",
+      "seconds": 66.60016066604294,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 201760,
+        "cached_input_tokens": 178688,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1435,
+        "reasoning_output_tokens": 143
+      },
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "6444970ebd92200f517433331dc23309c6a4e52186cc2ed3f4f7f6f36926de72",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 9,
+      "shell_errors": 0,
+      "compact_json_shell_calls": 4,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 4,
+      "root_help_shell_calls": 0,
+      "catalog_help_shell_calls": 1,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 1,
+      "first_operation": "app.activate",
+      "activation_before_observation": true,
+      "failed_observations": 0,
+      "operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "search_outcomes": [
+        {
+          "run_id": "01a114a6-a21c-7564-8ff4-5693c02fb6ad",
+          "reason": "text_visible",
+          "steps": 23,
+          "max_steps": 100
+        }
+      ],
+      "failure_messages": [],
+      "processed_tokens": 203195,
+      "uncached_input_plus_output": 24507,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-03.webp",
+      "evidence_sha256": "db6549f10d066dabc0a8c295f518017d041661eca239cb244e2d5251bf662115"
+    },
+    {
+      "trial": 4,
+      "version": "before",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "binary_sha256": "32c5b99eab3b869be91a6fd8723c4159440e698e1639dc44ec4b098748eb3e03",
+      "arm": "auv_with_skill",
+      "task": "Kestrel handoff",
+      "seconds": 90.78389666590374,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 178277,
+        "cached_input_tokens": 137472,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1584,
+        "reasoning_output_tokens": 237
+      },
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "30c4516404c8cb90b36a221b08657b227b524828123cfed53b0350df32dc2872",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 8,
+      "shell_errors": 0,
+      "compact_json_shell_calls": 4,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 3,
+      "root_help_shell_calls": 0,
+      "catalog_help_shell_calls": 0,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 1,
+      "first_operation": "app.activate",
+      "activation_before_observation": true,
+      "failed_observations": 0,
+      "operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "search_outcomes": [
+        {
+          "run_id": "01a114a8-96dc-7613-a68f-f735654777fa",
+          "reason": "text_visible",
+          "steps": 21,
+          "max_steps": 50
+        }
+      ],
+      "failure_messages": [],
+      "processed_tokens": 179861,
+      "uncached_input_plus_output": 42389,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-04.webp",
+      "evidence_sha256": "c7d1c56546bb1d2d5a81eda110a16be5a4def7d31c637d9500c6d5041f8fb328"
+    }
+  ],
+  "help_sizes": [
+    {
+      "operation": "app.activate",
+      "before": {
+        "bytes": 947,
+        "lines": 34,
+        "words": 103,
+        "sha256": "cce967d8b3d6bb834c77e8e9f5fe6ef93af5247272409dd6f8065a40815f828a"
+      },
+      "after": {
+        "bytes": 906,
+        "lines": 17,
+        "words": 98,
+        "sha256": "621b351d6a0335d69ba8eb9a032fd06493b7ed3486d2528ebee14620cbe70a74"
+      }
+    },
+    {
+      "operation": "window.capture",
+      "before": {
+        "bytes": 1370,
+        "lines": 40,
+        "words": 164,
+        "sha256": "87574a8437d96574e21905e8325423f7aac421759ff07964f05038544f751e53"
+      },
+      "after": {
+        "bytes": 1324,
+        "lines": 21,
+        "words": 159,
+        "sha256": "64e50bb494c0c5a40cf444a6d952515b7cdbc81d39f93504ed75fdd2e71c0ec5"
+      }
+    },
+    {
+      "operation": "input.scrollUntil",
+      "before": {
+        "bytes": 3648,
+        "lines": 99,
+        "words": 407,
+        "sha256": "7be35da64319e5060780bdacc70020019dde3f585c7d4d2ec3aebf2d29c7ecca"
+      },
+      "after": {
+        "bytes": 3414,
+        "lines": 59,
+        "words": 402,
+        "sha256": "d86d094506f3ab2dcad4d3a0c96fd4fd6646fe6774bb280261fdab71297fb84d"
+      }
+    }
+  ],
+  "help_contract_validation": "Every registered command retains all expanded-help contract words, excluding only the generated short/long-help hint; compact help has fewer lines.",
+  "build_profile": "debug",
+  "base_commit": "14a3b9eaf9d2e100505c15f972885952c667e0bf",
+  "patch_sha256": "b3051d2553e8de9348f5a97535cfeb82d23b82d07068224dd4f1c023f4d72cd0"
+}
