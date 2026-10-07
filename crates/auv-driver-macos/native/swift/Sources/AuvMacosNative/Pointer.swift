@@ -722,6 +722,11 @@ func scroll_point(x: Double, y: Double, delta_x: Double, delta_y: Double) -> Nat
       "grant Accessibility permission and retry"
     )
   }
+  // The cursor warp and HID delivery are asynchronous. Stamp the requested
+  // location so hit testing does not inherit the pointer's previous position.
+  // NOTICE: Location does not pin a recipient across desktop focus changes;
+  // see `docs/ai/references/driver/2026-10-06-scroll-event-location.md`.
+  scrollEvent.location = location
   scrollEvent.post(tap: .cghidEventTap)
 
   return nativeActionOk()

@@ -1200,6 +1200,55 @@ fn foreground_scroll_prepares_window_and_moves_receiver() {
   assert!(crate::native::window::input_target_is_focused(cover_pid, cover_number));
 }
 
+// ROOT CAUSE:
+//
+// With the pointer over the header, scrolling could report success without
+// moving the receiver because the wheel event had no explicit target location.
+// Before the fix, a warp alone supplied its position. The wheel event must carry
+// the requested location explicitly while preserving pointer restoration.
+#[test]
+#[ignore = "requires CanvasFixture reset to top and macOS Accessibility"]
+fn foreground_scroll_from_header_moves_each_sample() {
+  let session = MacosDriverSession { _private: () };
+  let target = session.window().resolve(SelectWindow::main_visible().owned_by(App::bundle("local.auv.CanvasFixture"))).unwrap();
+  let position = || {
+    session
+      .accessibility()
+      .capture_app_tree("local.auv.CanvasFixture", 12, 100)
+      .unwrap()
+      .nodes
+      .into_iter()
+      .find(|node| node.role == "AXScrollBar")
+      .unwrap()
+      .value
+      .parse::<f64>()
+      .unwrap()
+  };
+  let header = session.window().to_screen_point(&target, WindowPoint::new(90.0, 58.0)).unwrap().point();
+  crate::native::pointer::move_point(header.x, header.y, 0).unwrap();
+  let mut previous = position();
+  assert_eq!(previous, 0.0, "reset fixture before running");
+  for sample in 0..12 {
+    let action = session
+      .window()
+      .scroll(
+        &target,
+        WindowPoint::new(450.0, 400.0),
+        Scroll::new(0.0, 400.0),
+        ScrollOptions {
+          policy: InputPolicy::ForegroundPreferred,
+          settle: Duration::from_millis(150),
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let current = position();
+    assert!(current > previous, "sample {sample}: wheel posting succeeded but receiver stayed at {current}");
+    assert!(!action.verified);
+    previous = current;
+  }
+}
+
 // Re-reading exact focus must recover when another app takes it between timed
 // samples. A cached "prepared" bit would send later wheel input to the cover.
 #[test]
