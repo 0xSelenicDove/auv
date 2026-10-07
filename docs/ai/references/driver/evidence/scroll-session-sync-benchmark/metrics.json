@@ -1,0 +1,378 @@
+{
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "binary_provenance": {
+    "optimized": {
+      "revision": "7b646006",
+      "binary_sha256": "7b96b2bd1da9200caadc89888addcb218e3a027f2a92ed429c056d73eb21027a"
+    },
+    "synced": {
+      "revision": "93195467",
+      "binary_sha256": "07d6333699a3b6bf0901981438fcd1dcc8f3562c52d68e649864dce733c6e1a2"
+    }
+  },
+  "summary": {
+    "optimized": {
+      "trials": 3,
+      "successes": 3,
+      "all_usage_complete": true,
+      "processed_tokens": 664210,
+      "uncached_input_plus_output": 59282,
+      "command_calls": 22,
+      "seconds": 186.68656654190272
+    },
+    "synced": {
+      "trials": 3,
+      "successes": 3,
+      "all_usage_complete": true,
+      "processed_tokens": 520441,
+      "uncached_input_plus_output": 58617,
+      "command_calls": 18,
+      "seconds": 197.7045744570205
+    },
+    "reduction_percent": {
+      "processed_tokens": 21.64511223859924,
+      "uncached_input_plus_output": 1.1217570257413767
+    }
+  },
+  "rows": [
+    {
+      "trial": 12,
+      "pair": 1,
+      "sample": "upstream_sync_controlled",
+      "arm": "optimized",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 26.36299275001511,
+      "usage": {
+        "input_tokens": 150536,
+        "cached_input_tokens": 138496,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1022,
+        "reasoning_output_tokens": 122
+      },
+      "processed_tokens": 151558,
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "command_calls": 5,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_errors": 0,
+      "command_output_tokens_o200k": 5535,
+      "command_argument_tokens_o200k": 388,
+      "uncached_input_plus_output": 13062,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "evidence_file": "trial-12.png",
+      "evidence_sha256": "8262c22f1de6e8dc3722a465097baec499192c93ba3bf7563d3d7a210ab5088d",
+      "evidence_bytes": 170531
+    },
+    {
+      "trial": 13,
+      "pair": 1,
+      "sample": "upstream_sync_controlled",
+      "arm": "synced",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 85.46376533294097,
+      "usage": {
+        "input_tokens": 220658,
+        "cached_input_tokens": 198272,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1731,
+        "reasoning_output_tokens": 445
+      },
+      "processed_tokens": 222389,
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "command_calls": 9,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 2
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        },
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 1,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_errors": 0,
+      "command_output_tokens_o200k": 6192,
+      "command_argument_tokens_o200k": 452,
+      "uncached_input_plus_output": 24117,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "evidence_file": "trial-13.webp",
+      "evidence_sha256": "4d4c6dfc65e4a10744b18a1e05758eddaa90fef21e472b12082a731f092aae08",
+      "evidence_bytes": 74320
+    },
+    {
+      "trial": 14,
+      "pair": 2,
+      "sample": "upstream_sync_controlled",
+      "arm": "synced",
+      "task": "Kestrel handoff",
+      "exit_code": 0,
+      "seconds": 63.07923841604497,
+      "usage": {
+        "input_tokens": 157853,
+        "cached_input_tokens": 141568,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1036,
+        "reasoning_output_tokens": 271
+      },
+      "processed_tokens": 158889,
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "command_calls": 5,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 23,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_errors": 0,
+      "command_output_tokens_o200k": 3522,
+      "command_argument_tokens_o200k": 239,
+      "uncached_input_plus_output": 17321,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a0ef4c03dcead044433f1fdcbdea39d1a2dc357f68e67cc3cfbccd16445b3664",
+      "evidence_file": "trial-14.webp",
+      "evidence_sha256": "bd2907e34e069b4022919841f958c7617a50415526e406f5e766f5cff845033d",
+      "evidence_bytes": 74708
+    },
+    {
+      "trial": 15,
+      "pair": 2,
+      "sample": "upstream_sync_controlled",
+      "arm": "optimized",
+      "task": "Kestrel handoff",
+      "exit_code": 0,
+      "seconds": 118.9755948339589,
+      "usage": {
+        "input_tokens": 264175,
+        "cached_input_tokens": 252032,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1907,
+        "reasoning_output_tokens": 429
+      },
+      "processed_tokens": 266082,
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "command_calls": 9,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "app.activate": 1,
+        "window.capture": 1,
+        "input.scrollUntil": 2
+      },
+      "searches": [
+        {
+          "status": "failed",
+          "reason": null,
+          "steps": null,
+          "failure": "native Swift window capture failed before xcap fallback: macos native capture_window_image failed: ScreenCaptureKit window capture timed out after 10s; recovery=verify Screen Recording permission and retry; xcap fallback also failed: failed to capture window 23303: Failed to copy data"
+        },
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 4,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 1,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 2,
+      "activation_mismatches": 0,
+      "command_errors": 1,
+      "command_output_tokens_o200k": 4428,
+      "command_argument_tokens_o200k": 652,
+      "uncached_input_plus_output": 14050,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a0ef4c03dcead044433f1fdcbdea39d1a2dc357f68e67cc3cfbccd16445b3664",
+      "evidence_file": "trial-15.png",
+      "evidence_sha256": "34caf3ca33c2d45cd6cc2e7a85698b72c77d57ca2a725ba54b8ce9284c81c7ef",
+      "evidence_bytes": 166569
+    },
+    {
+      "trial": 16,
+      "pair": 3,
+      "sample": "upstream_sync_controlled",
+      "arm": "optimized",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 41.34797895792872,
+      "usage": {
+        "input_tokens": 244687,
+        "cached_input_tokens": 214400,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1883,
+        "reasoning_output_tokens": 355
+      },
+      "processed_tokens": 246570,
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "command_calls": 8,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_errors": 1,
+      "command_output_tokens_o200k": 5327,
+      "command_argument_tokens_o200k": 820,
+      "uncached_input_plus_output": 32170,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "evidence_file": "trial-16.png",
+      "evidence_sha256": "8262c22f1de6e8dc3722a465097baec499192c93ba3bf7563d3d7a210ab5088d",
+      "evidence_bytes": 170531
+    },
+    {
+      "trial": 17,
+      "pair": 3,
+      "sample": "upstream_sync_controlled",
+      "arm": "synced",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 49.16157070803456,
+      "usage": {
+        "input_tokens": 138145,
+        "cached_input_tokens": 121984,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1018,
+        "reasoning_output_tokens": 171
+      },
+      "processed_tokens": 139163,
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "command_calls": 4,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_errors": 0,
+      "command_output_tokens_o200k": 3698,
+      "command_argument_tokens_o200k": 363,
+      "uncached_input_plus_output": 17179,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "evidence_file": "trial-17.webp",
+      "evidence_sha256": "23e592d2a75bf1e6c7c1d54108b64c4a3eb93dcf26c20f40add7466a64121358",
+      "evidence_bytes": 76388
+    }
+  ]
+}
