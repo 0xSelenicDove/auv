@@ -31,6 +31,8 @@ and reproducible optimization evidence. The [standalone AUV Computer Control
 skill](https://github.com/0xSelenicDove/auv-computer-control-skill) distributes
 agent instructions separately from the runtime.
 
+[Why AUV?](#why-auv) ·
+[Compare this fork with upstream](#this-fork-compared-with-upstream-auv) ·
 [Build this fork](#quick-start-with-this-fork) ·
 [Use the agent skill](#use-auv-with-codex-and-claude-code) ·
 [Read performance evidence](#token-efficiency-and-speed-benchmarks) ·
@@ -40,12 +42,15 @@ agent instructions separately from the runtime.
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 ## Table of Contents
 
+- [Why AUV?](#why-auv)
+- [This fork compared with upstream AUV](#this-fork-compared-with-upstream-auv)
+- [AUV vs native computer use vs browser automation](#auv-vs-native-computer-use-vs-browser-automation)
 - [Desktop automation capabilities](#desktop-automation-capabilities)
 - [Quick start with this fork](#quick-start-with-this-fork)
 - [Use AUV with Codex and Claude Code](#use-auv-with-codex-and-claude-code)
 - [Getting Started](#getting-started)
 - [Understand AUV](#understand-auv)
-- [Why even build AUV?](#why-even-build-auv)
+- [Project origins](#project-origins)
 - [Capability Matrix](#capability-matrix)
 - [Token efficiency and speed benchmarks](#token-efficiency-and-speed-benchmarks)
 - [Frequently asked questions](#frequently-asked-questions)
@@ -57,6 +62,77 @@ agent instructions separately from the runtime.
 - [License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## Why AUV?
+
+Choose AUV when a desktop workflow needs reusable operations, explicit window
+targeting and inspectable execution evidence. AUV lets an agent move repeated
+UI work into typed commands or application code, then consume results and Run
+artifacts. The agent still decides what to do and verifies whether the user's
+requested outcome happened.
+
+- **Reuse application workflows.** CLI, MCP and library frontends share typed
+  operation and driver boundaries, so reusable behavior can live below the
+  agent's prompts. See the [execution model](#understand-auv).
+- **Inspect what happened.** Direct results, delivery metadata and recorded
+  artifacts help explain an operation and support separate verification. See
+  [Runs and artifacts](docs/TERMS_AND_CONCEPTS.md).
+- **Use the capability the task needs.** Window capture, OCR and targeted input
+  provide building blocks for native UI work. Availability depends on the
+  command and platform; see [capabilities and evidence](#desktop-automation-capabilities).
+
+These are architectural reasons to choose AUV, grounded in the linked source
+and contracts. They are not a guarantee of lower token usage or faster task
+completion. If an API, connector, accessibility interface or browser DOM already
+covers the task, that existing surface may need fewer steps.
+
+## This fork compared with upstream AUV
+
+This fork keeps upstream AUV's core architecture and adds focused improvements
+for agent-driven desktop work. The comparison below uses upstream
+[commit `472fe84b` (v0.0.30)](https://github.com/moeru-ai/auv/tree/472fe84b89d2308e2c9cd444ef91cf3aac1c9789)
+as its inspected baseline, reviewed on **2026-10-06**. It does not claim these
+changes will remain exclusive to the fork as upstream evolves.
+
+| Area | Upstream baseline | This fork's difference | Evidence level and limits |
+| --- | --- | --- | --- |
+| Core execution | Typed operations, drivers, CLI/MCP, SDKs and Run recording | Preserves these upstream foundations | [Source and contracts](docs/TERMS_AND_CONCEPTS.md); these are inherited capabilities |
+| Scroll-search evidence | Observations include captures | Local invoke publishes the final observation as an artifact without another capture or OCR call; reports a stalled boundary as unconfirmed | [Hermetic regression tests](docs/ai/references/driver/2026-10-06-scroll-search-evidence.md); final Runner artifact publication remains separate |
+| JSON output | Pretty-printed invoke JSON | Optional lossless `--compact-json` | [Renderer tests and fixture token counts](docs/ai/references/invoke-cli/2026-10-06-compact-json.md): 33.4–34.1% fewer response-text tokens in four fixtures, not whole-session savings |
+| Command discovery | Expanded command help and window discovery | More compact help retaining guidance, plus app/title filters for window discovery | [Help contract tests and measurements](docs/ai/references/invoke-cli/2026-10-06-compact-help-benchmark.md), [window filtering regression tests](crates/auv-cli-invoke/src/commands/window_test.rs); filtering narrows results, not platform support |
+| macOS foreground scrolling | Existing foreground delivery and focus handling | Prepares the exact target, checks foreground ordering and stamps the wheel event location | [Live receiver checks and regressions](docs/ai/references/driver/2026-10-06-scroll-focus-ordering.md), [event-location evidence](docs/ai/references/driver/2026-10-06-scroll-event-location.md); tested scenarios, not every app |
+| Agent workflow guidance | Existing Runner and capture-reference infrastructure | Versioned skill favors known targets, existing connections, capture reuse and selected Runner reuse | [Skill](.agents/skills/auv-computer-control/SKILL.md), [reuse pilot and CLI lifecycle checks](docs/ai/references/driver/2026-10-06-runner-ocr-reuse.md); Runner reuse is upstream functionality |
+
+The practical benefit is less redundant discovery and evidence collection,
+smaller responses where explicitly selected, and more reliable delivery in the
+reproduced macOS scroll cases. Choose this fork when those changes fit your
+workflow and you can build from source. Choose upstream when its release and
+packaging path fits your needs; the installers below distribute upstream builds.
+The fork also requires maintaining and validating its changes across upstream
+updates.
+
+There is **no comprehensive fork-versus-upstream task benchmark**. The
+[performance evidence](#token-efficiency-and-speed-benchmarks) compares specific
+output formats, skill configurations or execution lifecycles. For example,
+reusing an existing Runner was 32.82% faster than fresh sessions in one repeated
+OCR pilot; that is not a 32.82% speedup over upstream AUV.
+
+## AUV vs native computer use vs browser automation
+
+Choose by the task's available interface rather than assuming one tool is
+always fastest. This is a workflow-selection guide; the
+[capability matrix](#capability-matrix) gives the existing project comparison.
+
+| Approach | When to choose it | Cost or boundary to consider |
+| --- | --- | --- |
+| Application API or connector | The application already exposes the required data and action | Check that it covers the user's actual workflow and permissions |
+| Native computer-use tools already in the agent host | Existing accessibility and input tools cover a short desktop task | Avoid adding AUV setup and skill discovery unless its capabilities are needed; the [TextEdit benchmark](#token-efficiency-and-speed-benchmarks) measured extra tokens with AUV guidance |
+| AUV | Native GUI work benefits from targeted capture/OCR, typed reusable operations or recorded Run evidence | Discovery, startup, skill context and verification still cost time and tokens; use the [task-specific evidence](#token-efficiency-and-speed-benchmarks) |
+| Browser automation | The workflow is a web page with a usable DOM | Decide whether the task also needs native windows, OS dialogs or other desktop capabilities |
+
+AUV can complement existing tools in the same workflow. Reuse an available
+interface first, then add AUV where its operations or evidence provide a
+concrete benefit.
 
 ## Desktop automation capabilities
 
@@ -574,7 +650,7 @@ input delivery or semantic verification. This package structure lets another
 frontend or generated language client reuse the same operations rather than
 reimplementing them around the CLI.
 
-## Why even build AUV?
+## Project origins
 
 AUV born from the grounding knowledge of building general gaming agents for [Project AIRI](https://github.com/moeru-ai/airi), since 2024, we tried to build agents to allow LLMs to play the following games, you can find how we implement the agents in the following repos:
 
@@ -587,7 +663,7 @@ AUV born from the grounding knowledge of building general gaming agents for [Pro
 >
 > Now you have the framework to build for any applications, games.
 
-Since Vercel published the [`agent-browser`](https://github.com/vercel/agent-browser), we fell in love with it and have it assisted agents to build many web projects, but we found that the loop it requires for agents to call `agent-browser` CLI to execute the commands is too slow and inefficient, while in computer use world, many operations can be repeated thousands of times, just like how Playwright/Vitest would allow us to write E2E test for applications, why don't we expand this idea of writing code to control application to computer use world?
+Upstream's work with [`agent-browser`](https://github.com/vercel/agent-browser) also inspired AUV: repeated application operations should be expressible as code, much as browser workflows are expressed in end-to-end tests. This is project motivation, not a measured performance comparison with agent-browser.
 
 ## Capability Matrix
 
