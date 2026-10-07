@@ -1,0 +1,247 @@
+{
+  "revision": "b29e50f78abb6321678da10dd91f97a89fe542e0",
+  "classification": "test-only",
+  "release_build_command": "cargo build --release -p auv-cli --bin auv",
+  "rows": [
+    {
+      "run": 1,
+      "profile": "debug",
+      "seconds": 19.513036540942267,
+      "exit_code": 0,
+      "binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+      "steps": 22,
+      "reason": "text_visible",
+      "delivered": {
+        "delta_x": 0.0,
+        "delta_y": 9240.0
+      },
+      "text_match": {
+        "bounds": {
+          "origin": {
+            "x": 429.0,
+            "y": 713.0
+          },
+          "size": {
+            "height": 27.0,
+            "width": 493.0
+          }
+        },
+        "text": "Kestrel handoff | VK-7392 | Ready for review"
+      },
+      "action": {
+        "attempts": [
+          {
+            "message": "AX scroll is not implemented in this slice",
+            "path": "ax_scroll",
+            "succeeded": false
+          },
+          {
+            "message": null,
+            "path": "window_targeted_wheel",
+            "succeeded": true
+          }
+        ],
+        "clipboard_disturbance": "none",
+        "focus_disturbance": "none",
+        "mouse_disturbance": "none",
+        "selected_path": "window_targeted_wheel",
+        "verified": false
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a114e0-a35e-755f-a97c-b71e54677158/artifacts/01a114e0-ef82-7095-bcee-1dc42ad3a648",
+          "purpose": "auv.scan.scroll_until_final_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 80206,
+          "sha256": "d9ed9eedacebcfe5056fb18548a3b62a470fa0e95fe715630365278f91e3a1ba",
+          "attributes": {}
+        }
+      ],
+      "coordinator_verified": true
+    },
+    {
+      "run": 2,
+      "profile": "release",
+      "seconds": 41.830490416963585,
+      "exit_code": 0,
+      "binary_sha256": "77ef631d4aef828cfaf4b5f86c4cd1f7344ba125de68db18a15025e85f6e33e0",
+      "steps": 22,
+      "reason": "text_visible",
+      "delivered": {
+        "delta_x": 0.0,
+        "delta_y": 9240.0
+      },
+      "text_match": {
+        "bounds": {
+          "origin": {
+            "x": 429.0,
+            "y": 713.0
+          },
+          "size": {
+            "height": 27.0,
+            "width": 493.0
+          }
+        },
+        "text": "Kestrel handoff | VK-7392 | Ready for review"
+      },
+      "action": {
+        "attempts": [
+          {
+            "message": "AX scroll is not implemented in this slice",
+            "path": "ax_scroll",
+            "succeeded": false
+          },
+          {
+            "message": null,
+            "path": "window_targeted_wheel",
+            "succeeded": true
+          }
+        ],
+        "clipboard_disturbance": "none",
+        "focus_disturbance": "none",
+        "mouse_disturbance": "none",
+        "selected_path": "window_targeted_wheel",
+        "verified": false
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a114e1-42ff-7221-b1eb-5788c3edb182/artifacts/01a114e1-e65a-7689-8321-2b5d4290a261",
+          "purpose": "auv.scan.scroll_until_final_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 80206,
+          "sha256": "d9ed9eedacebcfe5056fb18548a3b62a470fa0e95fe715630365278f91e3a1ba",
+          "attributes": {}
+        }
+      ],
+      "coordinator_verified": true
+    },
+    {
+      "run": 3,
+      "profile": "release",
+      "seconds": 17.046304416959174,
+      "exit_code": 0,
+      "binary_sha256": "77ef631d4aef828cfaf4b5f86c4cd1f7344ba125de68db18a15025e85f6e33e0",
+      "steps": 22,
+      "reason": "text_visible",
+      "delivered": {
+        "delta_x": 0.0,
+        "delta_y": 9240.0
+      },
+      "text_match": {
+        "bounds": {
+          "origin": {
+            "x": 429.0,
+            "y": 713.0
+          },
+          "size": {
+            "height": 27.0,
+            "width": 493.0
+          }
+        },
+        "text": "Kestrel handoff | VK-7392 | Ready for review"
+      },
+      "action": {
+        "attempts": [
+          {
+            "message": "AX scroll is not implemented in this slice",
+            "path": "ax_scroll",
+            "succeeded": false
+          },
+          {
+            "message": null,
+            "path": "window_targeted_wheel",
+            "succeeded": true
+          }
+        ],
+        "clipboard_disturbance": "none",
+        "focus_disturbance": "none",
+        "mouse_disturbance": "none",
+        "selected_path": "window_targeted_wheel",
+        "verified": false
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a114e2-3372-7534-8f4f-c745efb71e6d/artifacts/01a114e2-75fd-70bb-a553-37a54ae648fb",
+          "purpose": "auv.scan.scroll_until_final_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 80206,
+          "sha256": "d9ed9eedacebcfe5056fb18548a3b62a470fa0e95fe715630365278f91e3a1ba",
+          "attributes": {}
+        }
+      ],
+      "coordinator_verified": true
+    },
+    {
+      "run": 4,
+      "profile": "debug",
+      "seconds": 43.565033583086915,
+      "exit_code": 0,
+      "binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+      "steps": 22,
+      "reason": "text_visible",
+      "delivered": {
+        "delta_x": 0.0,
+        "delta_y": 9240.0
+      },
+      "text_match": {
+        "bounds": {
+          "origin": {
+            "x": 429.0,
+            "y": 713.0
+          },
+          "size": {
+            "height": 27.0,
+            "width": 493.0
+          }
+        },
+        "text": "Kestrel handoff | VK-7392 | Ready for review"
+      },
+      "action": {
+        "attempts": [
+          {
+            "message": "AX scroll is not implemented in this slice",
+            "path": "ax_scroll",
+            "succeeded": false
+          },
+          {
+            "message": null,
+            "path": "window_targeted_wheel",
+            "succeeded": true
+          }
+        ],
+        "clipboard_disturbance": "none",
+        "focus_disturbance": "none",
+        "mouse_disturbance": "none",
+        "selected_path": "window_targeted_wheel",
+        "verified": false
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a114e2-eae6-71fa-82e7-f1a7557bc6dc/artifacts/01a114e3-94ff-7126-87b4-fba5f646c967",
+          "purpose": "auv.scan.scroll_until_final_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 80206,
+          "sha256": "d9ed9eedacebcfe5056fb18548a3b62a470fa0e95fe715630365278f91e3a1ba",
+          "attributes": {}
+        }
+      ],
+      "coordinator_verified": true
+    }
+  ],
+  "mean_seconds": {
+    "debug": 31.53903506201459,
+    "release": 29.43839741696138
+  },
+  "response_and_screenshot_parity": true,
+  "help_equal_sha256": {
+    "app.activate": "621b351d6a0335d69ba8eb9a032fd06493b7ed3486d2528ebee14620cbe70a74",
+    "window.capture": "64e50bb494c0c5a40cf444a6d952515b7cdbc81d39f93504ed75fdd2e71c0ec5",
+    "input.scrollUntil": "d86d094506f3ab2dcad4d3a0c96fd4fd6646fe6774bb280261fdab71297fb84d"
+  },
+  "model_token_usage_measured": false,
+  "remaining_fixture_windows": 0
+}
