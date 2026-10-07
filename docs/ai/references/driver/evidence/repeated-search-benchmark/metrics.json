@@ -1,0 +1,794 @@
+{
+  "status": "complete_all_six_registered_attempts_retained",
+  "primary_win_criterion_met": false,
+  "paired_completed_case_B_skill_vs_native": {
+    "verified_records_each": 8,
+    "skill_total_tokens": 111219,
+    "native_total_tokens": 183773,
+    "token_reduction_percent": 39.480228325162024,
+    "skill_seconds": 56.07107800000813,
+    "native_seconds": 51.466367957997136,
+    "time_increase_percent": 8.947027398103934
+  },
+  "rows": [
+    {
+      "trial": 1,
+      "arm": "native",
+      "case": "A",
+      "seconds_including_startup": 58.45435095799621,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 176568,
+        "cached_input_tokens": 102912,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1447,
+        "reasoning_output_tokens": 550
+      },
+      "total_tokens": 178015,
+      "uncached_plus_output": 75103,
+      "verified_record_count": 8,
+      "verified_task_success": true,
+      "final_verification": "last_target_visibly_present",
+      "external_lock_confounded": false,
+      "activation_mismatch_observed": false,
+      "timing_audit_overlap": false,
+      "shell_calls": 0,
+      "native_tool_calls": 3,
+      "native_observations": 19,
+      "skill_read_verified_in_command_log": false,
+      "prompt_sha256": "1ac8ccb188a21f1b674235684f1f7d06442d5749073e112ff476720b736bff51",
+      "record_evidence": [
+        {
+          "name": "Birch transfer",
+          "code": "BK-1600",
+          "status": "Stored",
+          "evidence": "trial-01-record-01.jpg",
+          "sha256": "49e3c09b9c889192cba173ce5cae35f7aad2ae0cf60e9a820497d693385a690e",
+          "audit": {
+            "name": "Birch transfer",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Cobalt dispatch",
+          "code": "BK-5738",
+          "status": "Pending audit",
+          "evidence": "trial-01-record-02.jpg",
+          "sha256": "5947da44813c6e4748a9b172ccbd62362f9557896876dd78657286d16883da26",
+          "audit": {
+            "name": "Cobalt dispatch",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Ember review",
+          "code": "BK-5856",
+          "status": "Stored",
+          "evidence": "trial-01-record-03.jpg",
+          "sha256": "bddf1fca8c7934dbad2de43ea05d39fd438648b0e70ddc267920d8b4445e1008",
+          "audit": {
+            "name": "Ember review",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Harbor receipt",
+          "code": "WS-9195",
+          "status": "Pending audit",
+          "evidence": "trial-01-record-04.jpg",
+          "sha256": "6493dd1046df668eb89e9b0599a29a28ae590c5fd119458dc4cbc5b61d88f9b0",
+          "audit": {
+            "name": "Harbor receipt",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Juniper request",
+          "code": "WS-1191",
+          "status": "Ready for review",
+          "evidence": "trial-01-record-05.jpg",
+          "sha256": "1c8e2905d1eada1dc716d64a630e242cbbe285fbaac78c3f9f9e23d0f78fb592",
+          "audit": {
+            "name": "Juniper request",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Linden handoff",
+          "code": "JP-6711",
+          "status": "Ready for review",
+          "evidence": "trial-01-record-06.jpg",
+          "sha256": "f3e9a149a76d743ee9e1592a35fa17d415288e7ffec744d6fbb168a7cb50fa66",
+          "audit": {
+            "name": "Linden handoff",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Quartz audit",
+          "code": "HN-3250",
+          "status": "Approved",
+          "evidence": "trial-01-record-07.jpg",
+          "sha256": "749032ca5fa3bc2987f0f5286781cb00bc8c5b50ca1523bfce28ed57257348f8",
+          "audit": {
+            "name": "Quartz audit",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Willow release",
+          "code": "WS-1353",
+          "status": "Approved",
+          "evidence": "trial-01-record-08.jpg",
+          "sha256": "4fe04632ee6c6637b5ade2233c64474daa4ed567e5db86a926dad2aba11289ec",
+          "audit": {
+            "name": "Willow release",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        }
+      ],
+      "native_relay_timing": [
+        {
+          "queue_delay_ms": 10.46240234375,
+          "service_ms": 5124,
+          "actions": 20,
+          "isError": false
+        },
+        {
+          "queue_delay_ms": 2.4443359375,
+          "service_ms": 184,
+          "actions": 1,
+          "isError": false
+        },
+        {
+          "queue_delay_ms": 18.10205078125,
+          "service_ms": 3994,
+          "actions": 16,
+          "isError": false
+        }
+      ],
+      "failure_details": []
+    },
+    {
+      "trial": 2,
+      "arm": "auv_without_skill",
+      "case": "A",
+      "seconds_including_startup": 126.65550495800562,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 215804,
+        "cached_input_tokens": 165632,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 3451,
+        "reasoning_output_tokens": 808
+      },
+      "total_tokens": 219255,
+      "uncached_plus_output": 53623,
+      "verified_record_count": 8,
+      "verified_task_success": true,
+      "final_verification": "last_target_visibly_present",
+      "external_lock_confounded": false,
+      "activation_mismatch_observed": false,
+      "timing_audit_overlap": true,
+      "shell_calls": 8,
+      "native_tool_calls": 0,
+      "native_observations": 0,
+      "skill_read_verified_in_command_log": false,
+      "prompt_sha256": "6f21b1fe9ca0e1c21f81ca53a6110ee6424dd28d0e4d280fdd5984d4f1fa1fc5",
+      "record_evidence": [
+        {
+          "name": "Birch transfer",
+          "code": "BK-1600",
+          "status": "Stored",
+          "evidence": "trial-02-record-01.webp",
+          "sha256": "c72679c1191e64e7f157a55c339e43a23aba592f9c14a3e61d940bf2cf54b37b",
+          "audit": {
+            "name": "Birch transfer",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Cobalt dispatch",
+          "code": "BK-5738",
+          "status": "Pending audit",
+          "evidence": "trial-02-record-02.webp",
+          "sha256": "89492e1d663bf40951182da85f5b8a55a8e9f2f51e343edbc767bc22a06a9144",
+          "audit": {
+            "name": "Cobalt dispatch",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Ember review",
+          "code": "BK-5856",
+          "status": "Stored",
+          "evidence": "trial-02-record-03.webp",
+          "sha256": "a2417b4a2abc50587dbf265640b6c0c9badaa1ebf5f78dacd99e3a4aeffc1585",
+          "audit": {
+            "name": "Ember review",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Harbor receipt",
+          "code": "WS-9195",
+          "status": "Pending audit",
+          "evidence": "trial-02-record-04.webp",
+          "sha256": "99e0c8e7454625e82aa8e1f6a2de7189c134d78fc98516e084ca97e585ebb0af",
+          "audit": {
+            "name": "Harbor receipt",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Juniper request",
+          "code": "WS-1191",
+          "status": "Ready for review",
+          "evidence": "trial-02-record-05.webp",
+          "sha256": "b4c6638ace02ab3d7700c45e160001ee018bb3da0aa0f1afc71d4c092a65a812",
+          "audit": {
+            "name": "Juniper request",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Linden handoff",
+          "code": "JP-6711",
+          "status": "Ready for review",
+          "evidence": "trial-02-record-06.webp",
+          "sha256": "b399cb0600168e465dcf77ecb0b07c385ae428d34ac7f2dd1c7c4ceb5ce7ab4a",
+          "audit": {
+            "name": "Linden handoff",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Quartz audit",
+          "code": "HN-3250",
+          "status": "Approved",
+          "evidence": "trial-02-record-07.webp",
+          "sha256": "668073795d8a0c0d44d3108fca7e75eaf4f7c6b77fc2f56bdb23d900af1279ea",
+          "audit": {
+            "name": "Quartz audit",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Willow release",
+          "code": "WS-1353",
+          "status": "Approved",
+          "evidence": "trial-02-record-08.webp",
+          "sha256": "3ab7d55a0d453e1f24e970136abf540895280dd6aa007cc42abe0144d33c4b94",
+          "audit": {
+            "name": "Willow release",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        }
+      ],
+      "native_relay_timing": [],
+      "failure_details": []
+    },
+    {
+      "trial": 3,
+      "arm": "auv_with_skill",
+      "case": "A",
+      "seconds_including_startup": 230.16435599990655,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 697560,
+        "cached_input_tokens": 660864,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 7635,
+        "reasoning_output_tokens": 1612
+      },
+      "total_tokens": 705195,
+      "uncached_plus_output": 44331,
+      "verified_record_count": 6,
+      "verified_task_success": false,
+      "final_verification": "blocked_by_manual_unlock",
+      "external_lock_confounded": true,
+      "activation_mismatch_observed": false,
+      "timing_audit_overlap": false,
+      "shell_calls": 18,
+      "native_tool_calls": 0,
+      "native_observations": 0,
+      "skill_read_verified_in_command_log": true,
+      "prompt_sha256": "442ccea6f2226c69ca2cf741a927d1028d432062e516d80ad39dc64c29c0b37a",
+      "record_evidence": [
+        {
+          "name": "Birch transfer",
+          "code": "BK-1600",
+          "status": "Stored",
+          "evidence": "trial-03-record-01.webp",
+          "sha256": "9ed0f5b81e6d3a1c10c2889173515fb4749b17d08bceaf3e84f93b9ed61861a1",
+          "audit": {
+            "name": "Birch transfer",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Cobalt dispatch",
+          "code": "BK-5738",
+          "status": "Pending audit",
+          "evidence": "trial-03-record-02.webp",
+          "sha256": "05aaaf76f2d10333db8164f647899bc96874c92c44962679addd3eb23d46c249",
+          "audit": {
+            "name": "Cobalt dispatch",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Ember review",
+          "code": "BK-5856",
+          "status": "Stored",
+          "evidence": "trial-03-record-03.webp",
+          "sha256": "5a5b102b6539b0d83db71a93d94bdeb1dcdec3852fa51bc71a6e6692f80f3024",
+          "audit": {
+            "name": "Ember review",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Harbor receipt",
+          "code": "WS-9195",
+          "status": "Pending audit",
+          "evidence": "trial-03-record-04.webp",
+          "sha256": "bdd813fd86a93198a0f15faf89814771679af9aec9d7e793462d3cceb98f35f4",
+          "audit": {
+            "name": "Harbor receipt",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Juniper request",
+          "code": "WS-1191",
+          "status": "Ready for review",
+          "evidence": "trial-03-record-05.webp",
+          "sha256": "fa52d5329cc19592a7d1b8ce17062976522143f163675ee3cdbe0ad74fce0b7f",
+          "audit": {
+            "name": "Juniper request",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Linden handoff",
+          "code": "JP-6711",
+          "status": "Ready for review",
+          "evidence": "trial-03-record-06.webp",
+          "sha256": "56038fa22e1a1fe6281d8b9afc8f317d7be25b2837f6d50199ddde0add6f0de3",
+          "audit": {
+            "name": "Linden handoff",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        }
+      ],
+      "native_relay_timing": [],
+      "failure_details": [
+        {
+          "records": [
+            "Quartz audit",
+            "Willow release"
+          ],
+          "operation": "input.scrollUntil",
+          "failure": "Runner capability RPC failed: code: 'The service is currently unavailable', message: \"macos native validate_input_target failed: target window could not be resolved through AX; recovery=resolve a current window with accessible focus support\"",
+          "recovery_attempted": true,
+          "recovery_result": "failed"
+        }
+      ]
+    },
+    {
+      "trial": 4,
+      "arm": "auv_with_skill",
+      "case": "B",
+      "seconds_including_startup": 56.07107800000813,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 108998,
+        "cached_input_tokens": 68736,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2221,
+        "reasoning_output_tokens": 210
+      },
+      "total_tokens": 111219,
+      "uncached_plus_output": 42483,
+      "verified_record_count": 8,
+      "verified_task_success": true,
+      "final_verification": "last_target_visibly_present",
+      "external_lock_confounded": false,
+      "activation_mismatch_observed": false,
+      "timing_audit_overlap": false,
+      "shell_calls": 3,
+      "native_tool_calls": 0,
+      "native_observations": 0,
+      "skill_read_verified_in_command_log": true,
+      "prompt_sha256": "e03f87ca0931376dd048b8a894e50ddc350364824135a8a920bf56037fcbfc08",
+      "record_evidence": [
+        {
+          "name": "Amber transfer",
+          "code": "QV-9244",
+          "status": "Approved",
+          "evidence": "trial-04-record-01.webp",
+          "sha256": "258d3a28d4805b0b395206121f79e60c49a21ba0d1e6e5a400a4c44ce0bd5cc3",
+          "audit": {
+            "name": "Amber transfer",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Cedar dispatch",
+          "code": "EL-5818",
+          "status": "Approved",
+          "evidence": "trial-04-record-02.webp",
+          "sha256": "e3ca085b37f0bee23596edbb7ed8d75b78eec9c7baa14953a11d71594ab630fb",
+          "audit": {
+            "name": "Cedar dispatch",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Fern review",
+          "code": "QV-5886",
+          "status": "Approved",
+          "evidence": "trial-04-record-03.webp",
+          "sha256": "043ab95794e73b73fb3e224a5bd8ee602a18412997ce0092cebc4109a9cb3fce",
+          "audit": {
+            "name": "Fern review",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Indigo receipt",
+          "code": "QV-5713",
+          "status": "Approved",
+          "evidence": "trial-04-record-04.webp",
+          "sha256": "3d2b64c92bbcde766581df4c6e20e9758c0bec13a873c776d6c4c4c1cbec75df",
+          "audit": {
+            "name": "Indigo receipt",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Laurel request",
+          "code": "BK-9322",
+          "status": "Pending audit",
+          "evidence": "trial-04-record-05.webp",
+          "sha256": "3a83db54e14af56d0581aa080b4a08e445326d0a8ee022629f763641d351bc10",
+          "audit": {
+            "name": "Laurel request",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Maple handoff",
+          "code": "HN-3847",
+          "status": "Approved",
+          "evidence": "trial-04-record-06.webp",
+          "sha256": "c4812794f9226d354c4b806690288064b6421821714faf28b6c10d9cc6e1b71e",
+          "audit": {
+            "name": "Maple handoff",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Rowan audit",
+          "code": "JP-9286",
+          "status": "Approved",
+          "evidence": "trial-04-record-07.webp",
+          "sha256": "1e1e7488d833c3094f003e1848ab5b29530eaf7f9d7c7be53ca47d8a699b804e",
+          "audit": {
+            "name": "Rowan audit",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Zinnia release",
+          "code": "CT-8040",
+          "status": "Pending audit",
+          "evidence": "trial-04-record-08.webp",
+          "sha256": "79c52335a02110c647948373275ef64aaaa653aed509923a3188a07bf7188b7b",
+          "audit": {
+            "name": "Zinnia release",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        }
+      ],
+      "native_relay_timing": [],
+      "failure_details": []
+    },
+    {
+      "trial": 5,
+      "arm": "auv_without_skill",
+      "case": "B",
+      "seconds_including_startup": 61.99011312494986,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 258228,
+        "cached_input_tokens": 232960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2135,
+        "reasoning_output_tokens": 439
+      },
+      "total_tokens": 260363,
+      "uncached_plus_output": 27403,
+      "verified_record_count": 0,
+      "verified_task_success": false,
+      "final_verification": "last_target_absent",
+      "external_lock_confounded": false,
+      "activation_mismatch_observed": true,
+      "timing_audit_overlap": false,
+      "shell_calls": 11,
+      "native_tool_calls": 0,
+      "native_observations": 0,
+      "skill_read_verified_in_command_log": false,
+      "prompt_sha256": "34274c1bb805ce348c0082a4e9760e7370adcb5882559fbbf54d011d87cd1fa6",
+      "record_evidence": [],
+      "native_relay_timing": [],
+      "failure_details": [
+        {
+          "operation": "app.activate",
+          "requested_bundle_id": "local.auv.RepeatedSearchFixture",
+          "status": "activation_only_foreground_mismatch",
+          "observed_bundle_id": "com.apple.Safari",
+          "message": "The requested benchmark app was not foreground after the single permitted corrective recovery; stopped without interacting with the observed unrelated app."
+        }
+      ]
+    },
+    {
+      "trial": 6,
+      "arm": "native",
+      "case": "B",
+      "seconds_including_startup": 51.466367957997136,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 182699,
+        "cached_input_tokens": 107392,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1074,
+        "reasoning_output_tokens": 255
+      },
+      "total_tokens": 183773,
+      "uncached_plus_output": 76381,
+      "verified_record_count": 8,
+      "verified_task_success": true,
+      "final_verification": "last_target_visibly_present",
+      "external_lock_confounded": false,
+      "activation_mismatch_observed": false,
+      "timing_audit_overlap": false,
+      "shell_calls": 0,
+      "native_tool_calls": 3,
+      "native_observations": 22,
+      "skill_read_verified_in_command_log": false,
+      "prompt_sha256": "168f0e3dd1f748248c11044aa1cb24c8ed1c493a20849a88017ef9a39f53ee4b",
+      "record_evidence": [
+        {
+          "name": "Amber transfer",
+          "code": "QV-9244",
+          "status": "Approved",
+          "evidence": "trial-06-record-01.jpg",
+          "sha256": "a9968000979f72ae968858b1c2b2c27ad4a55b57ef5fabb6f7bbecd13d540b32",
+          "audit": {
+            "name": "Amber transfer",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Cedar dispatch",
+          "code": "EL-5818",
+          "status": "Approved",
+          "evidence": "trial-06-record-02.jpg",
+          "sha256": "1a56d2df24a5cff64d489554b1c52d04a4a674c7ffa28403e316b825c6d4f338",
+          "audit": {
+            "name": "Cedar dispatch",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Fern review",
+          "code": "QV-5886",
+          "status": "Approved",
+          "evidence": "trial-06-record-03.jpg",
+          "sha256": "3e109f1ec11f4c78120a6ae89659222682ed958d860ba4ad78d0feab91ed9e73",
+          "audit": {
+            "name": "Fern review",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Indigo receipt",
+          "code": "QV-5713",
+          "status": "Approved",
+          "evidence": "trial-06-record-04.jpg",
+          "sha256": "2109e1430995cb905f98e6d53eeb48446aa426faf78d4d61372375c2b9c7d08b",
+          "audit": {
+            "name": "Indigo receipt",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Laurel request",
+          "code": "BK-9322",
+          "status": "Pending audit",
+          "evidence": "trial-06-record-05.jpg",
+          "sha256": "4ff13eee1505238e3b096840ef68781a27cd787a498149b7fb6a002e820122be",
+          "audit": {
+            "name": "Laurel request",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Maple handoff",
+          "code": "HN-3847",
+          "status": "Approved",
+          "evidence": "trial-06-record-06.jpg",
+          "sha256": "b06685cbdcc108acc34f5272404b80ce451d15d0cc3c07c3af0d302453a14254",
+          "audit": {
+            "name": "Maple handoff",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Rowan audit",
+          "code": "JP-9286",
+          "status": "Approved",
+          "evidence": "trial-06-record-07.jpg",
+          "sha256": "9b8de845091712c103d5c3ffc1ab3a1a20fa9da70cf0525fd2e9b55616a9997d",
+          "audit": {
+            "name": "Rowan audit",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Zinnia release",
+          "code": "CT-8040",
+          "status": "Pending audit",
+          "evidence": "trial-06-record-08.jpg",
+          "sha256": "60055d4d231ba672b21e620917ab82b518f2e26fddc2dcf1123eaa1e8c1d7f0e",
+          "audit": {
+            "name": "Zinnia release",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        }
+      ],
+      "native_relay_timing": [
+        {
+          "queue_delay_ms": 6.097900390625,
+          "service_ms": 706,
+          "actions": 2,
+          "isError": false
+        },
+        {
+          "queue_delay_ms": 7.9599609375,
+          "service_ms": 161,
+          "actions": 1,
+          "isError": false
+        },
+        {
+          "queue_delay_ms": 24.5419921875,
+          "service_ms": 9875,
+          "actions": 40,
+          "isError": false
+        }
+      ],
+      "failure_details": []
+    }
+  ],
+  "cleanup": {
+    "owned_fixture_closed": true,
+    "previously_observed_app_restored": "Safari",
+    "temporary_trial_credentials_removed": true
+  }
+}

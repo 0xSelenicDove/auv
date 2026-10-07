@@ -123,3 +123,5 @@ Count: **71**
 - [Rejected Retina OCR resolution experiment](2026-10-06-retina-ocr-resolution.md) — native-resolution recognition lost mixed small text; unchanged production behavior and retained first-call timing evidence.
 
 - [Existing Runner OCR reuse pilot](2026-10-06-runner-ocr-reuse.md): Startup-inclusive offline comparison, unchanged eight-row accuracy, retained first-call stall, adopted reuse skill and selected CLI lifecycle checks.
+
+- [Repeated visual search benchmark](2026-10-07-repeated-search-benchmark.md): Six-attempt three-method pilot with batching, current skill, startup accounting, retained interruptions, and a completed case showing fewer tokens but slightly longer elapsed time.

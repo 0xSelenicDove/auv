@@ -743,9 +743,16 @@ a platform only when their support is different.
 
 ## Token efficiency and speed benchmarks
 
-Evidence reviewed **2026-10-06**. AUV efficiency depends on the task, agent
+Evidence reviewed **2026-10-07**. AUV efficiency depends on the task, agent
 routing, observation surface and execution lifecycle. The following measurements
 have different baselines; they must not be combined into one savings claim.
+
+The latest [repeated visual-search benchmark](docs/ai/references/driver/2026-10-07-repeated-search-benchmark.md)
+found **39.5% fewer total tokens** with the current skill than pure computer use
+in one completed matched case: 111,219 versus 183,773, with all eight records
+correct. It took **56.1 versus 51.5 seconds**, about 9% longer. The full pilot
+retains a lock-interrupted run and an activation failure; it did not meet the
+registered goal of fewer tokens and faster completion in both cases.
 
 | Experiment and evidence level | Result | Limits |
 | --- | --- | --- |

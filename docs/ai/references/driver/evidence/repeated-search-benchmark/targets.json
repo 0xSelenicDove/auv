@@ -1,0 +1,105 @@
+{
+  "generation_seed": 20261007,
+  "cases": {
+    "A": [
+      {
+        "position": 12,
+        "label": "Birch transfer",
+        "code": "BK-1600",
+        "status": "Stored"
+      },
+      {
+        "position": 34,
+        "label": "Cobalt dispatch",
+        "code": "BK-5738",
+        "status": "Pending audit"
+      },
+      {
+        "position": 56,
+        "label": "Ember review",
+        "code": "BK-5856",
+        "status": "Stored"
+      },
+      {
+        "position": 78,
+        "label": "Harbor receipt",
+        "code": "WS-9195",
+        "status": "Pending audit"
+      },
+      {
+        "position": 100,
+        "label": "Juniper request",
+        "code": "WS-1191",
+        "status": "Ready for review"
+      },
+      {
+        "position": 122,
+        "label": "Linden handoff",
+        "code": "JP-6711",
+        "status": "Ready for review"
+      },
+      {
+        "position": 144,
+        "label": "Quartz audit",
+        "code": "HN-3250",
+        "status": "Approved"
+      },
+      {
+        "position": 166,
+        "label": "Willow release",
+        "code": "WS-1353",
+        "status": "Approved"
+      }
+    ],
+    "B": [
+      {
+        "position": 16,
+        "label": "Amber transfer",
+        "code": "QV-9244",
+        "status": "Approved"
+      },
+      {
+        "position": 38,
+        "label": "Cedar dispatch",
+        "code": "EL-5818",
+        "status": "Approved"
+      },
+      {
+        "position": 60,
+        "label": "Fern review",
+        "code": "QV-5886",
+        "status": "Approved"
+      },
+      {
+        "position": 82,
+        "label": "Indigo receipt",
+        "code": "QV-5713",
+        "status": "Approved"
+      },
+      {
+        "position": 104,
+        "label": "Laurel request",
+        "code": "BK-9322",
+        "status": "Pending audit"
+      },
+      {
+        "position": 126,
+        "label": "Maple handoff",
+        "code": "HN-3847",
+        "status": "Approved"
+      },
+      {
+        "position": 148,
+        "label": "Rowan audit",
+        "code": "JP-9286",
+        "status": "Approved"
+      },
+      {
+        "position": 170,
+        "label": "Zinnia release",
+        "code": "CT-8040",
+        "status": "Pending audit"
+      }
+    ]
+  }
+}
