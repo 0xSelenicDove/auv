@@ -109,3 +109,5 @@ Count: **64**
 - [Final-frame reuse and help-batching experiment](2026-10-06-skill-reuse-benchmark.md) — four successful sessions but higher total tokens; retained candidate snapshots, recovery costs and restored installed skill.
 
 - [Known covered-app activation skill pilot](2026-10-06-skill-visibility-benchmark.md) — four verified sessions, 2.8% fewer total tokens but more uncached tokens; activation adopted, lookup failure not reproduced.
+
+- [Compressed AUV skill experiments](2026-10-06-skill-compression-benchmarks.md) — two rejected candidates, eight retained sessions, broader discovery and one failed recovery; incumbent restored.

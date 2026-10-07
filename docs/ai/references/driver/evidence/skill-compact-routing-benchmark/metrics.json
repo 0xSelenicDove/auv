@@ -1,0 +1,355 @@
+{
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "codex_cli_version": "0.150.1",
+  "timeout_seconds": 600,
+  "auv_revision": "fc9b64c1",
+  "auv_binary_sha256": "32c5b99eab3b869be91a6fd8723c4159440e698e1639dc44ec4b098748eb3e03",
+  "variants": {
+    "before": {
+      "SKILL.md": {
+        "sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+        "bytes": 4365,
+        "words": 618
+      },
+      "references/operations.md": {
+        "sha256": "6ea34a76b650cc94b394643b83ed0bbd83a03937f07549d714765a613bd9cbed",
+        "bytes": 5451,
+        "words": 644
+      }
+    },
+    "after": {
+      "SKILL.md": {
+        "sha256": "3f6c8ac95ab2d4e7f89c8ce62bf137b7dbd284bbb5a4b0b1313cd5bc328667c7",
+        "bytes": 3300,
+        "words": 421
+      },
+      "references/operations.md": {
+        "sha256": "6ea34a76b650cc94b394643b83ed0bbd83a03937f07549d714765a613bd9cbed",
+        "bytes": 5451,
+        "words": 644
+      }
+    }
+  },
+  "all_trials_retained": true,
+  "candidate_promoted": false,
+  "installed_version": "before",
+  "decision": "Restore incumbent: candidate did not meet successful completion and total-token reduction criteria.",
+  "summary": {
+    "before": {
+      "trials": 2,
+      "successes": 2,
+      "all_usage_complete": true,
+      "processed_tokens": 406648,
+      "uncached_input_plus_output": 38392,
+      "seconds": 118.55038862500805,
+      "shell_calls": 19,
+      "help_calls": 6,
+      "runtime_probe_shell_calls": 0,
+      "compact_json_shell_calls": 11,
+      "multiple_help_flags_shell_calls": 0,
+      "captures_after_search": 3,
+      "root_help_shell_calls": 0,
+      "catalog_help_shell_calls": 0
+    },
+    "after": {
+      "trials": 2,
+      "successes": 1,
+      "all_usage_complete": true,
+      "processed_tokens": 804902,
+      "uncached_input_plus_output": 47398,
+      "seconds": 187.75258620793466,
+      "shell_calls": 28,
+      "help_calls": 11,
+      "runtime_probe_shell_calls": 0,
+      "compact_json_shell_calls": 15,
+      "multiple_help_flags_shell_calls": 0,
+      "captures_after_search": 8,
+      "root_help_shell_calls": 1,
+      "catalog_help_shell_calls": 1
+    }
+  },
+  "rows": [
+    {
+      "trial": 1,
+      "version": "before",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "arm": "auv_with_skill",
+      "task": "Archive record 012",
+      "seconds": 34.89137212501373,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 161284,
+        "cached_input_tokens": 142592,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1540,
+        "reasoning_output_tokens": 261
+      },
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "00aa0bf675a0ffd49ab04a221e6cc37827f831eba2a6c87305f60742178396c2",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 8,
+      "shell_errors": 0,
+      "compact_json_shell_calls": 4,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 3,
+      "root_help_shell_calls": 0,
+      "catalog_help_shell_calls": 0,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 1,
+      "first_operation": "app.activate",
+      "activation_before_observation": true,
+      "failed_observations": 0,
+      "operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "search_outcomes": [
+        {
+          "run_id": "01a11495-1048-7266-b183-682e38131bdb",
+          "reason": "text_visible",
+          "steps": 1,
+          "max_steps": 6
+        }
+      ],
+      "failure_messages": [],
+      "processed_tokens": 162824,
+      "uncached_input_plus_output": 20232,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-01.webp",
+      "evidence_sha256": "498ebef113ef8e2be568b55137a6d4e24011ecefe8652e0cebb23219472f11f0"
+    },
+    {
+      "trial": 2,
+      "version": "after",
+      "skill_sha256": "3f6c8ac95ab2d4e7f89c8ce62bf137b7dbd284bbb5a4b0b1313cd5bc328667c7",
+      "arm": "auv_with_skill",
+      "task": "Archive record 012",
+      "seconds": 63.77431245800108,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 177406,
+        "cached_input_tokens": 165632,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1709,
+        "reasoning_output_tokens": 272
+      },
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "30d9caf09c5cae4b5ce9213de72024ab7fffc9612f5080a8b09411416eaeb81f",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 9,
+      "shell_errors": 0,
+      "compact_json_shell_calls": 4,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 4,
+      "root_help_shell_calls": 1,
+      "catalog_help_shell_calls": 0,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 1,
+      "first_operation": "app.activate",
+      "activation_before_observation": true,
+      "failed_observations": 0,
+      "operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "search_outcomes": [
+        {
+          "run_id": "01a11496-6e31-7675-a4e7-f3aa39cc5ace",
+          "reason": "text_visible",
+          "steps": 1,
+          "max_steps": 4
+        }
+      ],
+      "failure_messages": [],
+      "processed_tokens": 179115,
+      "uncached_input_plus_output": 13483,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-02.webp",
+      "evidence_sha256": "04639eb85a66c902c5d682d507678975acd64e82fee666f20a9e8ef2ae10a92c"
+    },
+    {
+      "trial": 3,
+      "version": "after",
+      "skill_sha256": "3f6c8ac95ab2d4e7f89c8ce62bf137b7dbd284bbb5a4b0b1313cd5bc328667c7",
+      "arm": "auv_with_skill",
+      "task": "Kestrel handoff",
+      "seconds": 123.97827374993358,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 620740,
+        "cached_input_tokens": 591872,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 5047,
+        "reasoning_output_tokens": 1349
+      },
+      "answer": {
+        "found": false,
+        "code": "",
+        "status": "",
+        "screenshot_verified": false
+      },
+      "prompt_sha256": "24abafc156816ce700ad034c06a99b9fc7969684302df46020a50935cd8d7124",
+      "coordinator_verified": false,
+      "coordinator_failure": "Final receiver shows rows 034\u2013042, not Kestrel handoff; subject reports found=false.",
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 19,
+      "shell_errors": 1,
+      "compact_json_shell_calls": 11,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 7,
+      "root_help_shell_calls": 0,
+      "catalog_help_shell_calls": 1,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "app.activate": 1,
+        "window.capture": 8,
+        "input.scrollUntil": 1,
+        "input.clickPoint": 1,
+        "input.scroll": 6
+      },
+      "captures_after_search": 7,
+      "first_operation": "app.activate",
+      "activation_before_observation": true,
+      "failed_observations": 0,
+      "operation_counts": {
+        "app.activate": 1,
+        "window.capture": 8,
+        "input.scrollUntil": 1,
+        "input.clickPoint": 1,
+        "input.scroll": 6
+      },
+      "search_outcomes": [
+        {
+          "run_id": "01a11497-831f-7224-861d-185675279648",
+          "reason": "end_by_no_visual_progress",
+          "steps": 8,
+          "max_steps": 20
+        }
+      ],
+      "failure_messages": [],
+      "processed_tokens": 625787,
+      "uncached_input_plus_output": 33915,
+      "success": false,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-03.webp",
+      "evidence_sha256": "9760d11bf09e8a67c5f0c302752f7414d7a1d37f96e6809e764de42baac383e2"
+    },
+    {
+      "trial": 4,
+      "version": "before",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "arm": "auv_with_skill",
+      "task": "Kestrel handoff",
+      "seconds": 83.65901649999432,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 241511,
+        "cached_input_tokens": 225664,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2313,
+        "reasoning_output_tokens": 359
+      },
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "1975a8a1759b3620afed03bb9bce7de559a6a367a8155402cb1149521729077c",
+      "coordinator_verified": true,
+      "full_skill_read": true,
+      "other_skill_reads": 0,
+      "mcp_calls": 0,
+      "builtin_image_view_calls": null,
+      "shell_calls": 11,
+      "shell_errors": 1,
+      "compact_json_shell_calls": 7,
+      "help_batch_detected": false,
+      "multiple_help_flags_shell_calls": 0,
+      "help_calls": 3,
+      "root_help_shell_calls": 0,
+      "catalog_help_shell_calls": 0,
+      "runtime_probe_shell_calls": 0,
+      "completed_operation_counts": {
+        "app.activate": 2,
+        "window.capture": 3,
+        "input.scrollUntil": 1
+      },
+      "captures_after_search": 2,
+      "first_operation": "app.activate",
+      "activation_before_observation": true,
+      "failed_observations": 0,
+      "operation_counts": {
+        "app.activate": 2,
+        "window.capture": 3,
+        "input.scrollUntil": 2
+      },
+      "search_outcomes": [
+        {
+          "run_id": "01a1149a-3f6a-7356-a754-8dcdcfb3ead1",
+          "reason": null,
+          "steps": null,
+          "max_steps": null
+        },
+        {
+          "run_id": "01a1149a-e786-7460-8ac1-eab00ccb8d70",
+          "reason": "text_visible",
+          "steps": 4,
+          "max_steps": 100
+        }
+      ],
+      "failure_messages": [
+        "macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again"
+      ],
+      "processed_tokens": 243824,
+      "uncached_input_plus_output": 18160,
+      "success": true,
+      "setup_verified_foreground": true,
+      "answer_uses_search_artifact": false,
+      "evidence_file": "trial-04.webp",
+      "evidence_sha256": "1e00a6e180e8984c0fa874af775da84164e993e7ec10549b095079a9666b0146"
+    }
+  ]
+}
