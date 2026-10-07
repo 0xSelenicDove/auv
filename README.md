@@ -10,31 +10,45 @@
       srcset="./docs/assets/logo-short-height-light.svg"
       media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)"
     />
-    <img width="30%" src="./docs/assets/logo-short-height-light.svg" alt="logo of auv" />
+    <img width="30%" src="./docs/assets/logo-short-height-light.svg" alt="AUV desktop automation logo" />
   </picture>
 </p>
 
-<h1 align="center">AUV</h1>
+<h1 align="center">AUV: Programmable Desktop Automation for AI Agents</h1>
 
 [![License](https://badgen.net/github/license/moeru-ai/auv)](LICENSE.md)
 
-AUV means **Application Use Via ...**.
+AUV (Application Use Via ...) is an open-source desktop automation runtime for
+programmable computer use. It exposes typed operations through a CLI, Model
+Context Protocol (MCP), Rust and JavaScript/TypeScript, with Run recording and
+capture artifacts. Coding agents can use AUV to execute reusable application
+workflows and inspect their results.
 
-- Apple Music Application Use Via [`auv-apple-music`](https://github.com/moeru-ai/auv/tree/main/supported/apps/auv-apple-music)...
-- macOS Media Control Use Via [`auv-media-macos`](https://github.com/moeru-ai/auv/tree/main/crates/auv-media-macos)...
-- [Balatro](https://www.playbalatro.com/) (yes the game [Balatro](https://www.playbalatro.com/)) Application Use Via [`auv-game-balatro`](https://github.com/moeru-ai/auv/tree/main/supported/games/auv-game-balatro)...
-- ... more, waiting for your implementation.
+This repository is [0xSelenicDove/auv](https://github.com/0xSelenicDove/auv), a
+fork of [moeru-ai/AUV](https://github.com/moeru-ai/auv). The fork retains upstream
+AUV's architecture and maintains scroll-targeting fixes, agent-skill guidance
+and reproducible optimization evidence. The [standalone AUV Computer Control
+skill](https://github.com/0xSelenicDove/auv-computer-control-skill) distributes
+agent instructions separately from the runtime.
 
-> Think of it as a programmable computer use, without agents.
+[Build this fork](#quick-start-with-this-fork) ·
+[Use the agent skill](#use-auv-with-codex-and-claude-code) ·
+[Read performance evidence](#token-efficiency-and-speed-benchmarks) ·
+[Browse documentation](docs/README.md)
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 ## Table of Contents
 
+- [Desktop automation capabilities](#desktop-automation-capabilities)
+- [Quick start with this fork](#quick-start-with-this-fork)
+- [Use AUV with Codex and Claude Code](#use-auv-with-codex-and-claude-code)
 - [Getting Started](#getting-started)
 - [Understand AUV](#understand-auv)
 - [Why even build AUV?](#why-even-build-auv)
 - [Capability Matrix](#capability-matrix)
+- [Token efficiency and speed benchmarks](#token-efficiency-and-speed-benchmarks)
+- [Frequently asked questions](#frequently-asked-questions)
 - [Development](#development)
 - [Related](#related)
 - [Acknowledgements](#acknowledgements)
@@ -43,6 +57,86 @@ AUV means **Application Use Via ...**.
 - [License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## Desktop automation capabilities
+
+AUV's repository interfaces cover the following responsibilities. These are
+source-level descriptions; command and platform availability are narrower than
+the existence of a driver. Use installed command help and the
+[capability matrix](#capability-matrix) for limits, and linked evidence for
+validated behavior.
+
+| Need | AUV interface | Source and evidence |
+| --- | --- | --- |
+| Inspect a native application | Window discovery, targeted capture and OCR | [Window operations](crates/auv-cli-invoke/src/commands/window.rs) |
+| Deliver input to a target | Typed keyboard, pointer and scroll operations with delivery metadata | [Input operations](crates/auv-cli-invoke/src/commands/input.rs), [macOS scroll-focus regression evidence](docs/ai/references/driver/2026-10-06-scroll-focus-ordering.md) |
+| Keep execution inspectable | Direct operation results, Run records and screenshot artifacts | [Shared terms](docs/TERMS_AND_CONCEPTS.md), [tracing implementation](crates/auv-tracing/) |
+| Reuse execution across calls | Daemon-owned Runners and routed capability clients | [Runner reuse pilot](docs/ai/references/driver/2026-10-06-runner-ocr-reuse.md), [TypeScript SDK](js/packages/sdk/README.md) |
+
+Use AUV for native GUI automation, application testing and repeated workflows
+that need its targeting or observation capabilities. When an application's API,
+connector or native accessibility already supplies the needed data, use that
+surface. For browser pages with a usable DOM, a browser automation tool is
+usually the more direct path.
+
+App and game integrations remain separate packages, including
+[Apple Music](supported/apps/auv-apple-music/),
+[macOS media control](crates/auv-media-macos/) and
+[Balatro](supported/games/auv-game-balatro/). Their presence is not a claim that
+all application workflows are implemented or tested.
+
+## Quick start with this fork
+
+The package-manager and release installers in [Getting Started](#getting-started)
+install **upstream AUV releases**. To use this fork's source and changes, first
+install the [Rust and platform build prerequisites](#install-with-cargo), then:
+
+```sh
+git clone --recurse-submodules https://github.com/0xSelenicDove/auv.git
+cd auv
+cargo build --release -p auv-cli --bin auv
+./target/release/auv --version
+./target/release/auv invoke window.capture --help
+```
+
+Source builds do not include the signed macOS Helper; see
+[platform setup](#setup) and the installation notes before choosing a packaging
+method. OS permissions must be granted on the machine being controlled.
+
+For a macOS example, with TextEdit already open and the required permissions
+granted, discover the matching window and capture it:
+
+```sh
+./target/release/auv invoke window.list --target app:com.apple.TextEdit --title Untitled --compact-json
+./target/release/auv invoke window.capture --target app:com.apple.TextEdit --title Untitled --compact-json
+```
+
+Replace the app and title with your actual target. Inspect the screenshot at its
+returned artifact `file_path`; an exit code alone does not verify the requested
+application state. These commands demonstrate the current CLI contract, not a
+new live application test. For OCR, inspect `window.findText --help` before use.
+
+## Use AUV with Codex and Claude Code
+
+The [versioned skill in this fork](.agents/skills/auv-computer-control/SKILL.md)
+guides operation discovery, targeting, verification and reuse. The
+[standalone skill repository](https://github.com/0xSelenicDove/auv-computer-control-skill)
+provides installation instructions for Codex and Claude Code; its published
+revision can differ from the copy in this fork. To use this fork's exact
+instructions, install its `.agents/skills/auv-computer-control` directory into
+your host's supported skill location.
+
+Invoke `$auv-computer-control` in Codex or `/auv-computer-control` in Claude
+Code. A skill supplies instructions; AUV supplies the execution runtime. The
+host still needs shell access to the intended AUV binary or an already connected
+MCP server. The linked benchmarks exercised Codex on macOS; they do not validate
+Claude Code or every supported driver platform.
+
+For repeated work, keep an existing MCP/SDK connection or reuse a selected
+Runner through the CLI. Retain the exact Device and daemon endpoint; setting
+`AUV_ENDPOINT` alone does not route an unqualified `invoke` through a Runner.
+See the skill's [runner-reuse workflow](.agents/skills/auv-computer-control/references/operations.md#reuse-for-repeated-work).
+A successful input call remains separate from verification of the user's goal.
 
 ## Getting Started
 
@@ -320,8 +414,8 @@ flowchart LR
 
 Many of those repeated sequences can be squashed into reusable GUI operations.
 Opening an app, waiting for readiness, filling a form, and checking the result
-should be callable as one command instead of spending tokens on the same
-step-by-step loop every time.
+can be organized as an application-owned operation. This moves deterministic
+steps into code while preserving the checks the workflow requires.
 
 Modern agents often use
 [skills](https://developers.openai.com/api/docs/guides/tools-skills) or project
@@ -334,6 +428,10 @@ libraries.
 
 Similar to [Playwright](https://playwright.dev/), what if we could organize those actions
 into executable scripts, reusable?
+
+The Rust snippets below illustrate operation design; their types and methods
+are pseudocode, not copyable SDK APIs. Use the [Rust operation interface](crates/auv/src/client/)
+and [TypeScript SDK documentation](js/packages/sdk/README.md) for current APIs.
 
 <table>
 <thead><tr><th>Tool-call loop</th><th>Rust scripts</th></tr></thead>
@@ -446,8 +544,9 @@ That means:
 
 - If your agent can call a CLI, AUV can be used as computer use.
 - If your agent can write code, AUV can move repeated GUI work into reusable
-  Rust or JavaScript/TypeScript operations. Once a GUI flow is finalized as an
-  operation, repeated execution can approach zero reasoning-token cost.
+  Rust or JavaScript/TypeScript operations. Deterministic steps can execute
+  without a separate model decision for each input event. Planning, interpreting
+  images, verification and model-backed operations still consume tokens.
 - AUV's daemon and extension APIs use versioned Protobuf/gRPC contracts. A
   language with compatible Protobuf/gRPC generators can generate a client for
   those contracts without AUV inventing another language-specific protocol.
@@ -566,6 +665,76 @@ a platform only when their support is different.
   [local Sky API research](docs/ai/references/driver/2026-09-18-held-input-project-research.md)
   and the
   [background-delivery comparison](docs/ai/references/driver/2026-09-23-background-delivery-project-comparison.md).
+
+## Token efficiency and speed benchmarks
+
+Evidence reviewed **2026-10-06**. AUV efficiency depends on the task, agent
+routing, observation surface and execution lifecycle. The following measurements
+have different baselines; they must not be combined into one savings claim.
+
+| Experiment and evidence level | Result | Limits |
+| --- | --- | --- |
+| [Three-method scroll-search pilot](docs/ai/references/driver/2026-10-06-scroll-routing-benchmark.md): six verified macOS canvas tasks, two per method | AUV with skill used 306,986 total tokens versus 370,103 without skill, 17.1% fewer. It took 163.2 seconds versus 125.8 seconds. | Small model-session sample. Skill routing saved tokens but was slower; native recovery confounded the native comparison. |
+| [Existing Runner OCR reuse](docs/ai/references/driver/2026-10-06-runner-ocr-reuse.md): offline release-build RPC pilot | In the repeat, three calls averaged 1.59 seconds with fresh runners versus 1.07 seconds with reuse, a 32.82% reduction including startup. All 24 calls across both attempts preserved eight text rows and their bounds. | Initial slow call retained. This measures reused Runner/client RPCs, not end-to-end CLI/MCP workflows or model-token savings. |
+| [Native Computer Use comparison](https://github.com/0xSelenicDove/auv-computer-control-skill/blob/main/docs/native-computer-use-benchmark-2026-10-06.md): synthetic TextEdit tasks with the earlier skill/runtime | Adding AUV and the skill increased median processed tokens by 47.7% for reading and 93.3% for matched editing/restoration. | Different tasks and revisions: three reading pairs and two matched control pairs. Native accessibility already covered the requested work. |
+
+Model-session totals count input plus output, including cached input and skill
+loading. They are not monetary-cost or account-quota estimates. Compare the same
+task, model, initial state and verified outcome; keep failed attempts, recovery
+and startup costs visible. Runtime measurements alone do not establish token
+savings. The [Retina OCR experiment](docs/ai/references/driver/2026-10-06-retina-ocr-resolution.md)
+also records a rejected speed candidate that lost recognition accuracy.
+
+## Frequently asked questions
+
+### Is AUV an autonomous computer-use agent?
+
+AUV is an execution runtime for application operations. An agent or application
+chooses the workflow, calls AUV and checks the result. AUV's core CLI operations
+do not require a model API key; a host agent or model-backed integration can
+still need one. See [the execution model](#understand-auv).
+
+### Which desktop platforms does AUV support?
+
+AUV has macOS, Linux and Windows driver implementations. Individual CLI commands,
+input policies, helpers and application integrations have narrower availability
+and permission requirements. Check the [capability matrix](#capability-matrix),
+platform setup and installed command help. Android/iOS and a first-party Python
+SDK remain planned in this repository's documented matrix.
+
+### How is AUV different from Playwright?
+
+AUV targets native application capabilities through platform drivers and typed
+operations. Playwright targets browser automation. For a web task already
+covered by DOM-aware tools, use those tools; use AUV when the task needs native
+application targeting, desktop input or capture evidence. The
+[capability matrix](#capability-matrix) distinguishes these execution surfaces.
+
+### Does AUV reduce AI-agent token usage?
+
+Some measured workflows used fewer tokens, while others used more. AUV moves
+reusable mechanical steps into code, but discovery, observation, reasoning and
+verification still have costs. The [benchmark table](#token-efficiency-and-speed-benchmarks)
+reports both improvements and regressions, with each baseline and evidence level.
+No general token-saving percentage is established.
+
+### What are a Device, Runner and Run?
+
+A Device is an addressable execution node and trust boundary. A Runner is a
+daemon-owned process/runtime on one Device that supplies capabilities. A Run is a correlation and control scope
+that can contain multiple operations and retain Runner affinity. Reusing a
+Runner does not merge separate Runs. See the authoritative
+[terms and concepts](docs/TERMS_AND_CONCEPTS.md).
+
+### Where should I link when referencing AUV?
+
+Use [moeru-ai/AUV](https://github.com/moeru-ai/auv) for the upstream project,
+[0xSelenicDove/auv](https://github.com/0xSelenicDove/auv) for this fork, and
+[the standalone skill](https://github.com/0xSelenicDove/auv-computer-control-skill)
+for its distribution. Cite a specific commit and the relevant evidence report
+for performance or support claims. Include the platform, task, tested revision
+and verified outcome so a reader can distinguish an implementation from a
+measured behavior.
 
 ## Development
 
