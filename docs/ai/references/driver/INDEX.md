@@ -101,3 +101,5 @@ Count: **64**
 - [Scroll-search session benchmark after upstream sync](2026-10-06-scroll-session-sync-benchmark.md) — six complete verified sessions comparing pre-sync optimizations with the combined revision.
 
 - [Model-session benchmark for filtered window discovery](2026-10-06-scroll-session-filter-benchmark.md) — six verified sessions, natural filter adoption, cached and uncached totals.
+
+- [Three-arm computer-use session benchmark](2026-10-06-three-arm-session-benchmark.md) — corrected native/AUV-without/AUV-with-skill model sessions, cached and uncached usage, retained failure and preliminary isolation audit.
