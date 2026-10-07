@@ -1,0 +1,699 @@
+{
+  "kind": "controlled_actual_model_sessions",
+  "tokenizer_version": "0.14.0",
+  "binary_provenance": {
+    "baseline": {
+      "revision": "f87265e4",
+      "sha256": "a2935a3ad30a9c10f1740fbdfe06bf9355d5f134ac32ccacb02e994d3002a392"
+    },
+    "optimized": {
+      "revision": "7b646006",
+      "sha256": "7b96b2bd1da9200caadc89888addcb218e3a027f2a92ed429c056d73eb21027a"
+    }
+  },
+  "summary": {
+    "baseline": {
+      "trials": 3,
+      "successes": 2,
+      "all_usage_complete": true,
+      "processed_tokens": 1116582,
+      "uncached_input_plus_output": 81574,
+      "cached_input_tokens": 1035008,
+      "seconds_total": 234.10661399993114,
+      "median_seconds": 77.7480212500086,
+      "additional_search_calls": 3,
+      "recovery_search_calls": 2,
+      "budget_continuations": 1,
+      "extra_captures": 6,
+      "command_calls": 30,
+      "command_output_tokens_o200k": 24984,
+      "known_usage_processed_tokens": 1116582,
+      "tokens_per_success": 558291.0
+    },
+    "optimized": {
+      "trials": 3,
+      "successes": 2,
+      "all_usage_complete": false,
+      "processed_tokens": null,
+      "uncached_input_plus_output": null,
+      "cached_input_tokens": null,
+      "seconds_total": 372.04376620799303,
+      "median_seconds": 37.15442845795769,
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "extra_captures": 0,
+      "command_calls": 8,
+      "command_output_tokens_o200k": 9401,
+      "known_usage_processed_tokens": 291654,
+      "tokens_per_success": null
+    }
+  },
+  "comparisons": [
+    {
+      "label": "planned nearby pair 1",
+      "before_trial": 5,
+      "after_trial": 6,
+      "both_successful": false,
+      "processed_reduction_percent": 29.46721775563357,
+      "uncached_reduction_percent": 11.208811551277309
+    },
+    {
+      "label": "planned nearby pair 3",
+      "before_trial": 9,
+      "after_trial": 10,
+      "both_successful": true,
+      "processed_reduction_percent": 69.7752340780175,
+      "uncached_reduction_percent": 7.542228623805158
+    },
+    {
+      "label": "supplemental deep comparison",
+      "before_trial": 8,
+      "after_trial": 11,
+      "both_successful": true,
+      "processed_reduction_percent": 66.08447966989192,
+      "uncached_reduction_percent": 35.30151607859134
+    }
+  ],
+  "successful_matched_subset": {
+    "baseline": {
+      "processed_tokens": 904638,
+      "uncached_input_plus_output": 59966,
+      "command_calls": 24,
+      "command_output_tokens_o200k": 18639,
+      "recovery_search_calls": 2,
+      "budget_continuations": 1,
+      "extra_captures": 5
+    },
+    "optimized": {
+      "processed_tokens": 289453,
+      "uncached_input_plus_output": 47277,
+      "command_calls": 8,
+      "command_output_tokens_o200k": 9035,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "extra_captures": 0
+    },
+    "trial_pairs": [
+      [
+        9,
+        10
+      ],
+      [
+        8,
+        11
+      ]
+    ]
+  },
+  "rows": [
+    {
+      "trial": 1,
+      "pair": 1,
+      "sample": "exploratory_unconfirmed_initial_foreground",
+      "arm": "baseline",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 159.27807224995922,
+      "usage": {
+        "input_tokens": 298052,
+        "cached_input_tokens": 264960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1807,
+        "reasoning_output_tokens": 365
+      },
+      "processed_tokens": 299859,
+      "uncached_input_plus_output": 34899,
+      "success": true,
+      "command_calls": 8,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 2,
+        "window.capture": 2,
+        "app.activate": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "end_by_no_visual_progress",
+          "steps": 2,
+          "failure": null
+        },
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 1,
+      "recovery_search_calls": 1,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_output_tokens_o200k": 7281,
+      "command_argument_tokens_o200k": 603,
+      "coordinator_verified": true,
+      "coordinator_observation": "Fresh native screenshot shows Archive record 012 | AR-1012 | Stored; scrollbar 0.03193430656934307",
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      }
+    },
+    {
+      "trial": 2,
+      "pair": 1,
+      "sample": "exploratory_unconfirmed_initial_foreground",
+      "arm": "optimized",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 63.83435679192189,
+      "usage": {
+        "input_tokens": 139248,
+        "cached_input_tokens": 115840,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 775,
+        "reasoning_output_tokens": 73
+      },
+      "processed_tokens": 140023,
+      "uncached_input_plus_output": 24183,
+      "success": true,
+      "command_calls": 4,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_output_tokens_o200k": 3799,
+      "command_argument_tokens_o200k": 237,
+      "coordinator_verified": true,
+      "coordinator_observation": "Fresh native screenshot confirms Archive record 012 | AR-1012 | Stored, visible; scrollbar 0.03832116788321168",
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      }
+    },
+    {
+      "trial": 3,
+      "pair": 2,
+      "sample": "exploratory_unconfirmed_initial_foreground",
+      "arm": "optimized",
+      "task": "Kestrel handoff",
+      "exit_code": 0,
+      "seconds": 64.57888558297418,
+      "usage": {
+        "input_tokens": 147215,
+        "cached_input_tokens": 129280,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1122,
+        "reasoning_output_tokens": 254
+      },
+      "processed_tokens": 148337,
+      "uncached_input_plus_output": 19057,
+      "success": true,
+      "command_calls": 4,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 22,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_output_tokens_o200k": 5442,
+      "command_argument_tokens_o200k": 355,
+      "coordinator_verified": true,
+      "coordinator_observation": "Native screenshot confirms Kestrel handoff | VK-7392 | Ready for review, visible; scrollbar 0.843065693430657",
+      "prompt_sha256": "a0ef4c03dcead044433f1fdcbdea39d1a2dc357f68e67cc3cfbccd16445b3664",
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      }
+    },
+    {
+      "trial": 4,
+      "pair": 2,
+      "sample": "exploratory_unconfirmed_initial_foreground",
+      "arm": "baseline",
+      "task": "Kestrel handoff",
+      "exit_code": 0,
+      "seconds": 67.29352204198949,
+      "usage": {
+        "input_tokens": 135482,
+        "cached_input_tokens": 120448,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 972,
+        "reasoning_output_tokens": 185
+      },
+      "processed_tokens": 136454,
+      "uncached_input_plus_output": 16006,
+      "success": true,
+      "command_calls": 4,
+      "operation_counts": {
+        "input.scrollUntil": 1,
+        "window.capture": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 18,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_output_tokens_o200k": 2307,
+      "command_argument_tokens_o200k": 253,
+      "coordinator_verified": true,
+      "coordinator_observation": "Native screenshot confirms Kestrel handoff | VK-7392 | Ready for review, visible; scrollbar 0.8540145985401459",
+      "prompt_sha256": "a0ef4c03dcead044433f1fdcbdea39d1a2dc357f68e67cc3cfbccd16445b3664",
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      }
+    },
+    {
+      "trial": 5,
+      "pair": 1,
+      "sample": "controlled_verified_foreground",
+      "arm": "baseline",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 69.44612337497529,
+      "usage": {
+        "input_tokens": 210301,
+        "cached_input_tokens": 190336,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1643,
+        "reasoning_output_tokens": 457
+      },
+      "processed_tokens": 211944,
+      "uncached_input_plus_output": 21608,
+      "success": false,
+      "command_calls": 6,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1,
+        "window.capture": 1,
+        "app.activate": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "end_by_no_visual_progress",
+          "steps": 4,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 1,
+      "command_output_tokens_o200k": 6345,
+      "command_argument_tokens_o200k": 568,
+      "coordinator_verified": false,
+      "coordinator_observation": "Fresh native screenshot remains at initial Archive record 001 through 009; requested row 012 absent. Recovery app.activate reported loginwindow foreground mismatch; root follow-up cover activation succeeded.",
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "answer": {
+        "found": false,
+        "code": null,
+        "status": null,
+        "screenshot_verified": false
+      },
+      "evidence_image": "trial-05.png",
+      "evidence_sha256": "b69349bfaa6bdc63b71fa0a134165243c8829a9d2218c2109d0d5a2177d7cda5",
+      "initial_foreground_verification": {
+        "observed_bundle_id": "local.auv.ScrollCover",
+        "status": "verified_foreground",
+        "activation_run_id": "01a113b0-e9bc-7719-a480-8421d107fca2"
+      }
+    },
+    {
+      "trial": 6,
+      "pair": 1,
+      "sample": "controlled_verified_foreground",
+      "arm": "optimized",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 37.15442845795769,
+      "usage": {
+        "input_tokens": 148606,
+        "cached_input_tokens": 130304,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 884,
+        "reasoning_output_tokens": 82
+      },
+      "processed_tokens": 149490,
+      "uncached_input_plus_output": 19186,
+      "success": true,
+      "command_calls": 4,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_output_tokens_o200k": 5752,
+      "command_argument_tokens_o200k": 290,
+      "coordinator_verified": true,
+      "coordinator_observation": "Fresh native screenshot confirms Archive record 012 | AR-1012 | Stored, visible; scrollbar 0.03832116788321168",
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "evidence_image": "trial-06.png",
+      "evidence_sha256": "8262c22f1de6e8dc3722a465097baec499192c93ba3bf7563d3d7a210ab5088d",
+      "initial_foreground_verification": {
+        "observed_bundle_id": "local.auv.ScrollCover",
+        "status": "verified_foreground"
+      }
+    },
+    {
+      "trial": 7,
+      "pair": 2,
+      "sample": "controlled_verified_foreground",
+      "arm": "optimized",
+      "task": "Kestrel handoff",
+      "exit_code": 124,
+      "seconds": 300.0795574999647,
+      "usage": null,
+      "processed_tokens": null,
+      "uncached_input_plus_output": null,
+      "success": false,
+      "command_calls": 0,
+      "operation_counts": {},
+      "searches": [],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_output_tokens_o200k": 0,
+      "command_argument_tokens_o200k": 0,
+      "coordinator_verified": false,
+      "infrastructure_failure": "300-second timeout before any AUV command; service/catalog warning; no completion usage",
+      "prompt_sha256": "a0ef4c03dcead044433f1fdcbdea39d1a2dc357f68e67cc3cfbccd16445b3664",
+      "answer": {
+        "found": null,
+        "code": null,
+        "status": null,
+        "screenshot_verified": null
+      },
+      "initial_foreground_verification": {
+        "observed_bundle_id": "local.auv.ScrollCover",
+        "status": "verified_foreground"
+      }
+    },
+    {
+      "trial": 8,
+      "pair": 2,
+      "sample": "controlled_verified_foreground",
+      "arm": "baseline",
+      "task": "Kestrel handoff",
+      "exit_code": 0,
+      "seconds": 77.7480212500086,
+      "usage": {
+        "input_tokens": 432058,
+        "cached_input_tokens": 404864,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2224,
+        "reasoning_output_tokens": 364
+      },
+      "processed_tokens": 434282,
+      "uncached_input_plus_output": 29418,
+      "success": true,
+      "command_calls": 11,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 3,
+        "window.capture": 3,
+        "app.activate": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "end_by_no_visual_progress",
+          "steps": 2,
+          "failure": null
+        },
+        {
+          "status": "completed",
+          "reason": "budget_exhausted",
+          "steps": 20,
+          "failure": null
+        },
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 2,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 2,
+      "recovery_search_calls": 1,
+      "budget_continuations": 1,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_output_tokens_o200k": 8398,
+      "command_argument_tokens_o200k": 758,
+      "coordinator_verified": true,
+      "coordinator_observation": "Fresh native screenshot confirms Kestrel handoff | VK-7392 | Ready for review, visible; scrollbar 0.843065693430657",
+      "prompt_sha256": "a0ef4c03dcead044433f1fdcbdea39d1a2dc357f68e67cc3cfbccd16445b3664",
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "evidence_image": "trial-08.png",
+      "evidence_sha256": "1a622a7cf49127d3b5a37850ca8dfcef3db14b36223a3daf7cf6b2a846854e8b",
+      "initial_foreground_verification": {
+        "observed_bundle_id": "local.auv.ScrollCover",
+        "status": "verified_foreground"
+      }
+    },
+    {
+      "trial": 9,
+      "pair": 3,
+      "sample": "controlled_verified_foreground",
+      "arm": "baseline",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 86.91246937494725,
+      "usage": {
+        "input_tokens": 467379,
+        "cached_input_tokens": 439808,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2977,
+        "reasoning_output_tokens": 677
+      },
+      "processed_tokens": 470356,
+      "uncached_input_plus_output": 30548,
+      "success": true,
+      "command_calls": 13,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 2,
+        "window.capture": 2,
+        "app.activate": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "end_by_no_visual_progress",
+          "steps": 2,
+          "failure": null
+        },
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 1,
+      "recovery_search_calls": 1,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_output_tokens_o200k": 10241,
+      "command_argument_tokens_o200k": 1199,
+      "coordinator_verified": true,
+      "coordinator_observation": "Native screenshot confirms Archive record 012 | AR-1012 | Stored, visible; scrollbar 0.0364963503649635",
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "evidence_image": "trial-09.png",
+      "evidence_sha256": "47609dcea1555a38dd56cf846fd95b4754869d2da37bb9b8ce462faab94d08e5",
+      "initial_foreground_verification": {
+        "observed_bundle_id": "local.auv.ScrollCover",
+        "status": "verified_foreground"
+      }
+    },
+    {
+      "trial": 10,
+      "pair": 3,
+      "sample": "controlled_verified_foreground",
+      "arm": "optimized",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 34.80978025007062,
+      "usage": {
+        "input_tokens": 141216,
+        "cached_input_tokens": 113920,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 948,
+        "reasoning_output_tokens": 105
+      },
+      "processed_tokens": 142164,
+      "uncached_input_plus_output": 28244,
+      "success": true,
+      "command_calls": 4,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_output_tokens_o200k": 3649,
+      "command_argument_tokens_o200k": 294,
+      "coordinator_verified": true,
+      "coordinator_observation": "Fresh native screenshot confirms Archive record 012 | AR-1012 | Stored, visible; scrollbar 0.03832116788321168",
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "evidence_image": "trial-10.png",
+      "evidence_sha256": "8262c22f1de6e8dc3722a465097baec499192c93ba3bf7563d3d7a210ab5088d",
+      "initial_foreground_verification": {
+        "observed_bundle_id": "local.auv.ScrollCover",
+        "status": "verified_foreground"
+      }
+    },
+    {
+      "trial": 11,
+      "pair": 2,
+      "sample": "supplemental_deep_measurement",
+      "arm": "optimized",
+      "task": "Kestrel handoff",
+      "exit_code": 0,
+      "seconds": 40.67083541699685,
+      "usage": {
+        "input_tokens": 146179,
+        "cached_input_tokens": 128256,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1110,
+        "reasoning_output_tokens": 276
+      },
+      "processed_tokens": 147289,
+      "uncached_input_plus_output": 19033,
+      "success": true,
+      "command_calls": 4,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 23,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_output_tokens_o200k": 5386,
+      "command_argument_tokens_o200k": 358,
+      "coordinator_verified": true,
+      "coordinator_observation": "Fresh native screenshot confirms Kestrel handoff | VK-7392 | Ready for review, visible; scrollbar 0.8394160583941606",
+      "prompt_sha256": "a0ef4c03dcead044433f1fdcbdea39d1a2dc357f68e67cc3cfbccd16445b3664",
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "evidence_image": "trial-11.png",
+      "evidence_sha256": "34caf3ca33c2d45cd6cc2e7a85698b72c77d57ca2a725ba54b8ce9284c81c7ef",
+      "initial_foreground_verification": {
+        "observed_bundle_id": "local.auv.ScrollCover",
+        "status": "verified_foreground"
+      }
+    }
+  ],
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "codex_cli": "0.150.1",
+  "timeout_seconds": 300
+}

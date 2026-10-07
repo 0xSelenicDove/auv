@@ -92,3 +92,4 @@ Count: **63**
 
 - [macOS foreground scroll preparation](2026-10-06-foreground-scroll-preparation.md): Reproduced inactive-window stall, shared preparation fix, before/after receiver test, background-only preservation, and timing limits.
 - [Foreground scroll focus fast path](2026-10-06-scroll-focus-fast-path.md): Fresh exact-focus checks skip repeated activation, with focus-change receiver coverage and limited CLI latency evidence.
+- [Scroll-search model-session benchmark](2026-10-06-scroll-session-benchmark.md): Actual provider token usage, independent synthetic receiver verification, cached-input accounting, setup correction, and retained failures/missing usage.
