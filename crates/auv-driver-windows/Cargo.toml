@@ -22,6 +22,10 @@ latency-telemetry = []
 name = "auv-latency-benchmark"
 path = "src/bin/latency_benchmark.rs"
 
+[[bin]]
+name = "replay-qqmusic-operation"
+path = "src/bin/replay_qqmusic_operation.rs"
+
 [dependencies]
 auv-driver-common = { version = "0.0.30", path = "../auv-driver-common" }
 auv-driver-overlay = { version = "0.0.30", path = "../auv-driver-overlay", features = ["windows"], optional = true }

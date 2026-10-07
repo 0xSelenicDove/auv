@@ -21,8 +21,10 @@ pub mod media;
 pub mod mutation;
 pub mod ocr;
 pub mod permission;
+pub mod playback_guard;
 mod readiness;
 mod session;
+pub mod track_identity;
 pub mod vision;
 pub mod wgc;
 pub mod window;
@@ -36,10 +38,18 @@ pub use descriptor::{WINDOWS_DESKTOP_CAPABILITIES, WindowsDriverDescriptor, wind
 pub use desktop::ensure_input_desktop;
 pub use driver::{WindowsDriver, WindowsDriverSession};
 pub use media::{
-  AudioVolumeController, MediaPlaybackStatus, MediaTrackMetadata, NowPlayingState, ProcessAudioVolume, SmtcMediaManager, SmtcSession,
+  AudioLookupStats, AudioLookupStatus, AudioVolumeController, MediaPlaybackStatus, MediaTrackMetadata, NowPlayingState, ProcessAudioVolume,
+  SmtcMediaManager, SmtcSession,
 };
 pub use ocr::{OcrError, recognize_text_in_rgba};
 pub use permission::{WindowsPermissionProbe, probe as probe_permissions};
+pub use playback_guard::{
+  DEFAULT_PLAY_POLL_TIMEOUT, DEFAULT_TARGET_VOLUME, DEFAULT_VOLUME_TOLERANCE, MockPlaybackSink, PlaybackActionSink, RealPlaybackSink,
+  Step2CommandCounts, Step2Executor, Step2Options, Step2Plan, Step2Result, execute_step2_real, execute_step2_real_with_prestate,
+};
 pub use readiness::assess_readiness;
 pub use session::{AccessibilityApi, ClipboardApi, DisplayApi, InputApi, PermissionApi, VisionApi, WindowApi};
+pub use track_identity::{
+  NormalizedTrackIdentity, TrackChangeVerdict, TrackIdentity, TrackIdentityLevel, evaluate_track_change, normalize_track_field,
+};
 pub use wgc::{WindowHealth, capture_window_health, capture_window_wgc};
