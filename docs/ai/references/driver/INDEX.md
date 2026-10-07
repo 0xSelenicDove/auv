@@ -99,3 +99,5 @@ Count: **64**
 - [Scroll-search model-session benchmark](2026-10-06-scroll-session-benchmark.md): Actual provider token usage, independent synthetic receiver verification, cached-input accounting, setup correction, and retained failures/missing usage.
 
 - [Scroll-search session benchmark after upstream sync](2026-10-06-scroll-session-sync-benchmark.md) — six complete verified sessions comparing pre-sync optimizations with the combined revision.
+
+- [Model-session benchmark for filtered window discovery](2026-10-06-scroll-session-filter-benchmark.md) — six verified sessions, natural filter adoption, cached and uncached totals.

@@ -1,0 +1,401 @@
+{
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "binary_provenance": {
+    "pre-filter": {
+      "revision": "25d8f5fa",
+      "binary_sha256": "c2a4b82191954eb246e05d9b6e523a4f04299bbe63c4d38d84c54421104e3d1c"
+    },
+    "filtered": {
+      "revision": "fc9b64c1",
+      "binary_sha256": "32c5b99eab3b869be91a6fd8723c4159440e698e1639dc44ec4b098748eb3e03"
+    }
+  },
+  "summary": {
+    "pre-filter": {
+      "trials": 3,
+      "successes": 3,
+      "all_usage_complete": true,
+      "processed_tokens": 549840,
+      "uncached_input_plus_output": 57168,
+      "command_calls": 15,
+      "seconds": 168.95917737612035
+    },
+    "filtered": {
+      "trials": 3,
+      "successes": 3,
+      "all_usage_complete": true,
+      "processed_tokens": 597945,
+      "uncached_input_plus_output": 49721,
+      "command_calls": 20,
+      "seconds": 132.29386083281133
+    },
+    "reduction_percent": {
+      "processed_tokens": -8.748908773461373,
+      "uncached_input_plus_output": 13.026518331933945
+    }
+  },
+  "rows": [
+    {
+      "trial": 18,
+      "pair": 1,
+      "sample": "window_filter_controlled",
+      "arm": "pre-filter",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 59.25231808400713,
+      "usage": {
+        "input_tokens": 138991,
+        "cached_input_tokens": 123008,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 766,
+        "reasoning_output_tokens": 62
+      },
+      "processed_tokens": 139757,
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "command_calls": 4,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "listed_window_counts": [
+        22
+      ],
+      "window_list_filter_used": false,
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_errors": 0,
+      "command_output_tokens_o200k": 3591,
+      "command_argument_tokens_o200k": 241,
+      "uncached_input_plus_output": 16749,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "evidence_file": "trial-18.webp",
+      "evidence_sha256": "23e592d2a75bf1e6c7c1d54108b64c4a3eb93dcf26c20f40add7466a64121358",
+      "evidence_bytes": 76388
+    },
+    {
+      "trial": 19,
+      "pair": 1,
+      "sample": "window_filter_controlled",
+      "arm": "filtered",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 52.06391512497794,
+      "usage": {
+        "input_tokens": 240318,
+        "cached_input_tokens": 221824,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1817,
+        "reasoning_output_tokens": 608
+      },
+      "processed_tokens": 242135,
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "command_calls": 10,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "listed_window_counts": [
+        1
+      ],
+      "window_list_filter_used": true,
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_errors": 0,
+      "command_output_tokens_o200k": 4116,
+      "command_argument_tokens_o200k": 434,
+      "uncached_input_plus_output": 20311,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "evidence_file": "trial-19.webp",
+      "evidence_sha256": "23e592d2a75bf1e6c7c1d54108b64c4a3eb93dcf26c20f40add7466a64121358",
+      "evidence_bytes": 76388
+    },
+    {
+      "trial": 20,
+      "pair": 2,
+      "sample": "window_filter_controlled",
+      "arm": "filtered",
+      "task": "Kestrel handoff",
+      "exit_code": 0,
+      "seconds": 56.981325916945934,
+      "usage": {
+        "input_tokens": 220275,
+        "cached_input_tokens": 201344,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1719,
+        "reasoning_output_tokens": 491
+      },
+      "processed_tokens": 221994,
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "command_calls": 6,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 2
+      },
+      "listed_window_counts": [
+        1
+      ],
+      "window_list_filter_used": true,
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "budget_exhausted",
+          "steps": 20,
+          "failure": null
+        },
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 2,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 1,
+      "recovery_search_calls": 0,
+      "budget_continuations": 1,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_errors": 0,
+      "command_output_tokens_o200k": 4415,
+      "command_argument_tokens_o200k": 522,
+      "uncached_input_plus_output": 20650,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a0ef4c03dcead044433f1fdcbdea39d1a2dc357f68e67cc3cfbccd16445b3664",
+      "evidence_file": "trial-20.webp",
+      "evidence_sha256": "ba7d76a07b18957e1b0e97d931033fe3f70d0fb54c270bee7f1ee2b40307bc65",
+      "evidence_bytes": 80810
+    },
+    {
+      "trial": 21,
+      "pair": 2,
+      "sample": "window_filter_controlled",
+      "arm": "pre-filter",
+      "task": "Kestrel handoff",
+      "exit_code": 0,
+      "seconds": 80.11670454207342,
+      "usage": {
+        "input_tokens": 289567,
+        "cached_input_tokens": 267904,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2177,
+        "reasoning_output_tokens": 237
+      },
+      "processed_tokens": 291744,
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "command_calls": 8,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 2,
+        "app.activate": 1
+      },
+      "listed_window_counts": [
+        21
+      ],
+      "window_list_filter_used": false,
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "budget_exhausted",
+          "steps": 20,
+          "failure": null
+        },
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 2,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 1,
+      "recovery_search_calls": 0,
+      "budget_continuations": 1,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_errors": 1,
+      "command_output_tokens_o200k": 6053,
+      "command_argument_tokens_o200k": 1048,
+      "uncached_input_plus_output": 23840,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a0ef4c03dcead044433f1fdcbdea39d1a2dc357f68e67cc3cfbccd16445b3664",
+      "evidence_file": "trial-21.webp",
+      "evidence_sha256": "ba7d76a07b18957e1b0e97d931033fe3f70d0fb54c270bee7f1ee2b40307bc65",
+      "evidence_bytes": 80810
+    },
+    {
+      "trial": 22,
+      "pair": 3,
+      "sample": "window_filter_controlled",
+      "arm": "pre-filter",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 29.5901547500398,
+      "usage": {
+        "input_tokens": 117587,
+        "cached_input_tokens": 101760,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 752,
+        "reasoning_output_tokens": 107
+      },
+      "processed_tokens": 118339,
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "command_calls": 3,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "listed_window_counts": [
+        21
+      ],
+      "window_list_filter_used": false,
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_errors": 0,
+      "command_output_tokens_o200k": 3706,
+      "command_argument_tokens_o200k": 250,
+      "uncached_input_plus_output": 16579,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "evidence_file": "trial-22.webp",
+      "evidence_sha256": "23e592d2a75bf1e6c7c1d54108b64c4a3eb93dcf26c20f40add7466a64121358",
+      "evidence_bytes": 76388
+    },
+    {
+      "trial": 23,
+      "pair": 3,
+      "sample": "window_filter_controlled",
+      "arm": "filtered",
+      "task": "Archive record 012",
+      "exit_code": 0,
+      "seconds": 23.24861979088746,
+      "usage": {
+        "input_tokens": 133054,
+        "cached_input_tokens": 125056,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 762,
+        "reasoning_output_tokens": 40
+      },
+      "processed_tokens": 133816,
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "command_calls": 4,
+      "image_calls": null,
+      "coordinator_verified": true,
+      "operation_counts": {
+        "window.list": 1,
+        "input.scrollUntil": 1
+      },
+      "listed_window_counts": [
+        1
+      ],
+      "window_list_filter_used": true,
+      "searches": [
+        {
+          "status": "completed",
+          "reason": "text_visible",
+          "steps": 1,
+          "failure": null
+        }
+      ],
+      "additional_search_calls": 0,
+      "recovery_search_calls": 0,
+      "budget_continuations": 0,
+      "failed_envelopes": 0,
+      "activation_mismatches": 0,
+      "command_errors": 0,
+      "command_output_tokens_o200k": 1868,
+      "command_argument_tokens_o200k": 254,
+      "uncached_input_plus_output": 8760,
+      "usage_complete": true,
+      "success": true,
+      "setup_verified_foreground": true,
+      "prompt_sha256": "a2289cdae268a34917e9d4696ad9d92be3137f5774bee35040a2a292b4b62d71",
+      "evidence_file": "trial-23.webp",
+      "evidence_sha256": "23e592d2a75bf1e6c7c1d54108b64c4a3eb93dcf26c20f40add7466a64121358",
+      "evidence_bytes": 76388
+    }
+  ]
+}
