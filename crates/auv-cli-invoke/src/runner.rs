@@ -201,7 +201,7 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
     },
     "window.list" => {
       runner.windows().list().await.map_err(|status| format!("WindowService/ListWindows failed: {status}")).and_then(|windows| {
-        crate::commands::window::list_windows_output(&windows.iter().map(|window| window.resource().clone()).collect::<Vec<_>>())
+        crate::commands::window::list_windows_selected_output(&input, windows.iter().map(|window| window.resource().clone()).collect())
       })
     }
     "window.capture" => {

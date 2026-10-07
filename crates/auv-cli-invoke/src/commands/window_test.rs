@@ -3,6 +3,72 @@ use auv_driver::{CoordinateSpace, Rect, Window, WindowRef};
 use super::*;
 
 #[test]
+fn window_list_filters_known_app_and_title_without_losing_matching_metadata() {
+  let make_window = |id: &str, app: Option<&str>, title: Option<&str>| Window {
+    reference: WindowRef { id: id.into() },
+    title: title.map(str::to_string),
+    app_name: Some("Fixture".into()),
+    app_bundle_id: app.map(str::to_string),
+    process_id: Some(1234),
+    frame: Rect::new(12.0, 34.0, 640.0, 480.0),
+    coordinate_space: CoordinateSpace::Screen,
+    is_main: false,
+    is_visible: true,
+  };
+  let windows = vec![
+    make_window("1", Some("local.fixture"), Some("Project Notes")),
+    make_window("2", Some("local.fixture"), Some("Other Notes")),
+    make_window("3", Some("local.other"), Some("Project Notes")),
+    make_window("4", Some("local.fixture"), Some("Project notes")),
+    make_window("5", None, None),
+  ];
+  let mut input = InvokeCommandInput {
+    command_id: "window.list".into(),
+    target: Some(crate::ExecutionTarget::Application {
+      id: "local.fixture".into(),
+    }),
+    inputs: [("title".into(), "Notes".into())].into(),
+    typed_args: None,
+    dry_run: false,
+    cancellation: Default::default(),
+  };
+  // Previously discovery always exposed unrelated apps, even when the caller
+  // already knew its recipient. Keep all matches, including non-main windows.
+  let output = list_windows_selected_output(&input, windows.clone()).unwrap();
+  assert_eq!(output.result(), Some(&serde_json::to_value(&windows[..2]).unwrap()));
+  assert_eq!(output.report.unwrap().fields[0].value, "2 window(s)");
+
+  input.inputs.clear();
+  let output = list_windows_selected_output(&input, windows.clone()).unwrap();
+  assert_eq!(output.result(), Some(&serde_json::to_value([&windows[0], &windows[1], &windows[3]]).unwrap()));
+  input.inputs.insert("title".into(), "Notes".into());
+
+  input.target = None;
+  let output = list_windows_selected_output(&input, windows.clone()).unwrap();
+  assert_eq!(output.result(), Some(&serde_json::to_value(&windows[..3]).unwrap()));
+  input.inputs.clear();
+  let output = list_windows_selected_output(&input, windows.clone()).unwrap();
+  assert_eq!(output.result(), Some(&serde_json::to_value(&windows).unwrap()));
+  input.target = Some(crate::ExecutionTarget::Application {
+    id: "local.absent".into(),
+  });
+  assert_eq!(list_windows_selected_output(&input, windows).unwrap().result(), Some(&serde_json::json!([])));
+}
+
+#[test]
+fn window_list_cli_accepts_existing_app_target_and_title_filter() {
+  let args = ["--target", "app:local.fixture", "--title", "Notes"].map(str::to_string);
+  let crate::InvokeCommandCliParse::Invoke {
+    inputs, typed_args, ..
+  } = list_windows_invoke_command().parse_cli_args(&args).unwrap()
+  else {
+    panic!("expected invocation");
+  };
+  assert_eq!(inputs["title"], "Notes");
+  assert_eq!(typed_args.get::<ListWindowsArgs>().unwrap().title.as_deref(), Some("Notes"));
+}
+
+#[test]
 fn window_list_report_uses_human_first_table_and_wide_diagnostic_columns() {
   let windows = vec![
     Window {

@@ -30,11 +30,18 @@ pub fn group() -> CommandGroup {
 }
 
 #[derive(Clone, Debug, Args, serde::Serialize, serde::Deserialize)]
-#[command(after_long_help = "Examples:\n  auv invoke window.list --wide")]
-struct ListWindowsArgs {}
+#[command(
+  after_long_help = "Examples:\n  auv invoke window.list --wide\n  auv invoke window.list --target app:com.apple.TextEdit --title Notes --compact-json\nUse a known app target to omit unrelated windows. App identifiers match exactly; --title matches a case-sensitive substring. All matching windows and their full metadata are retained. On Linux the app identifier is the AT-SPI AccessibleId."
+)]
+struct ListWindowsArgs {
+  /// Keep windows whose title contains this text.
+  #[arg(long, value_name = "TEXT")]
+  title: Option<String>,
+}
 
 #[invoke_command(
   id = "window.list",
+  target = OptionalApplication,
   group = "window",
   description = "List visible window candidates using the normalized AUV window selector model (macOS and Linux).",
   input = ListWindowsArgs,
@@ -47,13 +54,26 @@ async fn list_windows(input: InvokeCommandInput, _args: ListWindowsArgs) -> Invo
     }
 
     let windows = observe_windows().await?;
-    list_windows_output(&windows)
+    list_windows_selected_output(&input, windows)
   }
   #[cfg(not(any(target_os = "macos", target_os = "linux")))]
   {
     let _ = input;
     Err("window.list is only available on macOS and Linux".to_string())
   }
+}
+
+/// Applies the same discovery filters to local and Runner window records.
+/// Listing preserves every match rather than resolving a single main window.
+pub(crate) fn list_windows_selected_output(input: &InvokeCommandInput, mut windows: Vec<auv_driver::Window>) -> InvokeCommandResult {
+  let args: ListWindowsArgs = crate::command::decode_args(input)?;
+  let app = input.application_target()?;
+  let title = args.title.as_deref().filter(|value| !value.trim().is_empty());
+  windows.retain(|window| {
+    app.is_none_or(|app| window.app_bundle_id.as_deref() == Some(app))
+      && title.is_none_or(|title| window.title.as_deref().is_some_and(|value| value.contains(title)))
+  });
+  list_windows_output(&windows)
 }
 
 /// Builds the transport-independent direct result for `window.list`.

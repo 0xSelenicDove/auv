@@ -35,3 +35,5 @@ Count: **23**
 - Shared vocabulary: [`../../../TERMS_AND_CONCEPTS.md`](../../../TERMS_AND_CONCEPTS.md)
 
 - [Compact invoke JSON](2026-10-06-compact-json.md): Opt-in lossless single-line output, regression coverage, and response-text token counts.
+
+- [Filtered window discovery](2026-10-06-window-list-filters.md) — app/title filters reuse existing targets and preserve complete matching records across local and Runner invoke.
