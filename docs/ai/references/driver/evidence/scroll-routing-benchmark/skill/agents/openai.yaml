@@ -1,0 +1,4 @@
+interface:
+  display_name: "AUV Computer Control"
+  short_description: "Use AUV for native app automation and verification"
+  default_prompt: "Use $auv-computer-control to choose efficient native or AUV operations for this desktop task and verify the result."

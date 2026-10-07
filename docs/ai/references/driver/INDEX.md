@@ -7,7 +7,7 @@ Executable GUI evaluations live in
 test objects, tasks, and cases. Rust runs evaluations; shared desktop receivers
 use TypeScript. Raw run output stays local.
 
-Count: **66**
+Count: **67**
 
 - [`2026-05-20-macos-driver-namespace-after-window-screen-design.md`](2026-05-20-macos-driver-namespace-after-window-screen-design.md)
 - [`2026-05-20-macos-osascript-backend-design.md`](2026-05-20-macos-osascript-backend-design.md)
@@ -113,3 +113,5 @@ Count: **66**
 - [Known covered-app activation skill pilot](2026-10-06-skill-visibility-benchmark.md) — four verified sessions, 2.8% fewer total tokens but more uncached tokens; activation adopted, lookup failure not reproduced.
 
 - [Compressed AUV skill experiments](2026-10-06-skill-compression-benchmarks.md) — two rejected candidates, eight retained sessions, broader discovery and one failed recovery; incumbent restored.
+
+- [Scroll routing three-method pilot](2026-10-06-scroll-routing-benchmark.md) — six verified sessions, current driver fix, total and uncached tokens, retained native recovery and setup confounds.

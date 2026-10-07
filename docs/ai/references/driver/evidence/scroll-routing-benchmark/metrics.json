@@ -1,0 +1,669 @@
+{
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "codex_cli_version": "0.150.1",
+  "timeout_seconds": 600,
+  "implementation": {
+    "base_revision": "7ca7db5332719bf0022e3e59c8af11bf3280c0e7",
+    "patch_sha256": "2a498dac4f63687313db59f1decfe7206ec61c77cd584cb0dc017674b2778a06",
+    "binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+    "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+    "implementation_commit": "cd37e69875b966c1c9b90ee9d2c000619d4a29da"
+  },
+  "auv_binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+  "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+  "native_relay_latency_included": true,
+  "isolated_cohort_trials": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "preliminary_cancelled_before_start": [],
+  "isolated_config": {
+    "skills.include_instructions": false,
+    "project_doc_max_bytes": 0,
+    "inherited_codex_environment_removed": true,
+    "strict_config": true
+  },
+  "summary": {
+    "native": {
+      "trials": 2,
+      "successes": 2,
+      "all_usage_complete": true,
+      "processed_tokens": 968392,
+      "uncached_input_plus_output": 132552,
+      "seconds": 267.8736336249858,
+      "shell_calls": 0,
+      "mcp_calls": 50
+    },
+    "auv_without_skill": {
+      "trials": 2,
+      "successes": 2,
+      "all_usage_complete": true,
+      "processed_tokens": 370103,
+      "uncached_input_plus_output": 60983,
+      "seconds": 125.75269837595988,
+      "shell_calls": 20,
+      "mcp_calls": 0
+    },
+    "auv_with_skill": {
+      "trials": 2,
+      "successes": 2,
+      "all_usage_complete": true,
+      "processed_tokens": 306986,
+      "uncached_input_plus_output": 24362,
+      "seconds": 163.21549141709693,
+      "shell_calls": 16,
+      "mcp_calls": 0
+    }
+  },
+  "rows": [
+    {
+      "trial": 1,
+      "arm": "native",
+      "task": "Archive record 012",
+      "seconds": 31.775327832903713,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 69717,
+        "cached_input_tokens": 36224,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 498,
+        "reasoning_output_tokens": 165
+      },
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "b34573373633d9ccda94cd48f7fa4113336f3ea277c680435b9c855cc9793fef",
+      "binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "coordinator_verified": true,
+      "setup_exclusion": "duplicate fixture instances",
+      "cohort": "preliminary",
+      "operation_counts": {},
+      "shell_calls": 0,
+      "shell_errors": 0,
+      "mcp_calls": 3,
+      "auv_skill_read": false,
+      "other_skill_read_count": 0,
+      "full_skill_text_observed": false,
+      "help_calls": 0,
+      "native_actions": [
+        {
+          "action": "observe"
+        },
+        {
+          "action": "scroll",
+          "element": 1,
+          "direction": "down",
+          "pages": 1
+        },
+        {
+          "action": "observe"
+        }
+      ],
+      "native_image_calls": 2,
+      "native_pages_outside_declared_schema": [],
+      "auv_image_calls": null,
+      "processed_tokens": 70215,
+      "uncached_input_plus_output": 33991,
+      "success": true,
+      "setup_verified_foreground": true,
+      "evidence_file": "trial-01.png",
+      "evidence_sha256": "3098e3720ca50f500a02694344ead5599100bee4486a693c66ad4a48cb8590a4",
+      "evidence_bytes": 221088,
+      "tool_and_explicit_skill_audit_passed": true,
+      "provider_usage_event_verified": true,
+      "native_relay_errors": []
+    },
+    {
+      "trial": 2,
+      "arm": "native",
+      "task": "Archive record 012",
+      "seconds": 51.08182387496345,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 158710,
+        "cached_input_tokens": 128896,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 759,
+        "reasoning_output_tokens": 295
+      },
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "b34573373633d9ccda94cd48f7fa4113336f3ea277c680435b9c855cc9793fef",
+      "binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "coordinator_verified": true,
+      "cohort": "isolated",
+      "operation_counts": {},
+      "shell_calls": 0,
+      "shell_errors": 0,
+      "mcp_calls": 5,
+      "auv_skill_read": false,
+      "other_skill_read_count": 0,
+      "full_skill_text_observed": false,
+      "help_calls": 0,
+      "native_actions": [
+        {
+          "action": "observe"
+        },
+        {
+          "action": "scroll",
+          "direction": "down",
+          "pages": 1
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "click",
+          "element": 6
+        },
+        {
+          "action": "observe"
+        }
+      ],
+      "native_image_calls": 3,
+      "native_pages_outside_declared_schema": [],
+      "auv_image_calls": null,
+      "processed_tokens": 159469,
+      "uncached_input_plus_output": 30573,
+      "success": true,
+      "setup_verified_foreground": true,
+      "evidence_file": "trial-02.png",
+      "evidence_sha256": "564760a76780598c34753ae1c9faa98ac70381040121b0411ed521b23d8e7a22",
+      "evidence_bytes": 284276,
+      "tool_and_explicit_skill_audit_passed": true,
+      "provider_usage_event_verified": true,
+      "native_relay_errors": [
+        {
+          "isError": true,
+          "content": [
+            {
+              "type": "text",
+              "text": "Error: coordinate must include finite x and y coordinates"
+            }
+          ]
+        }
+      ],
+      "setup_window_counts": {
+        "local.auv.CanvasFixture": 1,
+        "local.auv.ScrollCover": 1
+      }
+    },
+    {
+      "trial": 3,
+      "arm": "auv_without_skill",
+      "task": "Archive record 012",
+      "seconds": 55.60530445899349,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 161320,
+        "cached_input_tokens": 127872,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1785,
+        "reasoning_output_tokens": 646
+      },
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "368e2cd43e589d86d301af9e0661694cab6b5a12730083cc63c2e4a747221403",
+      "binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "coordinator_verified": true,
+      "cohort": "isolated",
+      "operation_counts": {
+        "window.list": 1,
+        "window.capture": 2,
+        "input.scroll": 1
+      },
+      "shell_calls": 10,
+      "shell_errors": 0,
+      "mcp_calls": 0,
+      "auv_skill_read": false,
+      "other_skill_read_count": 0,
+      "full_skill_text_observed": false,
+      "help_calls": 6,
+      "native_actions": [],
+      "native_image_calls": 0,
+      "native_pages_outside_declared_schema": [],
+      "auv_image_calls": null,
+      "processed_tokens": 163105,
+      "uncached_input_plus_output": 35233,
+      "success": true,
+      "setup_verified_foreground": true,
+      "evidence_file": "trial-03.webp",
+      "evidence_sha256": "a8fac733473e30329a3f8f5b2f7425560cdd31c720cf28a4e5c9b00f3cd5a6c6",
+      "evidence_bytes": 75566,
+      "tool_and_explicit_skill_audit_passed": true,
+      "provider_usage_event_verified": true,
+      "native_relay_errors": [],
+      "setup_window_counts": {
+        "local.auv.CanvasFixture": 1,
+        "local.auv.ScrollCover": 1
+      }
+    },
+    {
+      "trial": 4,
+      "arm": "auv_with_skill",
+      "task": "Archive record 012",
+      "seconds": 63.10533916705754,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 124769,
+        "cached_input_tokens": 115200,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1216,
+        "reasoning_output_tokens": 153
+      },
+      "answer": {
+        "found": true,
+        "code": "AR-1012",
+        "status": "Stored",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "c8045de877dc9e8ea7bd1240c97ec395dbb4e219797235dd558800186bf92ca0",
+      "binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "coordinator_verified": true,
+      "cohort": "isolated",
+      "operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "shell_calls": 8,
+      "shell_errors": 0,
+      "mcp_calls": 0,
+      "auv_skill_read": true,
+      "other_skill_read_count": 0,
+      "full_skill_text_observed": true,
+      "help_calls": 3,
+      "native_actions": [],
+      "native_image_calls": 0,
+      "native_pages_outside_declared_schema": [],
+      "auv_image_calls": null,
+      "processed_tokens": 125985,
+      "uncached_input_plus_output": 10785,
+      "success": true,
+      "setup_verified_foreground": true,
+      "evidence_file": "trial-04.webp",
+      "evidence_sha256": "81818f4f72e69d567cf5f51db1c0c9e1978116060dee96b9255bbc2a4ad1abca",
+      "evidence_bytes": 82160,
+      "tool_and_explicit_skill_audit_passed": true,
+      "provider_usage_event_verified": true,
+      "native_relay_errors": [],
+      "setup_window_counts": {
+        "local.auv.CanvasFixture": 1,
+        "local.auv.ScrollCover": 1
+      }
+    },
+    {
+      "trial": 5,
+      "arm": "auv_with_skill",
+      "task": "Kestrel handoff",
+      "seconds": 100.11015225003939,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 179089,
+        "cached_input_tokens": 167424,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1912,
+        "reasoning_output_tokens": 308
+      },
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "d7da6748602cfcae921ac8775f7bc7085945820c22c6c1d01d51111c8b6d63bc",
+      "binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "coordinator_verified": true,
+      "cohort": "isolated",
+      "operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "shell_calls": 8,
+      "shell_errors": 0,
+      "mcp_calls": 0,
+      "auv_skill_read": true,
+      "other_skill_read_count": 0,
+      "full_skill_text_observed": true,
+      "help_calls": 3,
+      "native_actions": [],
+      "native_image_calls": 0,
+      "native_pages_outside_declared_schema": [],
+      "auv_image_calls": null,
+      "processed_tokens": 181001,
+      "uncached_input_plus_output": 13577,
+      "success": true,
+      "setup_verified_foreground": true,
+      "evidence_file": "trial-05.webp",
+      "evidence_sha256": "6c8ee264fa444e55c2e46fcb2f55bf364ff43c4535920fc33e527b71d14a110c",
+      "evidence_bytes": 73754,
+      "tool_and_explicit_skill_audit_passed": true,
+      "provider_usage_event_verified": true,
+      "native_relay_errors": [],
+      "setup_window_counts": {
+        "local.auv.CanvasFixture": 1,
+        "local.auv.ScrollCover": 1
+      }
+    },
+    {
+      "trial": 6,
+      "arm": "auv_without_skill",
+      "task": "Kestrel handoff",
+      "seconds": 70.1473939169664,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 204877,
+        "cached_input_tokens": 181248,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2121,
+        "reasoning_output_tokens": 623
+      },
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "538101000718e1827c7aff509c51dd24bb28f1be3cbef654b88b31f9e1343155",
+      "binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "coordinator_verified": true,
+      "cohort": "isolated",
+      "operation_counts": {
+        "window.list": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 1
+      },
+      "shell_calls": 10,
+      "shell_errors": 0,
+      "mcp_calls": 0,
+      "auv_skill_read": false,
+      "other_skill_read_count": 0,
+      "full_skill_text_observed": false,
+      "help_calls": 6,
+      "native_actions": [],
+      "native_image_calls": 0,
+      "native_pages_outside_declared_schema": [],
+      "auv_image_calls": null,
+      "processed_tokens": 206998,
+      "uncached_input_plus_output": 25750,
+      "success": true,
+      "setup_verified_foreground": true,
+      "evidence_file": "trial-06.webp",
+      "evidence_sha256": "d9ed9eedacebcfe5056fb18548a3b62a470fa0e95fe715630365278f91e3a1ba",
+      "evidence_bytes": 80206,
+      "tool_and_explicit_skill_audit_passed": true,
+      "provider_usage_event_verified": true,
+      "native_relay_errors": [],
+      "setup_window_counts": {
+        "local.auv.CanvasFixture": 1,
+        "local.auv.ScrollCover": 1
+      }
+    },
+    {
+      "trial": 7,
+      "arm": "native",
+      "task": "Kestrel handoff",
+      "seconds": 216.79180975002237,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 807012,
+        "cached_input_tokens": 706944,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1911,
+        "reasoning_output_tokens": 552
+      },
+      "answer": {
+        "found": true,
+        "code": "VK-7392",
+        "status": "Ready for review",
+        "screenshot_verified": true
+      },
+      "prompt_sha256": "08a92363857b4e0546c0269936646bbb66e254293b9e126415b5e1bd22fbf177",
+      "binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+      "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+      "coordinator_verified": true,
+      "cohort": "isolated",
+      "operation_counts": {},
+      "shell_calls": 0,
+      "shell_errors": 0,
+      "mcp_calls": 45,
+      "auv_skill_read": false,
+      "other_skill_read_count": 0,
+      "full_skill_text_observed": false,
+      "help_calls": 0,
+      "native_actions": [
+        {
+          "action": "observe"
+        },
+        {
+          "action": "scroll",
+          "direction": "down",
+          "pages": 6
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.5"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.75"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "1"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.1"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.2"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.3"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.4"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.6"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.7"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.8"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.9"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.05"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.15"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.25"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.35"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.45"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.55"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.65"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.85"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.95"
+        },
+        {
+          "action": "observe"
+        },
+        {
+          "action": "set_value",
+          "element": 2,
+          "value": "0.85"
+        },
+        {
+          "action": "observe"
+        }
+      ],
+      "native_image_calls": 23,
+      "native_pages_outside_declared_schema": [
+        6
+      ],
+      "auv_image_calls": null,
+      "processed_tokens": 808923,
+      "uncached_input_plus_output": 101979,
+      "success": true,
+      "setup_verified_foreground": true,
+      "evidence_file": "trial-07.png",
+      "evidence_sha256": "c5ab2c872912506c0cdf7108a74143308d835d7a7d1b00a3047ddb21d83bc0b7",
+      "evidence_bytes": 210846,
+      "tool_and_explicit_skill_audit_passed": true,
+      "provider_usage_event_verified": true,
+      "native_relay_errors": [
+        {
+          "isError": true,
+          "content": [
+            {
+              "type": "text",
+              "text": "Error: coordinate must include finite x and y coordinates"
+            }
+          ]
+        }
+      ],
+      "setup_window_counts": {
+        "local.auv.CanvasFixture": 1,
+        "local.auv.ScrollCover": 1
+      }
+    }
+  ]
+}

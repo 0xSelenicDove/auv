@@ -1,0 +1,7 @@
+{
+  "base_revision": "7ca7db5332719bf0022e3e59c8af11bf3280c0e7",
+  "patch_sha256": "2a498dac4f63687313db59f1decfe7206ec61c77cd584cb0dc017674b2778a06",
+  "binary_sha256": "793cd8a6f6f7a3904f1063cac932a93d87394e0694001697233fb342ef676034",
+  "skill_sha256": "f52d2bbd3864e5f36aa08db9afce44197f74db4c819cc768db0e1482da61aedc",
+  "implementation_commit": "cd37e69875b966c1c9b90ee9d2c000619d4a29da"
+}

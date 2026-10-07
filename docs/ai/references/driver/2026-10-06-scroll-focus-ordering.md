@@ -41,5 +41,5 @@ The disposable local fixtures now open without automatic activation. They are
 closed outside measured sessions. The user approved brief live checks and then
 explicitly approved the full three-method model-session benchmark. Its protocol,
 metrics, retained setup corrections and conclusions are recorded separately in
-the accompanying benchmark report; receiver-test success alone is not token
+[the accompanying benchmark report](2026-10-06-scroll-routing-benchmark.md); receiver-test success alone is not token
 savings evidence.
