@@ -27,9 +27,9 @@ workflows and inspect their results.
 This repository is [0xSelenicDove/auv](https://github.com/0xSelenicDove/auv), a
 fork of [moeru-ai/AUV](https://github.com/moeru-ai/auv). The fork retains upstream
 AUV's architecture and maintains scroll-targeting fixes, agent-skill guidance
-and reproducible optimization evidence. The [standalone AUV Computer Control
-skill](https://github.com/0xSelenicDove/auv-computer-control-skill) distributes
-agent instructions separately from the runtime.
+and reproducible optimization evidence. The [AUV Computer Control skill](.agents/skills/auv-computer-control/SKILL.md)
+is maintained in this fork alongside the runtime. The earlier standalone skill
+repository is private and is no longer the recommended installation source.
 
 [Why AUV?](#why-auv) ·
 [Compare this fork with upstream](#this-fork-compared-with-upstream-auv) ·
@@ -126,7 +126,7 @@ always fastest. This is a workflow-selection guide; the
 | Approach | When to choose it | Cost or boundary to consider |
 | --- | --- | --- |
 | Application API or connector | The application already exposes the required data and action | Check that it covers the user's actual workflow and permissions |
-| Native computer-use tools already in the agent host | Existing accessibility and input tools cover a short desktop task | Avoid adding AUV setup and skill discovery unless its capabilities are needed; the [TextEdit benchmark](#token-efficiency-and-speed-benchmarks) measured extra tokens with AUV guidance |
+| Native computer-use tools already in the agent host | Existing accessibility and input tools cover a short desktop task | Avoid adding AUV setup and skill discovery unless its capabilities are needed; the [earlier three-arm benchmark](docs/ai/references/driver/2026-10-06-three-arm-session-benchmark.md) measured extra tokens with AUV guidance |
 | AUV | Native GUI work benefits from targeted capture/OCR, typed reusable operations or recorded Run evidence | Discovery, startup, skill context and verification still cost time and tokens; use the [task-specific evidence](#token-efficiency-and-speed-benchmarks) |
 | Browser automation | The workflow is a web page with a usable DOM | Decide whether the task also needs native windows, OS dialogs or other desktop capabilities |
 
@@ -195,12 +195,13 @@ new live application test. For OCR, inspect `window.findText --help` before use.
 ## Use AUV with Codex and Claude Code
 
 The [versioned skill in this fork](.agents/skills/auv-computer-control/SKILL.md)
-guides operation discovery, targeting, verification and reuse. The
-[standalone skill repository](https://github.com/0xSelenicDove/auv-computer-control-skill)
-provides installation instructions for Codex and Claude Code; its published
-revision can differ from the copy in this fork. To use this fork's exact
-instructions, install its `.agents/skills/auv-computer-control` directory into
-your host's supported skill location.
+guides operation discovery, targeting, verification and reuse. Use this bundled
+copy so the instructions match the fork; the earlier standalone distribution
+is private. Install the entire `.agents/skills/auv-computer-control` directory,
+including its references, into your host's supported skill location. For Codex,
+copy it to `~/.codex/skills/auv-computer-control`; for Claude Code, copy it to
+`~/.claude/skills/auv-computer-control`. Replace an older installed copy rather
+than keeping competing versions in the same host.
 
 Invoke `$auv-computer-control` in Codex or `/auv-computer-control` in Claude
 Code. A skill supplies instructions; AUV supplies the execution runtime. The
@@ -752,7 +753,7 @@ have different baselines; they must not be combined into one savings claim.
 | --- | --- | --- |
 | [Three-method scroll-search pilot](docs/ai/references/driver/2026-10-06-scroll-routing-benchmark.md): six verified macOS canvas tasks, two per method | AUV with skill used 306,986 total tokens versus 370,103 without skill, 17.1% fewer. It took 163.2 seconds versus 125.8 seconds. | Small model-session sample. Skill routing saved tokens but was slower; native recovery confounded the native comparison. |
 | [Existing Runner OCR reuse](docs/ai/references/driver/2026-10-06-runner-ocr-reuse.md): offline release-build RPC pilot | In the repeat, three calls averaged 1.59 seconds with fresh runners versus 1.07 seconds with reuse, a 32.82% reduction including startup. All 24 calls across both attempts preserved eight text rows and their bounds. | Initial slow call retained. This measures reused Runner/client RPCs, not end-to-end CLI/MCP workflows or model-token savings. |
-| [Native Computer Use comparison](https://github.com/0xSelenicDove/auv-computer-control-skill/blob/main/docs/native-computer-use-benchmark-2026-10-06.md): synthetic TextEdit tasks with the earlier skill/runtime | Adding AUV and the skill increased median processed tokens by 47.7% for reading and 93.3% for matched editing/restoration. | Different tasks and revisions: three reading pairs and two matched control pairs. Native accessibility already covered the requested work. |
+| [Earlier three-arm comparison](docs/ai/references/driver/2026-10-06-three-arm-session-benchmark.md): synthetic canvas tasks with an earlier skill revision | Pure computer-use used 306,175 total tokens; AUV without skill used 416,504; AUV with skill used 498,589 and failed one task. | Two tasks per arm. Failures remain counted; this historical result does not measure the current skill. The [subsequent skill revision](docs/ai/references/driver/2026-10-06-skill-token-benchmark.md) reduced its own matched baseline totals. |
 
 Model-session totals count input plus output, including cached input and skill
 loading. They are not monetary-cost or account-quota estimates. Compare the same
@@ -806,8 +807,8 @@ Runner does not merge separate Runs. See the authoritative
 
 Use [moeru-ai/AUV](https://github.com/moeru-ai/auv) for the upstream project,
 [0xSelenicDove/auv](https://github.com/0xSelenicDove/auv) for this fork, and
-[the standalone skill](https://github.com/0xSelenicDove/auv-computer-control-skill)
-for its distribution. Cite a specific commit and the relevant evidence report
+[the bundled skill](.agents/skills/auv-computer-control/SKILL.md) for its agent
+instructions. Cite a specific commit and the relevant evidence report
 for performance or support claims. Include the platform, task, tested revision
 and verified outcome so a reader can distinguish an implementation from a
 measured behavior.
