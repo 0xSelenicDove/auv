@@ -1060,10 +1060,58 @@ fn selected_global_text_dry_run_returns_validation_without_delivery() {
   assert!(output.status.success(), "{}", stderr(&output));
   let devices: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
   let device_id = devices[0]["device_id"].as_str().unwrap();
-  let output = Command::new(env!("CARGO_BIN_EXE_auv"))
+  let mut run_ids = std::collections::BTreeSet::new();
+  let mut runner_identity = None;
+  // Separate CLI processes finish their own Runs but must keep the same
+  // daemon-owned Runner available for the next operation.
+  for _ in 0..3 {
+    let output = Command::new(env!("CARGO_BIN_EXE_auv"))
+      .current_dir(directory.path())
+      .env_remove("AUV_CONTEXT")
+      .env("AUV_ENDPOINT", &endpoint)
+      .env("AUV_CONFIG_PROFILES_FILE", directory.path().join("profiles.json"))
+      .args([
+        "--device-id",
+        device_id,
+        "invoke",
+        "input.typeText",
+        "",
+        "--dry-run",
+        "--compact-json",
+      ])
+      .output()
+      .unwrap();
+    assert!(output.status.success(), "stdout={} stderr={}", stdout(&output), stderr(&output));
+    let response: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(response["status"], "completed", "{response}");
+    assert!(response["result"].is_null(), "dry-run returned delivery evidence: {response}");
+    assert!(run_ids.insert(response["run_id"].as_str().unwrap().to_string()), "each invocation owns a distinct Run");
+    let listed = Command::new(env!("CARGO_BIN_EXE_auv")).args(["runner", "list", "--endpoint", &endpoint, "--json"]).output().unwrap();
+    assert!(listed.status.success(), "{}", stderr(&listed));
+    let runners: serde_json::Value = serde_json::from_slice(&listed.stdout).unwrap();
+    assert_eq!(runners.as_array().unwrap().len(), 1);
+    assert_eq!(runners[0]["phase"], "RUNNER_PHASE_READY");
+    let identity = (runners[0]["runner_id"].clone(), runners[0]["process_id"].clone());
+    assert!(!identity.0.is_null() && identity.1.as_u64().is_some_and(|pid| pid > 0));
+    if let Some(previous) = &runner_identity {
+      assert_eq!(&identity, previous);
+    }
+    runner_identity = Some(identity);
+  }
+  let records = std::fs::read_to_string(directory.path().join(".auv").join("store").join("records.jsonl")).unwrap();
+  let records: Vec<serde_json::Value> = records.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+  for run_id in run_ids {
+    assert!(
+      records.iter().any(|row| row["record"]["run_id"] == run_id && row["record"]["type"] == "event"),
+      "reused Runner must preserve per-invocation recording for {run_id}"
+    );
+  }
+  interrupt(&daemon.0);
+  assert!(daemon.0.wait().unwrap().success());
+  let unavailable = Command::new(env!("CARGO_BIN_EXE_auv"))
     .current_dir(directory.path())
-    .env_remove("AUV_CONTEXT")
     .env("AUV_ENDPOINT", &endpoint)
+    .env("AUV_CONFIG_PROFILES_FILE", directory.path().join("profiles.json"))
     .args([
       "--device-id",
       device_id,
@@ -1071,14 +1119,12 @@ fn selected_global_text_dry_run_returns_validation_without_delivery() {
       "input.typeText",
       "",
       "--dry-run",
-      "--json",
+      "--compact-json",
     ])
     .output()
     .unwrap();
-  assert!(output.status.success(), "stdout={} stderr={}", stdout(&output), stderr(&output));
-  let response: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-  assert_eq!(response["status"], "completed", "{response}");
-  assert!(response["result"].is_null(), "dry-run returned delivery evidence: {response}");
+  assert!(!unavailable.status.success(), "an unavailable selected Runner must not fall back locally");
+  assert!(stderr(&unavailable).contains("connect"), "{}", stderr(&unavailable));
 }
 
 /// Offline timing probe through the existing owner-only daemon and local Runner.

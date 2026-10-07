@@ -92,3 +92,37 @@ hashes and the measured executable hashes are recorded.
 Validation: both ignored release profiles, normal root CLI tests, default
 `cargo test`, `cargo fmt --check`, `cargo check`, `git diff --check`, and
 `cargo run --quiet -- invoke --help`.
+
+## Workflow adoption
+
+The owner subsequently approved adoption. The existing runtime already supports
+this lifecycle; adoption selects that path rather than adding another daemon or
+changing unqualified one-off invokes. The canonical skill is now tracked at
+[`.agents/skills/auv-computer-control/SKILL.md`](../../../../.agents/skills/auv-computer-control/SKILL.md),
+with matching installed files under `~/.codex/skills/auv-computer-control`.
+Update the canonical files and copy the changed files to the installed directory
+when maintaining this skill; preserve local UI metadata unless it changes.
+
+Repeated work prefers an existing connected MCP/SDK client. With a daemon,
+separate CLI operations retain `AUV_ENDPOINT` and the exact observed
+`--device-id`, plus any existing Run selection. The endpoint alone does not
+route an unqualified invoke through a Runner. The optional skill reference
+contains the concrete CLI example, task-owned private socket lifecycle,
+connection ownership and capture-reference rules. One-off direct invocation
+remains available; selected connection failure never becomes local execution.
+
+The existing macOS selected CLI regression now executes three separate CLI
+processes against one private daemon. Each completes validation without input
+delivery, records a distinct Run and retains the same ready Runner ID/PID.
+After graceful daemon shutdown, a further selected invocation fails. This
+validates the adopted CLI lifecycle and recording boundary without opening or
+focusing test windows. It is not an OCR speed or model-token measurement.
+The offline OCR accuracy evidence above remains the recognition gate; unchanged
+OCR settings preserve the rejected resolution experiment's safety boundary.
+
+The 32.82% result remains limited to the offline reused-client RPC pilot, not
+the separate-process CLI workflow or all MCP implementations. End-to-end model
+tokens and speed need a matched workflow benchmark before a broader claim.
+Validation for adoption: focused selected CLI lifecycle test, default tests,
+format/check/invoke help/diff checks, and skill validation of canonical and
+installed copies.
