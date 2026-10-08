@@ -600,27 +600,54 @@ func validate_input_target(pid: Int64, window_number: Int64, require_window_focu
 // Fresh focus and WindowServer ordering avoid repeating activation for timed
 // wheel samples. AX can report focus before the window finishes coming forward.
 // Missing state is false, so the caller uses its preparation/error path.
-func input_target_is_focused(pid: Int64, window_number: Int64) -> Bool {
-  guard inputProcessIsRunning(pid) else { return false }
+private func inputFocusFailure(pid: Int64, window_number: Int64) -> String? {
+  guard inputProcessIsRunning(pid) else { return "target process is not running" }
   let appElement = AXUIElementCreateApplication(pid_t(pid))
-  guard windowAxBoolAttribute(appElement, kAXFrontmostAttribute as String) else { return false }
-  if window_number == 0 { return true }
-  guard let focused = windowAxElementAttribute(appElement, kAXFocusedWindowAttribute as String) else { return false }
-  guard windowAxCgWindowId(focused) == window_number else { return false }
+  guard windowAxBoolAttribute(appElement, kAXFrontmostAttribute as String) else { return "AX application is not frontmost" }
+  if window_number == 0 { return nil }
+  guard let focused = windowAxElementAttribute(appElement, kAXFocusedWindowAttribute as String) else { return "AX focused window is unavailable" }
+  guard windowAxCgWindowId(focused) == window_number else { return "AX focused window does not match target" }
   guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
-    return false
+    return "WindowServer ordering is unavailable"
   }
   // HID hit testing follows WindowServer order, not AX's earlier focus update.
   // Ignore other floating overlays and fully transparent windows in this check;
   // the target itself may be a floating window.
   // NOTICE: This readiness check does not prevent focus changes after posting.
-  let front = windows.first {
-    (($0[kCGWindowNumber as String] as? NSNumber)?.int64Value == window_number ||
-      ($0[kCGWindowLayer as String] as? NSNumber)?.intValue == 0) &&
-    (($0[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1) > 0
+  // NOTICE(screen-sharing-focus): AppKit's captured-window badge is a
+  // layer-zero, unfocused, non-modal AXDialog owned by the focused app.
+  // It does not replace the focused recipient. Other apps, standard windows,
+  // modal dialogs, and missing AX state still block readiness.
+  // Resolve AXWindows only when an owned window precedes the target, keeping
+  // the normal timed-input path free of additional AX enumeration.
+  var accessibleWindows: [AXUIElement]?
+  let front = windows.first { window in
+    let number = (window[kCGWindowNumber as String] as? NSNumber)?.int64Value
+    guard number == window_number || (window[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
+          ((window[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1) > 0 else { return false }
+    if number != window_number && (window[kCGWindowOwnerPID as String] as? NSNumber)?.int64Value == pid {
+      if accessibleWindows == nil {
+        accessibleWindows = windowAxElementArrayAttribute(appElement, kAXWindowsAttribute as String)
+      }
+      if let auxiliary = accessibleWindows?.first(where: { windowAxCgWindowId($0) == number }),
+         windowAxStringAttribute(auxiliary, kAXSubroleAttribute as String) == kAXDialogSubrole as String,
+         let modal = windowAxAttributeValue(auxiliary, kAXModalAttribute as String) as? NSNumber,
+         let focused = windowAxAttributeValue(auxiliary, kAXFocusedAttribute as String) as? NSNumber,
+         !modal.boolValue, !focused.boolValue {
+        return false
+      }
+    }
+    return true
   }
-  return (front?[kCGWindowNumber as String] as? NSNumber)?.int64Value == window_number &&
-    (front?[kCGWindowOwnerPID as String] as? NSNumber)?.int64Value == pid
+  guard (front?[kCGWindowNumber as String] as? NSNumber)?.int64Value == window_number,
+        (front?[kCGWindowOwnerPID as String] as? NSNumber)?.int64Value == pid else {
+    return "target is not the frontmost WindowServer recipient"
+  }
+  return nil
+}
+
+func input_target_is_focused(pid: Int64, window_number: Int64) -> Bool {
+  inputFocusFailure(pid: pid, window_number: window_number) == nil
 }
 
 // Activation is owned by the existing Rust input preparation lifecycle. Raise
@@ -648,7 +675,8 @@ func confirm_input_focus(pid: Int64, window_number: Int64) -> NativeActionRespon
     // Observe until ready; never repeatedly activate or assume a fixed sleep proves focus.
     RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.01))
   } while ProcessInfo.processInfo.systemUptime < deadline
-  return nativeActionError("target activation or window focus was not confirmed", "resolve and focus the target again")
+  let failure = inputFocusFailure(pid: pid, window_number: window_number) ?? "focus changed during confirmation"
+  return nativeActionError("target activation or window focus was not confirmed: \(failure)", "resolve and focus the target again")
 }
 
 /// The window's size and minimized state as its application reports them over

@@ -1486,3 +1486,29 @@ fn captured_frame_without_application_size_is_treated_as_transformed() {
     CapturedWindowFrame::Transformed { minimized: false }
   );
 }
+
+// ROOT CAUSE:
+//
+// Capturing the fixture exposes AppKit's unfocused, non-modal sharing badge
+// ahead of its standard window. The old WindowServer check rejected the
+// correctly focused recipient. Ignore owned auxiliary dialogs only with
+// explicit non-modal/unfocused AX evidence; other apps must still block input.
+#[test]
+#[ignore = "requires RepeatedSearchFixture, CanvasFixture and macOS Accessibility; briefly activates both"]
+fn foreground_preparation_confirms_repeated_search_window() {
+  let session = MacosDriverSession { _private: () };
+  let target = session.window().resolve(SelectWindow::main_visible().owned_by(App::bundle("local.auv.RepeatedSearchFixture"))).unwrap();
+  let cover = session.window().resolve(SelectWindow::main_visible().owned_by(App::bundle("local.auv.CanvasFixture"))).unwrap();
+  let (pid, number) = resolve_input_target(&InputTarget::Window(target)).unwrap();
+  let (cover_pid, cover_number) = resolve_input_target(&InputTarget::Window(cover)).unwrap();
+  activate_process(pid).unwrap();
+  crate::native::window::confirm_input_focus(pid, number).unwrap();
+  assert!(crate::native::window::input_target_is_focused(pid, number));
+  assert!(!crate::native::window::input_target_is_focused(pid, -1));
+  activate_process(cover_pid).unwrap();
+  crate::native::window::confirm_input_focus(cover_pid, cover_number).unwrap();
+  assert!(!crate::native::window::input_target_is_focused(pid, number));
+  activate_process(pid).unwrap();
+  crate::native::window::confirm_input_focus(pid, number).unwrap();
+  assert!(crate::native::window::input_target_is_focused(pid, number));
+}
