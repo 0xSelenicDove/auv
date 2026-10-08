@@ -138,3 +138,5 @@ Count: **84**
 - [Rejected evidence reuse guidance candidate](2026-10-07-skill-evidence-candidate.md): One verified case B follow-up regressed tokens and time; incumbent restored and missing Runner final-artifact boundary identified.
 
 - [Runner scroll search final-observation evidence](2026-10-07-runner-scroll-evidence.md): Runner-side capture recording with metadata-only receipts, matched-frame regressions, different-store live verification and recording-error separation; no new token-saving claim.
+
+- [Runner evidence matched benchmark](2026-10-07-runner-evidence-benchmark.md): four full model sessions; capture failures prevent a performance conclusion.

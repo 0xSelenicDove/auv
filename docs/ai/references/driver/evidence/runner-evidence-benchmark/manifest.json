@@ -1,0 +1,28 @@
+{
+  "classification": "test-only matched before/after pilot",
+  "revisions": {
+    "before": "75260c50",
+    "after": "3fe5b264"
+  },
+  "before_binary_provenance": "Frozen 1f1e7a41 release; git diff 1f1e7a41..75260c50 crates Cargo.lock proto is empty.",
+  "binary_sha256": {
+    "before": "f837b61cf2d6000df7007262a7ee5463fefb53578768e5e3ee3b42ce546cfe5b",
+    "after": "f2f63d5ab740a44760b192b9764dfc0c30b1b7362c84b5151354af6b06c09d7c"
+  },
+  "skill_sha256": {
+    "before": "23318b9057ed8a2ffac1f6003aef9bc4468dc559474988d7b98c0500c7248624",
+    "after": "a99627662367e5f84efbb85f1ec953c66e10094b25db6590a52bd507ac3de920"
+  },
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "codex_cli": "0.150.1",
+  "order": [
+    "before/A",
+    "after/A",
+    "after/B",
+    "before/B"
+  ],
+  "timeout_seconds": 900,
+  "registered_before_trial_01": true,
+  "scope": "four fresh full model sessions; no native or without-skill controls rerun"
+}

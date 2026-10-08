@@ -1,0 +1,305 @@
+{
+  "conclusion": "inconclusive: no task pair has equal successful completion; retain all four attempts",
+  "rows": [
+    {
+      "trial": 1,
+      "arm": "before",
+      "case": "A",
+      "seconds_including_startup": 216.53226400003769,
+      "exit_code": 0,
+      "timed_out": false,
+      "usage": {
+        "input_tokens": 564154,
+        "cached_input_tokens": 499712,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 5121,
+        "reasoning_output_tokens": 799
+      },
+      "prompt_sha256": "44caba92a7219c633af8b2799f65dc4fe290bfa41529db4b171685b0db4e4002",
+      "total_tokens": 569275,
+      "uncached_plus_output": 69563,
+      "verified_records": 8,
+      "success": true,
+      "final_target_visible": true,
+      "failures": [],
+      "record_evidence": [
+        {
+          "name": "Birch transfer",
+          "code": "BK-1600",
+          "status": "Stored",
+          "screenshot_verified": true,
+          "evidence": "trial-01-record-01.webp",
+          "sha256": "f83b9da011ec04e913f4971ac21269f92dc38df0149a52938363a57e9dcef31c"
+        },
+        {
+          "name": "Cobalt dispatch",
+          "code": "BK-5738",
+          "status": "Pending audit",
+          "screenshot_verified": true,
+          "evidence": "trial-01-record-02.webp",
+          "sha256": "d847e7655cf36071627f4c93d08c0eefe1bd438628074014efd7af5701e4477c"
+        },
+        {
+          "name": "Ember review",
+          "code": "BK-5856",
+          "status": "Stored",
+          "screenshot_verified": true,
+          "evidence": "trial-01-record-03.webp",
+          "sha256": "2eda4df528a99e7a91c54ed6951829922d565dc8a63949a9a638927a7f91d481"
+        },
+        {
+          "name": "Harbor receipt",
+          "code": "WS-9195",
+          "status": "Pending audit",
+          "screenshot_verified": true,
+          "evidence": "trial-01-record-04.webp",
+          "sha256": "c27c42ee9244c186713834e94e8ab86fb0d8791db54642a7fb06cd53af206fd1"
+        },
+        {
+          "name": "Juniper request",
+          "code": "WS-1191",
+          "status": "Ready for review",
+          "screenshot_verified": true,
+          "evidence": "trial-01-record-05.webp",
+          "sha256": "c7fd5667a8479270336430363e4c6d9349a82f29930628377f563dc981c54457"
+        },
+        {
+          "name": "Linden handoff",
+          "code": "JP-6711",
+          "status": "Ready for review",
+          "screenshot_verified": true,
+          "evidence": "trial-01-record-06.webp",
+          "sha256": "7403d58f9cd74b943a2c7faa8c9d59d1ac64a18b89e474a3a668f9bef9bd2712"
+        },
+        {
+          "name": "Quartz audit",
+          "code": "HN-3250",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-01-record-07.webp",
+          "sha256": "b77a08f029608a5bdf3877b0ba70d34d151b1cb0c904db53bdf5be9a8b085bb3"
+        },
+        {
+          "name": "Willow release",
+          "code": "WS-1353",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-01-record-08.webp",
+          "sha256": "46f546c5e4c9b03d0334be2583c4dd66a89f86d82765df8aae00e3b4ec7c100e"
+        }
+      ]
+    },
+    {
+      "trial": 2,
+      "arm": "after",
+      "case": "A",
+      "seconds_including_startup": 187.8563459169818,
+      "exit_code": 0,
+      "timed_out": false,
+      "usage": {
+        "input_tokens": 399918,
+        "cached_input_tokens": 350464,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 3193,
+        "reasoning_output_tokens": 778
+      },
+      "prompt_sha256": "10edb3ff60f41423010ddc0bb66165e4a4fd7b6736544731f5230a59a6ad707a",
+      "total_tokens": 403111,
+      "uncached_plus_output": 52647,
+      "verified_records": 1,
+      "success": false,
+      "final_target_visible": false,
+      "failures": [
+        {
+          "record": "Cobalt dispatch",
+          "failure": "AUV window capture failed after one corrective recovery: ScreenCaptureKit capture was declined and xcap fallback failed. Stopped as required without guessing remaining records."
+        }
+      ],
+      "record_evidence": [
+        {
+          "name": "Birch transfer",
+          "code": "BK-1600",
+          "status": "Stored",
+          "screenshot_verified": true,
+          "evidence": "trial-02-record-01.webp",
+          "sha256": "a658cc050f7b05c95962a5f872b93c5f96c5f01cef1f9ee06fc13506609eaa05"
+        }
+      ]
+    },
+    {
+      "trial": 3,
+      "arm": "after",
+      "case": "B",
+      "seconds_including_startup": 201.15960766596254,
+      "exit_code": 0,
+      "timed_out": false,
+      "usage": {
+        "input_tokens": 387400,
+        "cached_input_tokens": 318336,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 4150,
+        "reasoning_output_tokens": 677
+      },
+      "prompt_sha256": "8d1b916943008638a8ff058885be29988c2b989fbca49932cde58fd46db8eb11",
+      "total_tokens": 391550,
+      "uncached_plus_output": 73214,
+      "verified_records": 8,
+      "success": true,
+      "final_target_visible": true,
+      "failures": [],
+      "record_evidence": [
+        {
+          "name": "Amber transfer",
+          "code": "QV-9244",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-03-record-01.webp",
+          "sha256": "25d0f343eb1281b9c4dce68dcbf8f1a2c32e89a1d63e44176a5dd206d0894941"
+        },
+        {
+          "name": "Cedar dispatch",
+          "code": "EL-5818",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-03-record-02.webp",
+          "sha256": "900f7a3f187eaf376e7eb4c432793d59161eaf70294d687fa737b1db61f0e52b"
+        },
+        {
+          "name": "Fern review",
+          "code": "QV-5886",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-03-record-03.webp",
+          "sha256": "e3f2c53e0da5650c77a869bced878ae6958788af4ae0699bbaa50af688574d66"
+        },
+        {
+          "name": "Indigo receipt",
+          "code": "QV-5713",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-03-record-04.webp",
+          "sha256": "f6a9bb43a507c2cd4fa5bd84afc98d977596d2c5e6e054e92c8b96551ca757cb"
+        },
+        {
+          "name": "Laurel request",
+          "code": "BK-9322",
+          "status": "Pending audit",
+          "screenshot_verified": true,
+          "evidence": "trial-03-record-05.webp",
+          "sha256": "80d8fb575b8d7d8c2530e55d405ee0f979a704be852360d5bf2d179a4c1cd1be"
+        },
+        {
+          "name": "Maple handoff",
+          "code": "HN-3847",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-03-record-06.webp",
+          "sha256": "767d2d347504ff296497bbec9bc9de74f7165b1e24ff166806a246294889f213"
+        },
+        {
+          "name": "Rowan audit",
+          "code": "JP-9286",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-03-record-07.webp",
+          "sha256": "d2e6c64790ed86b9eb641aae00438a101f99ce647894738b4fdfa519be4bd2d3"
+        },
+        {
+          "name": "Zinnia release",
+          "code": "CT-8040",
+          "status": "Pending audit",
+          "screenshot_verified": true,
+          "evidence": "trial-03-record-08.webp",
+          "sha256": "6615a7ac3892fbbe580807ba6bbd6cb61fcf75c8f923f718612443ed60047e27"
+        }
+      ]
+    },
+    {
+      "trial": 4,
+      "arm": "before",
+      "case": "B",
+      "seconds_including_startup": 219.89054629206657,
+      "exit_code": 0,
+      "timed_out": false,
+      "usage": {
+        "input_tokens": 326806,
+        "cached_input_tokens": 289920,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 3594,
+        "reasoning_output_tokens": 947
+      },
+      "prompt_sha256": "040d7114e73e67fd0c1bca6a1e199a71d3197942c0938190fd9f0b14aa3cba71",
+      "total_tokens": 330400,
+      "uncached_plus_output": 40480,
+      "verified_records": 4,
+      "success": false,
+      "final_target_visible": false,
+      "failures": [
+        {
+          "operation": "input.scrollUntil",
+          "target": "Laurel request",
+          "run_id": "01a11a08-f967-75f2-b4eb-f7fc16eb6b4f",
+          "failure": "ScreenCaptureKit window capture timed out after 10s; xcap fallback also failed to capture window 27619. The single permitted corrective capture recovery was unsuccessful."
+        },
+        {
+          "unresolved_records": [
+            "Laurel request",
+            "Maple handoff",
+            "Rowan audit",
+            "Zinnia release"
+          ],
+          "last_requested_record_visible": false
+        }
+      ],
+      "record_evidence": [
+        {
+          "name": "Amber transfer",
+          "code": "QV-9244",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-04-record-01.webp",
+          "sha256": "06ddbe4f314e40fc663a0746cd7141b983cf72e7ea927d006a1067a0e190bcee"
+        },
+        {
+          "name": "Cedar dispatch",
+          "code": "EL-5818",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-04-record-02.webp",
+          "sha256": "a7334ba65240e5f4ac4c29771697f6be9842499714e6c2d3399c2e3274b465b6"
+        },
+        {
+          "name": "Fern review",
+          "code": "QV-5886",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-04-record-03.webp",
+          "sha256": "db588329984b5a08dbe80b89b6670c7bc5f4496b24640319878e858bb44f4c03"
+        },
+        {
+          "name": "Indigo receipt",
+          "code": "QV-5713",
+          "status": "Approved",
+          "screenshot_verified": true,
+          "evidence": "trial-04-record-04.webp",
+          "sha256": "e79e698cfb37eb0add9f2c1eb2d5c24d33411d4be8df174efe1a64ae494fe17e"
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "before": {
+      "total_tokens": 899675,
+      "seconds": 436.42281029210426,
+      "successful_tasks": 1,
+      "verified_records": 12
+    },
+    "after": {
+      "total_tokens": 794661,
+      "seconds": 389.01595358294435,
+      "successful_tasks": 1,
+      "verified_records": 9
+    }
+  },
+  "primary_win_criterion_met": false
+}

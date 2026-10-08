@@ -1,0 +1,72 @@
+{
+  "trial": 3,
+  "record_checks": [
+    {
+      "name": "Amber transfer",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Cedar dispatch",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Fern review",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Indigo receipt",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Laurel request",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Maple handoff",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Rowan audit",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Zinnia release",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    }
+  ],
+  "final_target_visible": true,
+  "verified_records": 8,
+  "complete": true
+}
