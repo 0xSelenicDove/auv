@@ -271,6 +271,43 @@ const music = windows.find(w => w.window.applicationBundleId === 'com.netease.16
 await music?.click({ x: 400, y: 50 }, { click: { count: 1 } })
 ```
 
+Clicks and scrolls take a point in any coordinate space. A plain `{ x, y }` is
+window-local on a `WindowClient` and screen space on `input`; a `Position`
+names its space; anything with screen `bounds`, such as a text match, is
+clicked at its center. A window converts screen and display positions with its
+current frame on the Runner, so OCR results need no manual offset:
+
+```ts
+const { matches } = await window.findText('Continue', { signal })
+await window.click(matches[0]!) // delivered to this window
+await runner.input.click({ x: 640, y: 400 }) // a global click in screen space
+await runner.input.click({ coordinateSpace: { case: 'displayId', value: displays[0]!.id }, x: 10, y: 10 })
+```
+
+A global click (screen or display position on `input`) has no target window,
+so the Runner rejects `policy` and `windowStrategy` there.
+
+Keyboard input can name its window too. `typeText`, `pressKeys` and
+`pasteText` on a `WindowClient` send `InputService/InputKeyboard` with that
+window as the recipient. By default (`InputPolicy.FOREGROUND_PREFERRED`) the
+window is brought to the front and focused first, so the input cannot land in
+another app. `input.typeText` and `input.pressKey` go to whichever app has
+keyboard focus when they run:
+
+```ts
+import { InputPolicy } from '@auv-js/sdk'
+
+await music?.typeText('Reply')
+await music?.pressKeys(['return'])
+await music?.pressKeys(['cmd', 'a'], { policy: InputPolicy.BACKGROUND_ONLY }) // control must already have focus
+```
+
+Background policies post to the window's process without activating it. The
+control must already have keyboard focus: in NetEase Cloud Music, a background
+click on the search box did not give it focus while another app was in front.
+`input.keyboard` and `input.pressKeys` take the full request, including an
+application or foreground recipient and several ordered actions.
+
 A window reference belongs to the Device, not to a Run. Bind a known window to
 another route without a call, or refresh it by ID:
 
