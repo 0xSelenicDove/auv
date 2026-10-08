@@ -1,9 +1,9 @@
-import type { AuvClient, AuvConnection, Device, RunnerClient, WindowClient } from '@auv-js/sdk'
+import type { AuvClient, AuvConnection, Device, DiscoveredRunner, RunnerClient, Transport, WindowClient } from '@auv-js/sdk'
 
 import type { ClickOptions, KeyboardOptions, Point, Rect, ScrollDelta, ScrollUntilUpdate, WindowSelector } from '../script-api/api'
-import type { Backend, CapturedFrame, DisplayInfo, InputReceipt, RunOutcomeKind, ScrollUntilOutcome, ScrollUntilRequest, TextSearchResult, WindowInfo } from './types'
+import type { Backend, CapturedFrame, DisplayInfo, InputReceipt, RunOutcomeKind, ScrollUntilOutcome, ScrollUntilRequest, SdkAccess, TextSearchResult, WindowInfo } from './types'
 
-import { AuvRemoteError, CaptureResolution, connect, createAuv, createHttpTransport, ImageEncoding, InputDeliveryPath, InputPolicy, MouseButton, pairDevice, ScrollUntilStopReason } from '@auv-js/sdk'
+import { AuvRemoteError, CaptureResolution, connect, createAuv, createHttpTransport, discoverRunner, ImageEncoding, InputDeliveryPath, InputPolicy, MouseButton, pairDevice, ScrollUntilStopReason } from '@auv-js/sdk'
 
 type CaptureResponse = Awaited<ReturnType<RunnerClient['displays']['capture']>>
 type NativeAction = Awaited<ReturnType<RunnerClient['input']['typeText']>>['action']
@@ -41,6 +41,7 @@ function screenPoint(frame: Parameters<typeof toRect>[0], point: Point): Point |
 class AuvBackend implements Backend {
   readonly kind = 'auv'
   readonly label: string
+  #discovered?: Promise<DiscoveredRunner | undefined>
   #runId?: string
   #runner: RunnerClient
 
@@ -48,6 +49,7 @@ class AuvBackend implements Backend {
     private readonly connection: AuvConnection,
     private readonly client: AuvClient,
     private readonly device: Device,
+    private readonly http: { credential?: string, transport: Transport },
   ) {
     // NOTICE(device-name): a local daemon may report an empty Device name.
     this.label = `${device.name || device.labels.hostname || device.id.slice(0, 12)} (${device.platform})`
@@ -203,6 +205,25 @@ class AuvBackend implements Backend {
     }
   }
 
+  sdk(): SdkAccess {
+    // Reflection runs once per backend; inspection falls back to bare method
+    // names if the Runner does not answer it.
+    this.#discovered ??= discoverRunner(this.connection, { deviceId: this.device.id, runnerClass: RUNNER_CLASS })
+      .catch((error: unknown) => {
+        console.warn('AUV Runner reflection failed; SDK calls are recorded without effects', error)
+        return undefined
+      })
+    const discovered = this.#discovered
+    return {
+      describe: async method => (await discovered)?.describeMethod(method),
+      route: { deviceId: this.device.id, runId: this.#runId, runnerClass: RUNNER_CLASS },
+      target: {
+        headers: this.http.credential === undefined ? undefined : { authorization: `Bearer ${this.http.credential}` },
+        transport: this.http.transport,
+      },
+    }
+  }
+
   async typeText(text: string): Promise<InputReceipt> {
     const response = await this.#runner.input.typeText(text)
     return { path: deliveryPath(response.action) }
@@ -220,10 +241,8 @@ class AuvBackend implements Backend {
 }
 
 export async function createAuvBackend(options: AuvBackendOptions): Promise<{ backend: Backend, device: Device, devices: readonly Device[] }> {
-  const connection = await connect({
-    credential: options.credential,
-    transport: createHttpTransport({ endpoint: options.endpoint }),
-  })
+  const transport = createHttpTransport({ endpoint: options.endpoint })
+  const connection = await connect({ credential: options.credential, transport })
   const client = createAuv(connection)
   const devices = await client.devices.list()
   const device = devices.find(candidate => candidate.id === options.deviceId)
@@ -231,7 +250,13 @@ export async function createAuvBackend(options: AuvBackendOptions): Promise<{ ba
     ?? devices[0]
   if (!device)
     throw new Error('The daemon reported no Devices')
-  return { backend: withReadableErrors(new AuvBackend(connection, client, device)), device, devices }
+  return { backend: withReadableErrors(new AuvBackend(connection, client, device, { credential: options.credential, transport })), device, devices }
+}
+
+/** Delivery path for display, e.g. `window-targeted-mouse` for `WINDOW_TARGETED_MOUSE`. */
+export function deliveryPath(action: NativeAction): string | undefined {
+  const name = action ? InputDeliveryPath[action.selectedPath] : undefined
+  return name && name !== 'UNSPECIFIED' ? name.toLowerCase().replaceAll('_', '-') : undefined
 }
 
 /** Pairs this browser with a daemon using a one-time token from `auv devices pair create-token`. */
@@ -246,16 +271,61 @@ export async function pairBrowser(endpoint: string, token: string, label = 'AUV 
   }
 }
 
-function deliveryPath(action: NativeAction): string | undefined {
-  const name = action ? InputDeliveryPath[action.selectedPath] : undefined
-  return name && name !== 'UNSPECIFIED' ? name.toLowerCase().replaceAll('_', '-') : undefined
+export function toDisplay(display: NativeDisplay): DisplayInfo {
+  return {
+    frame: toRect(display.frame) ?? { height: 0, width: 0, x: 0, y: 0 },
+    id: display.displayId,
+    name: display.name,
+    primary: display.primary,
+    scale: display.scaleFactor || 1,
+  }
+}
+
+/** A capture's reference and placement, from AUV's `CapturedFrame`. */
+export function toFrame(capture: NativeFrame | undefined, source: string): CapturedFrame {
+  if (!capture?.ref)
+    throw new Error('AUV returned a capture without a reference')
+  const { height = 0, width = 0 } = capture.pixelSize ?? {}
+  return {
+    bounds: toRect(capture.bounds) ?? { height, width, x: 0, y: 0 },
+    height,
+    ref: capture.ref.captureId,
+    scale: capture.scaleFactor || 1,
+    source,
+    thumbhash: capture.thumbhash.length > 0 ? capture.thumbhash : undefined,
+    width,
+  }
+}
+
+/** OCR response as playground matches. */
+export function toRecognized(response: NativeRecognized): TextSearchResult {
+  return {
+    // Region bounds are screen rectangles, like TextMatch bounds (see
+    // "Capture Frame" in docs/TERMS_AND_CONCEPTS.md).
+    matches: response.regions.map(region => ({ bounds: toRect(region.bounds)!, confidence: region.confidence ?? 1, text: region.text })),
+    text: response.text,
+  }
+}
+
+export function toRect(rect: undefined | { height: number, width: number, x: number, y: number }): Rect | undefined {
+  return rect ? { height: rect.height, width: rect.width, x: rect.x, y: rect.y } : undefined
+}
+
+export function toWindow(window: NativeWindow): WindowInfo {
+  return {
+    app: window.applicationName,
+    bundleId: window.applicationBundleId,
+    frame: toRect(window.frame) ?? { height: 0, width: 0, x: 0, y: 0 },
+    id: window.ref?.windowId ?? '',
+    pid: window.processId,
+    title: window.title,
+  }
 }
 
 function keyboardPolicy(options: KeyboardOptions | undefined): InputPolicy {
   return options?.background ? InputPolicy.BACKGROUND_ONLY : InputPolicy.FOREGROUND_PREFERRED
 }
 
-/** Delivery path for display, e.g. `window-targeted-mouse` for `WINDOW_TARGETED_MOUSE`. */
 /** `cmd+a` → `['cmd', 'a']`; a trailing `+` is the plus key (`cmd++`). */
 function keyCombination(key: string): string[] {
   return key.split(/\+(?=.)/).map(part => part.trim()).filter(part => part.length > 0)
@@ -294,47 +364,9 @@ function toClick(options: ClickOptions | undefined) {
   return { count, interval: toDuration(ms) }
 }
 
-function toDisplay(display: NativeDisplay): DisplayInfo {
-  return {
-    frame: toRect(display.frame) ?? { height: 0, width: 0, x: 0, y: 0 },
-    id: display.displayId,
-    name: display.name,
-    primary: display.primary,
-    scale: display.scaleFactor || 1,
-  }
-}
-
 /** `google.protobuf.Duration` from milliseconds. */
 function toDuration(ms: number) {
   return { nanos: Math.round((ms % 1000) * 1e6), seconds: BigInt(Math.floor(ms / 1000)) }
-}
-
-function toFrame(capture: NativeFrame | undefined, source: string): CapturedFrame {
-  if (!capture?.ref)
-    throw new Error('AUV returned a capture without a reference')
-  const { height = 0, width = 0 } = capture.pixelSize ?? {}
-  return {
-    bounds: toRect(capture.bounds) ?? { height, width, x: 0, y: 0 },
-    height,
-    ref: capture.ref.captureId,
-    scale: capture.scaleFactor || 1,
-    source,
-    width,
-  }
-}
-
-/** OCR response as playground matches. */
-function toRecognized(response: NativeRecognized): TextSearchResult {
-  return {
-    // Region bounds are screen rectangles, like TextMatch bounds (see
-    // "Capture Frame" in docs/TERMS_AND_CONCEPTS.md).
-    matches: response.regions.map(region => ({ bounds: toRect(region.bounds)!, confidence: region.confidence ?? 1, text: region.text })),
-    text: response.text,
-  }
-}
-
-function toRect(rect: undefined | { height: number, width: number, x: number, y: number }): Rect | undefined {
-  return rect ? { height: rect.height, width: rect.width, x: rect.x, y: rect.y } : undefined
 }
 
 function toSelector(selector: WindowSelector): Parameters<RunnerClient['windows']['resolve']>[0] {
@@ -351,17 +383,6 @@ function toSelector(selector: WindowSelector): Parameters<RunnerClient['windows'
       ? { case: 'titleContains' as const, value: selector.titleContains }
       : { case: 'mainVisible' as const, value: true }
   return { application, window }
-}
-
-function toWindow(window: NativeWindow): WindowInfo {
-  return {
-    app: window.applicationName,
-    bundleId: window.applicationBundleId,
-    frame: toRect(window.frame) ?? { height: 0, width: 0, x: 0, y: 0 },
-    id: window.ref?.windowId ?? '',
-    pid: window.processId,
-    title: window.title,
-  }
 }
 
 /**
