@@ -26,7 +26,7 @@ use crate::view_parsers::sidebar::region::{
   DefaultScreenRestoreReason, broad_sidebar_probe_bounds, detect_blocking_modal, detect_default_screen_restore, detect_sidebar_region,
   fallback_playlist_sidebar_region, sidebar_scroll_anchor,
 };
-use crate::{RatioRect, SidebarCandidateKind, ViewBounds};
+use crate::{RelativeRect, SidebarCandidateKind, ViewBounds};
 
 #[test]
 fn sidebar_scroll_anchor_matches_live_ratio() {
@@ -40,7 +40,7 @@ fn sidebar_scroll_anchor_matches_live_ratio() {
 #[test]
 fn detect_sidebar_region_uses_manual_region_when_provided() {
   let region =
-    detect_sidebar_region(Some(RatioRect::new(0.0, 0.1, 0.25, 0.8)), auv_driver::Size::new(1000.0, 800.0), &fake_recognition(Vec::new()))
+    detect_sidebar_region(Some(RelativeRect::new(0.0, 0.1, 0.25, 0.8)), auv_driver::Size::new(1000.0, 800.0), &fake_recognition(Vec::new()))
       .expect("manual sidebar region should be accepted");
 
   assert_eq!(region.name, Some("playlist_sidebar".to_string()));
