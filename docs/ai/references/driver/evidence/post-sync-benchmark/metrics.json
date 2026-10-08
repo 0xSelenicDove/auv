@@ -1,0 +1,873 @@
+{
+  "status": "complete_all_six_registered_attempts_retained",
+  "primary_win_criterion_met": false,
+  "rows": [
+    {
+      "trial": 1,
+      "arm": "native",
+      "case": "A",
+      "seconds_including_startup": 53.31524616596289,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 125888,
+        "cached_input_tokens": 79872,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1566,
+        "reasoning_output_tokens": 602
+      },
+      "prompt_sha256": "1ac8ccb188a21f1b674235684f1f7d06442d5749073e112ff476720b736bff51",
+      "total_tokens": 127454,
+      "uncached_plus_output": 47582,
+      "verified_record_count": 8,
+      "verified_task_success": true,
+      "final_target_visible": true,
+      "shell_calls": 0,
+      "native_tool_calls": 4,
+      "native_observations": 12,
+      "skill_read_verified_in_command_log": false,
+      "record_evidence": [
+        {
+          "name": "Birch transfer",
+          "code": "BK-1600",
+          "status": "Stored",
+          "evidence": "trial-01-record-01.jpg",
+          "sha256": "bc67e09ea10d840f054a37c513ff44f5bf3e16768dba4aee830921f5c1a04a5a",
+          "audit": {
+            "name": "Birch transfer",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Cobalt dispatch",
+          "code": "BK-5738",
+          "status": "Pending audit",
+          "evidence": "trial-01-record-02.jpg",
+          "sha256": "773d487caaa12afa4d7662e83b85d40c6e9e6d4eec97387d4e1c1beae3e9ba3a",
+          "audit": {
+            "name": "Cobalt dispatch",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Ember review",
+          "code": "BK-5856",
+          "status": "Stored",
+          "evidence": "trial-01-record-03.jpg",
+          "sha256": "9430702a5c7a31f33eb301ce9b6ad806549ad61fd0c77c4b20d228c8ad92835c",
+          "audit": {
+            "name": "Ember review",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Harbor receipt",
+          "code": "WS-9195",
+          "status": "Pending audit",
+          "evidence": "trial-01-record-04.jpg",
+          "sha256": "ec5496d09f23a9122c42289e9a74f713813f24eefae764844e0a9d297a1762dd",
+          "audit": {
+            "name": "Harbor receipt",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Juniper request",
+          "code": "WS-1191",
+          "status": "Ready for review",
+          "evidence": "trial-01-record-05.jpg",
+          "sha256": "7caf2ca6a4a3a2dcb2275f464d8761a08b897b25982dff7b3c434ccff1a801c0",
+          "audit": {
+            "name": "Juniper request",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Linden handoff",
+          "code": "JP-6711",
+          "status": "Ready for review",
+          "evidence": "trial-01-record-06.jpg",
+          "sha256": "fdce980b936f611d93cd3f2941abce159474be74b507ed16e66595ac88f4a04e",
+          "audit": {
+            "name": "Linden handoff",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Quartz audit",
+          "code": "HN-3250",
+          "status": "Approved",
+          "evidence": "trial-01-record-07.jpg",
+          "sha256": "85cdb0ebf1666eec9caeaaa2e4ecd27114da3f6af27dd6135c2f1109e1c32777",
+          "audit": {
+            "name": "Quartz audit",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Willow release",
+          "code": "WS-1353",
+          "status": "Approved",
+          "evidence": "trial-01-record-08.jpg",
+          "sha256": "e2c5fce362e499a1c64bca3d4a9d6bde1a35517ce5599ccc848ee3e5fc70c322",
+          "audit": {
+            "name": "Willow release",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        }
+      ],
+      "final_evidence": "trial-01-final.jpg",
+      "final_sha256": "0d3d990730a8caf0cb48d9390ac59343f0e4e87dcdf14cfd9f7f1d1d8d9a2220",
+      "native_relay": [
+        {
+          "request": "2ba0b7bf6e8b429186ab88ff174ad4b8",
+          "actions": 1,
+          "service_ms": 87
+        },
+        {
+          "request": "703b72766f1b4a83a69efc2ec4a7db69",
+          "actions": 2,
+          "service_ms": 1041
+        },
+        {
+          "request": "e5264036538845acab7a750321c35a9a",
+          "actions": 8,
+          "service_ms": 2748
+        },
+        {
+          "request": "d7662da92a9f48e99549d7db5bbe1c18",
+          "actions": 12,
+          "service_ms": 4419
+        }
+      ]
+    },
+    {
+      "trial": 2,
+      "arm": "auv_without_skill",
+      "case": "A",
+      "seconds_including_startup": 135.49363545805681,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 351260,
+        "cached_input_tokens": 312448,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 4165,
+        "reasoning_output_tokens": 535
+      },
+      "prompt_sha256": "fe94fb614292acc82def9efba5fb93af1ffa23b4704c5551f907e26b8c15810f",
+      "total_tokens": 355425,
+      "uncached_plus_output": 42977,
+      "verified_record_count": 8,
+      "verified_task_success": true,
+      "final_target_visible": true,
+      "shell_calls": 18,
+      "native_tool_calls": 0,
+      "native_observations": 0,
+      "skill_read_verified_in_command_log": false,
+      "record_evidence": [
+        {
+          "name": "Birch transfer",
+          "code": "BK-1600",
+          "status": "Stored",
+          "evidence": "trial-02-record-01.webp",
+          "sha256": "794a1428d678671c00b59cdc22808f97f9377c6aa14ffeb1194a87090f44c4c8",
+          "audit": {
+            "name": "Birch transfer",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Cobalt dispatch",
+          "code": "BK-5738",
+          "status": "Pending audit",
+          "evidence": "trial-02-record-02.webp",
+          "sha256": "55a452ca9be111505f2ba96f1f281f17fdcbb430d2b75983a4559647c9bba048",
+          "audit": {
+            "name": "Cobalt dispatch",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Ember review",
+          "code": "BK-5856",
+          "status": "Stored",
+          "evidence": "trial-02-record-03.webp",
+          "sha256": "d9b5478e44c0fe5278d6a916f13160c924d54e811bb9bccb708e4a4ad0806263",
+          "audit": {
+            "name": "Ember review",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Harbor receipt",
+          "code": "WS-9195",
+          "status": "Pending audit",
+          "evidence": "trial-02-record-04.webp",
+          "sha256": "f799ecd50c9b42083d4406762d23865c3568cd77e6caa1b4b7700800b9d65eef",
+          "audit": {
+            "name": "Harbor receipt",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Juniper request",
+          "code": "WS-1191",
+          "status": "Ready for review",
+          "evidence": "trial-02-record-05.webp",
+          "sha256": "754ee8e2cc012c4db0fab4214cb6a60e61d9e0951ad8da073ba36eff0cb63a53",
+          "audit": {
+            "name": "Juniper request",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Linden handoff",
+          "code": "JP-6711",
+          "status": "Ready for review",
+          "evidence": "trial-02-record-06.webp",
+          "sha256": "8f561ca0bcf0061b31546ed9a6dce3a01caf36e5e4d93bae8518b06d2f1539f7",
+          "audit": {
+            "name": "Linden handoff",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Quartz audit",
+          "code": "HN-3250",
+          "status": "Approved",
+          "evidence": "trial-02-record-07.webp",
+          "sha256": "effa0dee099f8f9fdd741f3abc33772325dd94d77091c3ee51332e53a33da822",
+          "audit": {
+            "name": "Quartz audit",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Willow release",
+          "code": "WS-1353",
+          "status": "Approved",
+          "evidence": "trial-02-record-08.webp",
+          "sha256": "633c5819039c3b410f95fdd58e7599dab42bdbb88dd772ddc9c495d4577f3fc1",
+          "audit": {
+            "name": "Willow release",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        }
+      ],
+      "final_evidence": "trial-02-final.jpg",
+      "final_sha256": "6439832c9e657842a7aa7b2533813f7abe26e078de47e007f3a91fff94f27857"
+    },
+    {
+      "trial": 3,
+      "arm": "auv_with_skill",
+      "case": "A",
+      "seconds_including_startup": 66.5967444999842,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 229324,
+        "cached_input_tokens": 203392,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 3423,
+        "reasoning_output_tokens": 555
+      },
+      "prompt_sha256": "86c284c253f4c591f9d9cc76ca204369dfc534834a168fab4fce30f1988127b0",
+      "total_tokens": 232747,
+      "uncached_plus_output": 29355,
+      "verified_record_count": 0,
+      "verified_task_success": false,
+      "final_target_visible": false,
+      "shell_calls": 9,
+      "native_tool_calls": 0,
+      "native_observations": 0,
+      "skill_read_verified_in_command_log": true,
+      "record_evidence": [],
+      "final_evidence": "trial-03-final.jpg",
+      "final_sha256": "698dcd81d045f4c1feca4d4a6a342809e4b85d81b2d80c9807cd8ea0974453cb",
+      "failures": [
+        {
+          "run_id": "0df91894-2558-8cb0-6cda-2dd505086117",
+          "status": "failed",
+          "command_id": "input.clickPoint",
+          "result": null,
+          "failure": "InputService/ClickWindowPoint failed: Runner capability RPC failed: code: 'The service is currently unavailable', message: \"macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again\"",
+          "failure_details": {
+            "code": "command_failed",
+            "message": "InputService/ClickWindowPoint failed: Runner capability RPC failed: code: 'The service is currently unavailable', message: \"macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again\""
+          }
+        },
+        {
+          "run_id": "bea3e1b5-79f7-1317-24f8-99b51ec2243e",
+          "status": "failed",
+          "command_id": "input.scrollUntil",
+          "result": null,
+          "failure": "Runner capability RPC failed: code: 'The service is currently unavailable', message: \"macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again\"",
+          "failure_details": {
+            "code": "backend",
+            "message": "Runner capability RPC failed: code: 'The service is currently unavailable', message: \"macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again\""
+          }
+        },
+        {
+          "run_id": "a00d7325-74ea-9588-57b9-8a049d1906f4",
+          "status": "failed",
+          "command_id": "input.clickPoint",
+          "result": null,
+          "failure": "InputService/ClickWindowPoint failed: Runner capability RPC failed: code: 'The service is currently unavailable', message: \"macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again\"",
+          "failure_details": {
+            "code": "command_failed",
+            "message": "InputService/ClickWindowPoint failed: Runner capability RPC failed: code: 'The service is currently unavailable', message: \"macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again\""
+          }
+        },
+        {
+          "run_id": "84a733f5-bb13-aa64-c878-53388bb944c8",
+          "status": "failed",
+          "command_id": "input.scrollUntil",
+          "result": null,
+          "failure": "Runner capability RPC failed: code: 'The service is currently unavailable', message: \"macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again\"",
+          "failure_details": {
+            "code": "backend",
+            "message": "Runner capability RPC failed: code: 'The service is currently unavailable', message: \"macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again\""
+          }
+        }
+      ]
+    },
+    {
+      "trial": 4,
+      "arm": "auv_with_skill",
+      "case": "B",
+      "seconds_including_startup": 189.35816537495703,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 526591,
+        "cached_input_tokens": 481408,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 5914,
+        "reasoning_output_tokens": 1622
+      },
+      "prompt_sha256": "a5c3d0a2264d7d95851bc4314b7a411fc3abf370b5b50c54b0ee517f6908830f",
+      "total_tokens": 532505,
+      "uncached_plus_output": 51097,
+      "verified_record_count": 8,
+      "verified_task_success": true,
+      "final_target_visible": true,
+      "shell_calls": 12,
+      "native_tool_calls": 0,
+      "native_observations": 0,
+      "skill_read_verified_in_command_log": true,
+      "record_evidence": [
+        {
+          "name": "Amber transfer",
+          "code": "QV-9244",
+          "status": "Approved",
+          "evidence": "trial-04-record-01.webp",
+          "sha256": "25742dab9531e801c81cc07fb96942d2100b88dd608528b284805ac0bfc250d1",
+          "audit": {
+            "name": "Amber transfer",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Cedar dispatch",
+          "code": "EL-5818",
+          "status": "Approved",
+          "evidence": "trial-04-record-02.webp",
+          "sha256": "09dd64bb3e890837bbcad25f86f0db63250365c0a9034f82ed964555146135b4",
+          "audit": {
+            "name": "Cedar dispatch",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Fern review",
+          "code": "QV-5886",
+          "status": "Approved",
+          "evidence": "trial-04-record-03.webp",
+          "sha256": "64c55689ce8123cc3f7ed01f853c1d8d28fb329f73cf4566b36ba22da9363d45",
+          "audit": {
+            "name": "Fern review",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Indigo receipt",
+          "code": "QV-5713",
+          "status": "Approved",
+          "evidence": "trial-04-record-04.webp",
+          "sha256": "d8265e9ded9e064b8a46d5707e4ce84d33014349248414aac0c333451594a802",
+          "audit": {
+            "name": "Indigo receipt",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Laurel request",
+          "code": "BK-9322",
+          "status": "Pending audit",
+          "evidence": "trial-04-record-05.webp",
+          "sha256": "bbcd649902005b98b7ec08669671b0fcc1e1e38856768710bc4fcb98aab6dd4f",
+          "audit": {
+            "name": "Laurel request",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Maple handoff",
+          "code": "HN-3847",
+          "status": "Approved",
+          "evidence": "trial-04-record-06.webp",
+          "sha256": "14fe452117e409bf464e0eefb144050ba69fb928f012ecce8845f5af01a73aa5",
+          "audit": {
+            "name": "Maple handoff",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Rowan audit",
+          "code": "JP-9286",
+          "status": "Approved",
+          "evidence": "trial-04-record-07.webp",
+          "sha256": "4abfc17335712d189e60b8d602b8df50548aa0abcd0b34198d8fea9133553537",
+          "audit": {
+            "name": "Rowan audit",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Zinnia release",
+          "code": "CT-8040",
+          "status": "Pending audit",
+          "evidence": "trial-04-record-08.webp",
+          "sha256": "eb3361a79dd6470b1873256d06f909fd4c12abbf7cbc4bd41ca5850cbc9ee229",
+          "audit": {
+            "name": "Zinnia release",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        }
+      ],
+      "final_evidence": "trial-04-final.jpg",
+      "final_sha256": "c8fc5dac4a31685a7616f8c02828085ab22dd48969a770ae9c15df0c4db5b192"
+    },
+    {
+      "trial": 5,
+      "arm": "auv_without_skill",
+      "case": "B",
+      "seconds_including_startup": 149.89809933293145,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 446337,
+        "cached_input_tokens": 403072,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 4613,
+        "reasoning_output_tokens": 811
+      },
+      "prompt_sha256": "ea0cf0dc22e0ff97e5eef0e684dc1ba9033f873d377897ad3119ba5b549baa8d",
+      "total_tokens": 450950,
+      "uncached_plus_output": 47878,
+      "verified_record_count": 8,
+      "verified_task_success": true,
+      "final_target_visible": true,
+      "shell_calls": 11,
+      "native_tool_calls": 0,
+      "native_observations": 0,
+      "skill_read_verified_in_command_log": false,
+      "record_evidence": [
+        {
+          "name": "Amber transfer",
+          "code": "QV-9244",
+          "status": "Approved",
+          "evidence": "trial-05-record-01.webp",
+          "sha256": "bf47ed7984b8f6d72ad7c0dd3056116fe9fd3a141a6b273e745360d1e7ca0ac7",
+          "audit": {
+            "name": "Amber transfer",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Cedar dispatch",
+          "code": "EL-5818",
+          "status": "Approved",
+          "evidence": "trial-05-record-02.webp",
+          "sha256": "7a726e9e1273e1a6a5cea23db6c517430ba296d90b100c0ca5734e21ca9b1584",
+          "audit": {
+            "name": "Cedar dispatch",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Fern review",
+          "code": "QV-5886",
+          "status": "Approved",
+          "evidence": "trial-05-record-03.webp",
+          "sha256": "19959ed5ee2b6694d72f606a8d3db0bfa9b4604af78078b4a8a2d43fe1931aad",
+          "audit": {
+            "name": "Fern review",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Indigo receipt",
+          "code": "QV-5713",
+          "status": "Approved",
+          "evidence": "trial-05-record-04.webp",
+          "sha256": "5f9fc1dcf7f873701fec75082d9da34b6d60131d0b4290b7876a11e385ab914a",
+          "audit": {
+            "name": "Indigo receipt",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Laurel request",
+          "code": "BK-9322",
+          "status": "Pending audit",
+          "evidence": "trial-05-record-05.webp",
+          "sha256": "7fe57d15a7fec4db6c675d5de020d297784412af15cf8ed5ab563df6e11a354a",
+          "audit": {
+            "name": "Laurel request",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Maple handoff",
+          "code": "HN-3847",
+          "status": "Approved",
+          "evidence": "trial-05-record-06.webp",
+          "sha256": "afe1b7db8dfdbdfb638022e31f94b30a685c076eecaaca30e2f526edf1947be3",
+          "audit": {
+            "name": "Maple handoff",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Rowan audit",
+          "code": "JP-9286",
+          "status": "Approved",
+          "evidence": "trial-05-record-07.webp",
+          "sha256": "9d44118de1a8629c6bd5a67e630bbad35defd8ad36dba42a2d7c656ef55b0356",
+          "audit": {
+            "name": "Rowan audit",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        },
+        {
+          "name": "Zinnia release",
+          "code": "CT-8040",
+          "status": "Pending audit",
+          "evidence": "trial-05-record-08.webp",
+          "sha256": "a52d657e8ac8033aa78e887729e4a9b61df3d8a9d6304b5f195825cc1d1b9b9c",
+          "audit": {
+            "name": "Zinnia release",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 900,
+            "evidence_height": 682
+          }
+        }
+      ],
+      "final_evidence": "trial-05-final.jpg",
+      "final_sha256": "8cfaf1be1eb8ddad10b442401db3e547b6692099dc0df5f9a9b09b75547117b5"
+    },
+    {
+      "trial": 6,
+      "arm": "native",
+      "case": "B",
+      "seconds_including_startup": 56.71488891704939,
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 224608,
+        "cached_input_tokens": 163072,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1876,
+        "reasoning_output_tokens": 645
+      },
+      "prompt_sha256": "168f0e3dd1f748248c11044aa1cb24c8ed1c493a20849a88017ef9a39f53ee4b",
+      "total_tokens": 226484,
+      "uncached_plus_output": 63412,
+      "verified_record_count": 8,
+      "verified_task_success": true,
+      "final_target_visible": true,
+      "shell_calls": 0,
+      "native_tool_calls": 7,
+      "native_observations": 19,
+      "skill_read_verified_in_command_log": false,
+      "record_evidence": [
+        {
+          "name": "Amber transfer",
+          "code": "QV-9244",
+          "status": "Approved",
+          "evidence": "trial-06-record-01.jpg",
+          "sha256": "91f10a9672c80523ea4c8ac184e7aaa8ff083303d6a59b6e8ca97ff6ff335e49",
+          "audit": {
+            "name": "Amber transfer",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Cedar dispatch",
+          "code": "EL-5818",
+          "status": "Approved",
+          "evidence": "trial-06-record-02.jpg",
+          "sha256": "08ac8d392b5e11ef98a488bf5bf69728ab7bc08d09b5d59b2f807d8e055c3d05",
+          "audit": {
+            "name": "Cedar dispatch",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Fern review",
+          "code": "QV-5886",
+          "status": "Approved",
+          "evidence": "trial-06-record-03.jpg",
+          "sha256": "af7f3be79b89347cd6b9bfe2bf982ad78ff7bfa89c90eee3763163dd3084e3e8",
+          "audit": {
+            "name": "Fern review",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Indigo receipt",
+          "code": "QV-5713",
+          "status": "Approved",
+          "evidence": "trial-06-record-04.jpg",
+          "sha256": "d8847cd1c7ac4a45824206e848142a5c27a6ff5ce096b4d30edca74972b7573a",
+          "audit": {
+            "name": "Indigo receipt",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Laurel request",
+          "code": "BK-9322",
+          "status": "Pending audit",
+          "evidence": "trial-06-record-05.jpg",
+          "sha256": "9e47e265aa9e0fa09fbe4cdeaaac1e300684390473f6f9d2671017406b7e6e96",
+          "audit": {
+            "name": "Laurel request",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Maple handoff",
+          "code": "HN-3847",
+          "status": "Approved",
+          "evidence": "trial-06-record-06.jpg",
+          "sha256": "70cca5ea47ed68f8910bccb8df6d511fc4884d622643ce4f3e86e61fd474a1be",
+          "audit": {
+            "name": "Maple handoff",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Rowan audit",
+          "code": "JP-9286",
+          "status": "Approved",
+          "evidence": "trial-06-record-07.jpg",
+          "sha256": "e56796f90c392ed3f942dd0aa64e911d64793cb6be8b4b43da5cf9495f5226f9",
+          "audit": {
+            "name": "Rowan audit",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        },
+        {
+          "name": "Zinnia release",
+          "code": "CT-8040",
+          "status": "Pending audit",
+          "evidence": "trial-06-record-08.jpg",
+          "sha256": "4e3c25796c693513389039dd818e1139a30e09a30534486ff19bfa8e84ecb3ac",
+          "audit": {
+            "name": "Zinnia release",
+            "oracle_matches": true,
+            "evidence_contains_exact_row": true,
+            "subject_claims_inspected": true,
+            "evidence_width": 1800,
+            "evidence_height": 1364
+          }
+        }
+      ],
+      "final_evidence": "trial-06-final.jpg",
+      "final_sha256": "4322edb5eefea8461f4d3fc31156ba91404fbc3a29b73b280cb45aaecd6d2e83",
+      "native_relay": [
+        {
+          "request": "1c1a5f4bbf7948fc912e1458ee97222e",
+          "actions": 1,
+          "service_ms": 56
+        },
+        {
+          "request": "9ad1db4fac0c4d958635aac00656511f",
+          "actions": 10,
+          "service_ms": 4258
+        },
+        {
+          "request": "19fce5a59da0452a9ed0fcd54ea60e93",
+          "actions": 12,
+          "service_ms": 4433
+        },
+        {
+          "request": "b158d55f22cb419284fff4738bb2cbcd",
+          "actions": 1,
+          "service_ms": 207
+        },
+        {
+          "request": "92d435b77dbe4fc587a42e63a66087ed",
+          "actions": 6,
+          "service_ms": 2242
+        },
+        {
+          "request": "545ec65807484639bf6ce7a58e560da9",
+          "actions": 6,
+          "service_ms": 2196
+        }
+      ]
+    }
+  ]
+}

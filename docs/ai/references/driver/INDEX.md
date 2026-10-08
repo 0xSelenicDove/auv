@@ -7,7 +7,7 @@ Executable GUI evaluations live in
 test objects, tasks, and cases. Rust runs evaluations; shared desktop receivers
 use TypeScript. Raw run output stays local.
 
-Count: **83**
+Count: **84**
 
 - [`2026-05-20-macos-driver-namespace-after-window-screen-design.md`](2026-05-20-macos-driver-namespace-after-window-screen-design.md)
 - [`2026-05-20-macos-osascript-backend-design.md`](2026-05-20-macos-osascript-backend-design.md)
@@ -126,3 +126,5 @@ Count: **83**
 - [Existing Runner OCR reuse pilot](2026-10-06-runner-ocr-reuse.md): Startup-inclusive offline comparison, unchanged eight-row accuracy, retained first-call stall, adopted reuse skill and selected CLI lifecycle checks.
 
 - [Repeated visual search benchmark](2026-10-07-repeated-search-benchmark.md): Six-attempt three-method pilot with batching, current skill, startup accounting, retained interruptions, and a completed case showing fewer tokens but slightly longer elapsed time.
+
+- [Post-sync repeated visual search benchmark](2026-10-08-post-sync-benchmark.md): Six retained sessions on the merged fork; native wins both tasks, foreground-focus failure retained, total and uncached tokens distinguished.

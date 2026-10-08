@@ -1,0 +1,19 @@
+{
+  "registered_date": "2026-10-08",
+  "revision": "50aa49724f3508f0c6696281f885c0c8bb6cdaa8",
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "codex_cli": "0.150.1",
+  "auv_binary_sha256": "daa52d04394adc56871bd887a68cd5b7594843367940e69d77582dcaf5805fc8",
+  "skill_sha256": "5e3b8007476e8b95cf80efcbed43ad6d02af638ecd86da9b5946880d4b94e95f",
+  "fixture_source_sha256": "c32848bf861296db06af393a1fe404c1a599a144d21be1c5256dd41ab25c6765",
+  "native_adapter_sha256": "972dc7b3667f8fd8216079e8275e0fc36c29c5a63323dff38f03de37aed7ecb7",
+  "order": [
+    "native/A",
+    "auv_without_skill/A",
+    "auv_with_skill/A",
+    "auv_with_skill/B",
+    "auv_without_skill/B",
+    "native/B"
+  ]
+}

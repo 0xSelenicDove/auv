@@ -5,6 +5,9 @@ registered model sessions on one synthetic macOS AppKit fixture, with returned
 values checked against a withheld oracle and saved screenshot pixels.
 Production AUV and its skill are unchanged.
 
+Historical pilot from 2026-10-07. The [2026-10-08 post-sync rerun](2026-10-08-post-sync-benchmark.md)
+did not repeat the completed-case token saving and retained a foreground-focus failure.
+
 **One completed matched case demonstrated 39.5% fewer total tokens with the
 current AUV skill than pure computer use, but took 8.9% longer.** Both methods
 returned all eight records correctly. The registered goal of lower tokens and
