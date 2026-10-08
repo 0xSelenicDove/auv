@@ -32,9 +32,10 @@ controlled desktop.
   bound to, used by — each jumps the time cursor), and an **AX tree** panel
   (DevTools-style; hover highlights the element on the canvas, clicking the
   canvas selects the element under the pointer).
-- **Offline replay**: every live run records its device calls. Replay re-runs
-  the (possibly edited) script against that recording without touching the
-  device, and stops with a divergence error at the first call that differs.
+- **Offline replay**: every live run records its device calls, including direct
+  SDK calls as encoded messages. Replay re-runs the (possibly edited) script
+  against that recording without touching the device, and stops with a
+  divergence error at the first call that differs.
 - **Mock desktop**: a deterministic in-browser desktop (todo app, counter, and
   a music app with a 40-song list that scrolls and plays on click) whose state
   changes on input, so everything works without a device.
@@ -181,6 +182,54 @@ const found = await music.scrollUntil(songs, { dy: 240, text: 'Remember' })
 await auv.input.click(area(found.match!), { count: 2 })
 await music.findText('Now playing: Remember', { within: area(music).region({ bottom: 0, height: 70 }) })
 ```
+
+### Typing
+
+`win.typeText(text)` and `win.pressKey('cmd+a')` deliver to that window
+(`InputService/InputKeyboard`): the window is brought to the front and focused
+first, so the text cannot land in another app. `auv.input.typeText` and
+`auv.input.pressKey` go to whichever app has keyboard focus when they run, which
+can be this playground's browser.
+
+```ts
+const music = await auv.windows.resolve({ bundleId: 'com.netease.163music' })
+await music.click({ x: 528, y: 50 }) // the search box, window-relative
+await music.typeText('Reply 超时空辉夜姬')
+await music.pressKey('return')
+await music.pressKey('cmd+a', { background: true }) // no activation; the box must already have focus
+```
+
+`{ background: true }` posts without activating the window. The control must
+already have keyboard focus; a click does not give it focus in every app (it did
+not in NetEase Cloud Music while another app was in front).
+
+### Direct SDK (prototype)
+
+Scripts can also call `@auv-js/sdk` directly. `sdk` is the SDK module and
+`device` is the Runner client for the selected device and the current Run,
+injected before every run: the same object a Node script gets from
+`createAuv(await connect(...)).runner(route)`. Every
+Runner RPC is available without a playground binding:
+
+```ts
+const music = (await device.windows.list()).find(w => w.window.applicationBundleId === 'com.netease.163music')
+await music.click({ x: 528, y: 50 })
+await music.typeText('Reply', { policy: sdk.InputPolicy.FOREGROUND_PREFERRED })
+const playing = await device.macos.media.nowPlaying()
+```
+
+Calls cross to the page encoded, where the device credential is added; each one
+is recorded in the timeline as `<Service>/<Method>` with ProtoJSON request and
+response. Results are drawn by message type, like `auv.*` handles: captures as
+frames, text matches and recognized text as boxes, input results as receipts at
+the delivered point, windows and displays as outlines. Offline replay answers
+SDK calls from the live run's recording too. The mock desktop does not serve SDK
+calls yet, and the editor types `device` and `sdk` as `any`. See
+`docs/ai/references/inspect/2026-10-08-playground-sdk-transport-design.md`.
+
+Captures carry a ThumbHash (`CapturedFrame.thumbhash`): frames, and the first
+live frame after connecting to a device, show a blurred preview at once and fade
+the pixels in when they load.
 
 Script API types (`Area`, `Rect`, `Point`, `WindowHandle`, `TextMatch`, …) can
 be used by name in cells, e.g. `function toolbar(win: Area): Area`.

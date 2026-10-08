@@ -1,8 +1,9 @@
 import type { Backend, CapturedFrame, DisplayInfo, InputReceipt, ScrollUntilRequest, TextSearchResult, WindowInfo } from '../backend/types'
-import type { ClickOptions, DisplayHandle, FrameHandle, InputHandle, Point, Rect, ScrollDelta, ScrollUntilUpdate, TextHandle, WindowSelector } from '../script-api/api'
+import type { ClickOptions, DisplayHandle, FrameHandle, InputHandle, KeyboardOptions, Point, Rect, ScrollDelta, ScrollUntilUpdate, TextHandle, WindowSelector } from '../script-api/api'
 import type { Effect, Resource, WindowData } from '../store'
 import type { WireValue } from './protocol'
 
+import { decodeThumbHash, revealStart } from '../preview'
 import { actions, nowMs, usePlayground } from '../store'
 
 let nextHandle = 1
@@ -20,8 +21,8 @@ const SCROLL_UNTIL_DEFAULTS = { confirmations: 2, maxSteps: 50, settleMs: 400 }
 
 type ResourceBody = Resource extends infer R ? R extends unknown ? Omit<R, 'callId' | 'run' | 'seq'> : never : never
 
-/** Tracks the resource refs one binding call produced. */
-class CallScope {
+/** Tracks the resource refs one call produced (a script binding or an SDK RPC). */
+export class CallScope {
   readonly refs: string[] = []
 
   constructor(readonly callId: number, readonly seq: number, readonly backend: Backend | null) {}
@@ -43,11 +44,23 @@ class CallScope {
       width: frame.width,
     }
     this.#put(handle.$ref, { capturedAt: nowMs(), frame, handle, kind: 'frame' })
+    const current = () => {
+      const resource = usePlayground.getState().resources[handle.$ref]
+      return resource?.kind === 'frame' ? resource : undefined
+    }
+    // The ThumbHash preview decodes locally and shows before the pixels load.
+    void decodeThumbHash(frame.thumbhash).then((preview) => {
+      const resource = current()
+      if (preview && resource && !resource.bitmap)
+        actions.putResource(handle.$ref, { ...resource, preview })
+      else
+        preview?.close()
+    })
     if (this.backend) {
       void decodeBitmap(this.backend, frame).then((bitmap) => {
-        const current = usePlayground.getState().resources[handle.$ref]
-        if (current?.kind === 'frame')
-          actions.putResource(handle.$ref, { ...current, bitmap })
+        const resource = current()
+        if (resource)
+          actions.putResource(handle.$ref, { ...resource, bitmap, revealedAt: revealStart(resource) })
         else
           bitmap.close()
       }, error => console.warn(`Loading ${handle.$ref} pixels failed`, error))
@@ -122,6 +135,7 @@ const BINDINGS: Record<string, Binding> = {
     return scope.text(await backend.findWindowText(windowId(window), String(query), within?.area), String(query), undefined, within?.area)
   }),
   'windows.list': read(async (backend, scope) => (await backend.listWindows()).map(info => scope.window(info))),
+  'windows.pressKey': input(async (backend, scope, [window, key, options]) => scope.input('key', await backend.pressKeyWindow(windowId(window), String(key), options as KeyboardOptions | undefined))),
   'windows.resolve': read(async (backend, scope, [selector]) => scope.window(await backend.resolveWindow((selector ?? {}) as WindowSelector))),
   'windows.scroll': input(async (backend, scope, [window, at, delta]) => {
     const local = windowPoint(window, at)
@@ -146,6 +160,7 @@ const BINDINGS: Record<string, Binding> = {
       text: outcome.recognized ? scope.text(outcome.recognized, request.text, frame) : undefined,
     }
   }),
+  'windows.typeText': input(async (backend, scope, [window, text, options]) => scope.input('type', await backend.typeTextWindow(windowId(window), String(text), options as KeyboardOptions | undefined))),
 }
 
 export interface CallContext {

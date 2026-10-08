@@ -1197,11 +1197,19 @@ not assert visibility, freshness, or actionability. Input policies and delivery
 evidence remain the responsibility of the driver, and semantic verification
 remains the responsibility of the operation.
 
-The initial consumer is macOS `WindowApi::click_target`: it resolves only the
-stored window ID, uses the window's current frame, and rejects missing windows
-or non-window positions. It does not select a replacement main window. Window
-movement can be accommodated; content reflow and OS window-ID reuse are not
-proven safe by this contract.
+Runner input takes positions directly. `InputService/ClickPoint` delivers a
+window position to that window (under the click's input policy and window
+strategy) and a screen or display position as a global click, which rejects
+window delivery options. With a target window, a click or window scroll accepts
+a screen or display position too, and the Runner converts it with the window's
+current frame. A display position is relative to the display's frame origin.
+`MoveMouse` and `DragMouse` keep screen points.
+
+The driver-level consumer is macOS `WindowApi::click_target`: it resolves only
+the stored window ID, uses the window's current frame, and rejects missing
+windows or non-window positions. Neither path selects a replacement main window.
+Window movement can be accommodated; content reflow and OS window-ID reuse are
+not proven safe by this contract.
 
 ## Region
 
@@ -1328,7 +1336,11 @@ Across the Runner API, a capture frame stays in the Runner that produced it
 - **Capture reference** (`CaptureRef`, *provisional*): a Runner resource that
   names one capture in that Runner's **capture store**. Capture, find-text and
   scroll-until responses return `CapturedFrame` with `ref`, bounds, origin,
-  scale and `pixel_size`, but no pixels.
+  scale and `pixel_size`, but no pixels. Each also carries a `thumbhash`
+  (about 20 bytes, [ThumbHash](https://evanw.github.io/thumbhash/)) of the
+  whole capture, so a viewer can draw a blurred preview before it fetches
+  pixels. Computing it costs about 3 ms for a 2880x1800 capture and 9 ms for
+  a 5120x2880 one (release build, Apple silicon, 2026-10-08).
 - **Capture store** (*provisional*): the Runner's in-memory cache of the
   captures it produced. It evicts the least recently used captures beyond a
   byte budget (512 MiB, `AUV_CAPTURE_STORE_BUDGET_MIB`) and captures unused for

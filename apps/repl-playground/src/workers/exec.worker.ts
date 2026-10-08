@@ -1,11 +1,15 @@
 import type { ExecWorkerApi, HostApi, LogLevel, ResumeMode, RunOutcome, RunRequest, WireValue } from '../runtime/protocol'
-import type { AuvScriptApi, ClickOptions, Point, Rect, ScrollDelta, ScrollUntilOptions, ScrollUntilUpdate, TextSearchOptions, WindowHandle } from '../script-api/api'
+import type { AuvScriptApi, ClickOptions, KeyboardOptions, Point, Rect, ScrollDelta, ScrollUntilOptions, ScrollUntilUpdate, TextSearchOptions, WindowHandle } from '../script-api/api'
 /// <reference lib="webworker" />
 import type { StepSite } from '../stepper/compile'
 
+import { createContext as createHostChannel } from '@moeru/eventa/adapters/webworkers/worker'
 import { createBirpc } from 'birpc'
 
+import * as sdk from '@auv-js/sdk'
+
 import { HOST_EVENTS } from '../runtime/protocol'
+import { createBridgeTransport, SDK_PORT_MESSAGE } from '../runtime/sdk-bridge'
 import { areaOf } from './area'
 
 // NOTICE(exec-worker-isolation): this worker only isolates the playground
@@ -28,6 +32,8 @@ let breakpoints = new Set<number>()
 let resumeWaiter: ((next: 'stop' | ResumeMode) => void) | undefined
 let stopRequested = false
 let currentStep: null | number = null
+
+const globals = globalThis as unknown as Record<string, unknown>
 const persistentNames = new Set<string>()
 
 const now = () => performance.timeOrigin + performance.now()
@@ -47,6 +53,7 @@ const api: ExecWorkerApi = {
     resumeWaiter?.(next)
   },
   async run(request) {
+    globals.device = await deviceRunner(request.sdkRoute)
     return await runCell(request)
   },
   setBreakpoints(lines) {
@@ -60,15 +67,46 @@ const api: ExecWorkerApi = {
 
 const host = createBirpc<HostApi, ExecWorkerApi>(api, {
   eventNames: [...HOST_EVENTS],
-  on: fn => addEventListener('message', event => fn(event.data)),
+  on: fn => addEventListener('message', (event) => {
+    if ((event.data as null | { type?: unknown })?.type !== SDK_PORT_MESSAGE)
+      fn(event.data)
+  }),
   post: data => postMessage(data),
   // Script bindings can legitimately take long (OCR, slow apps).
   timeout: 10 * 60_000,
 })
 
-// ---- Step hooks -------------------------------------------------------------
+// ---- Direct SDK -------------------------------------------------------------
+// Scripts may also use `@auv-js/sdk` directly: `sdk` is the module and `device`
+// is the Runner client for the selected Device and the current Run, the same
+// object a Node script gets from `createAuv(await connect(...)).runner(route)`. Calls
+// cross to the host encoded, on their own port (`runtime/sdk-bridge.ts`).
 
-const globals = globalThis as unknown as Record<string, unknown>
+let sdkConnection: Promise<sdk.AuvConnection> | undefined
+
+addEventListener('message', (event) => {
+  if ((event.data as null | { type?: unknown })?.type !== SDK_PORT_MESSAGE)
+    return
+  const port = event.ports[0]
+  if (!port)
+    return
+  const { context } = createHostChannel({ messagePort: port as unknown as Worker })
+  sdkConnection = sdk.connect({ transport: createBridgeTransport(context, () => currentStep) })
+})
+
+async function deviceRunner(route: RunRequest['sdkRoute']): Promise<sdk.RunnerClient> {
+  if (!route || !sdkConnection) {
+    // Fails on first use, with the reason, rather than as `device is undefined`.
+    return new Proxy({} as sdk.RunnerClient, {
+      get() {
+        throw new Error('`device` needs a connected device; the mock desktop and replays do not serve SDK calls yet')
+      },
+    })
+  }
+  return sdk.createAuv(await sdkConnection).runner(route)
+}
+
+// ---- Step hooks -------------------------------------------------------------
 
 globals.__step = async (id: number) => {
   if (stopRequested)
@@ -109,6 +147,7 @@ function attachWindowMethods(window: WindowHandle): void {
     capture: { value: () => call('windows.capture', ref) },
     click: { value: (point: Point, options?: ClickOptions) => call('windows.click', ref, point, options) },
     findText: { value: (query: string, options?: TextSearchOptions) => call('windows.findText', ref, query, options) },
+    pressKey: { value: (key: string, options?: KeyboardOptions) => call('windows.pressKey', ref, key, options) },
     scroll: { value: (at: Point | Rect, delta: ScrollDelta) => call('windows.scroll', ref, at, delta) },
     scrollUntil: {
       value: async (at: Point | Rect, options: ScrollUntilOptions) => {
@@ -126,6 +165,7 @@ function attachWindowMethods(window: WindowHandle): void {
         }
       },
     },
+    typeText: { value: (text: string, options?: KeyboardOptions) => call('windows.typeText', ref, text, options) },
   })
 }
 
@@ -256,6 +296,7 @@ const auv: AuvScriptApi = {
 }
 
 globals.auv = auv
+globals.sdk = sdk
 globals.area = areaOf
 globals.focus = <T>(target: T, options?: { autoZoomOut?: boolean, zoom?: boolean }): T => {
   host.onFocus(toWire(target), options, currentStep, now())

@@ -433,9 +433,10 @@ fn input_options_reject_malformed_values_before_delivery() {
   .expect_err("negative protobuf duration");
   assert_eq!(duration_error.code(), tonic::Code::InvalidArgument);
 
-  let point_error = window_point_from_proto(proto::WindowPoint {
+  let point_error = position_from_proto(proto::Position {
     x: f64::NAN,
     y: 0.0,
+    coordinate_space: Some(proto::position::CoordinateSpace::WindowId("window-1".to_string())),
   })
   .expect_err("non-finite point");
   assert_eq!(point_error.code(), tonic::Code::InvalidArgument);
@@ -488,11 +489,12 @@ fn click_rpc_preserves_modifiers_for_window_and_screen_delivery() {
     ..Default::default()
   }))
   .unwrap();
-  let (_, _, screen) = screen_click_options_from_proto(Some(proto::ScreenClickOptions {
+  let screen = global_click_options_from_proto(Some(proto::ClickOptions {
     modifiers: Some(modifiers),
     ..Default::default()
   }))
-  .unwrap();
+  .unwrap()
+  .modifiers;
   assert_eq!(
     window.modifiers,
     auv_driver::ClickModifiers {
@@ -504,7 +506,62 @@ fn click_rpc_preserves_modifiers_for_window_and_screen_delivery() {
   );
   assert_eq!(screen, window.modifiers);
   assert!(click_options_from_proto(None).unwrap().modifiers.is_empty());
-  assert!(screen_click_options_from_proto(Some(Default::default())).unwrap().2.is_empty());
+  assert!(global_click_options_from_proto(None).unwrap().modifiers.is_empty());
+}
+
+#[test]
+fn global_click_rejects_window_delivery_options() {
+  // A screen or display click has no target window. Window policy and
+  // strategy are rejected instead of being silently ignored by the driver.
+  let policy = global_click_options_from_proto(Some(proto::ClickOptions {
+    policy: proto::InputPolicy::BackgroundOnly as i32,
+    ..Default::default()
+  }))
+  .unwrap_err();
+  assert_eq!(policy.code(), tonic::Code::InvalidArgument);
+  let strategy = global_click_options_from_proto(Some(proto::ClickOptions {
+    window_strategy: proto::WindowClickStrategy::PidTargeted as i32,
+    ..Default::default()
+  }))
+  .unwrap_err();
+  assert_eq!(strategy.code(), tonic::Code::InvalidArgument);
+}
+
+#[test]
+fn window_scoped_positions_convert_with_the_current_window_frame() {
+  let window = auv_driver::Window {
+    reference: auv_driver::WindowRef {
+      id: "window-1".to_string(),
+    },
+    title: None,
+    app_name: None,
+    app_bundle_id: None,
+    process_id: None,
+    frame: auv_driver::Rect::new(100.0, 50.0, 400.0, 300.0),
+    coordinate_space: auv_driver::CoordinateSpace::Screen,
+    is_main: true,
+    is_visible: true,
+  };
+  let no_display = |id: &str| -> Result<auv_driver::Point, Status> { panic!("unexpected display lookup for {id}") };
+  let at = |x, y, coordinate_space| auv_driver::Position {
+    point: auv_driver::Point::new(x, y),
+    coordinate_space,
+  };
+
+  let local = window_point_for_position(&window, &at(10.0, 20.0, auv_driver::CoordinateSpace::Window("window-1".into())), no_display);
+  assert_eq!(local.unwrap(), auv_driver::WindowPoint::new(10.0, 20.0));
+
+  let screen = window_point_for_position(&window, &at(110.0, 70.0, auv_driver::CoordinateSpace::Screen), no_display);
+  assert_eq!(screen.unwrap(), auv_driver::WindowPoint::new(10.0, 20.0));
+
+  let display = window_point_for_position(&window, &at(10.0, 20.0, auv_driver::CoordinateSpace::Display("d2".into())), |id| {
+    assert_eq!(id, "d2");
+    Ok(auv_driver::Point::new(-1000.0, 0.0))
+  });
+  assert_eq!(display.unwrap(), auv_driver::WindowPoint::new(-1090.0, -30.0));
+
+  let other = window_point_for_position(&window, &at(10.0, 20.0, auv_driver::CoordinateSpace::Window("window-2".into())), no_display);
+  assert_eq!(other.unwrap_err().code(), tonic::Code::InvalidArgument);
 }
 
 #[test]
@@ -828,12 +885,12 @@ fn click_rpc_decodes_all_buttons_and_rejects_unknown_before_delivery() {
       button
     );
     assert_eq!(
-      screen_click_options_from_proto(Some(proto::ScreenClickOptions {
+      global_click_options_from_proto(Some(proto::ClickOptions {
         button: wire as i32,
         ..Default::default()
       }))
       .unwrap()
-      .0,
+      .button,
       button
     );
   }
@@ -848,7 +905,7 @@ fn click_rpc_decodes_all_buttons_and_rejects_unknown_before_delivery() {
     tonic::Code::InvalidArgument
   );
   assert_eq!(
-    screen_click_options_from_proto(Some(proto::ScreenClickOptions {
+    global_click_options_from_proto(Some(proto::ClickOptions {
       button: 99,
       ..Default::default()
     }))
@@ -1223,6 +1280,25 @@ fn capture_image_crops_outward_and_fits_inside_max_size() {
   let jpeg = enlarged.image.expect("image");
   assert_eq!((jpeg.width, jpeg.height), (10, 4), "max_size never enlarges");
   assert_eq!(image::load_from_memory(&jpeg.data).unwrap().to_rgb8().dimensions(), (10, 4));
+}
+
+#[test]
+fn stored_capture_carries_a_thumbhash_preview_of_the_whole_image() {
+  // A Retina-sized capture is downscaled first: ThumbHash accepts at most
+  // 100x100 pixels. The preview keeps the aspect ratio and average color.
+  let capture = auv_driver::Capture {
+    image: image::RgbaImage::from_pixel(2880, 1800, image::Rgba([200, 40, 40, 255])),
+    ..gradient_capture(1, 1)
+  };
+  let frame = stored_capture_to_proto(&CaptureStore::new(CaptureStoreOptions::default()), capture);
+  let (red, green, blue, alpha) = thumbhash::thumb_hash_to_average_rgba(&frame.thumbhash).expect("valid thumbhash");
+  assert!((red - 200.0 / 255.0).abs() < 0.05 && (green - 40.0 / 255.0).abs() < 0.05 && (blue - 40.0 / 255.0).abs() < 0.05);
+  assert!((alpha - 1.0).abs() < 0.01);
+  let aspect = thumbhash::thumb_hash_to_approximate_aspect_ratio(&frame.thumbhash).expect("valid thumbhash");
+  // ThumbHash stores the aspect ratio coarsely (it decodes 1.6 as 1.75).
+  assert!((aspect - 1.6).abs() < 0.2, "aspect {aspect}");
+
+  assert!(capture_thumbhash(&image::RgbaImage::new(0, 0)).is_empty());
 }
 
 #[test]
