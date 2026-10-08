@@ -792,6 +792,19 @@ remain callable through their generated typed clients. Device authentication
 and authorization remain independent of these developer-tool annotations. The
 optional Run association is also independent.
 
+**Method presentation** (*provisional*) is how a method describes itself to
+people and tools. The `presentation` annotation carries three fields:
+- an API name in dotted lower_snake_case that follows the SDK path, such as
+  `window.find_text`, with other casings derived from it;
+- a short title;
+- a one-paragraph, plain-text description that can become a JSDoc comment or
+  a Python docstring.
+
+Long-form **method docs** are Markdown files named by that API name. The
+fenced blocks in their `## Examples` section are examples, one per language. A
+Runner serves the docs on request through `MethodDocsService`. See
+`docs/ai/references/session-api/2026-10-09-method-presentation-and-docs.md`.
+
 ## Driver API
 
 The Driver API is the typed protobuf projection of `auv-driver` capabilities.
@@ -1359,18 +1372,19 @@ Across the Runner API, a capture frame stays in the Runner that produced it
   path for a remote client. An unknown/expired reference is `NOT_FOUND`, and an
   unconfigured store is `FAILED_PRECONDITION`; neither causes a fresh capture.
   Recorded Runner `input.scrollUntil` invocations persist the last streamed
-  observation as `auv.scan.scroll_until_final_capture`, matching local invoke.
+  update as `auv.scan.scroll_until_final_capture`, matching local invoke.
   Dry runs and calls without artifact recording emit no screenshot artifact.
   If optional recording fails, invoke retains the direct scroll result and emits
   `auv.invoke.artifact_preparation_failed`; it never repeats input to recover
   evidence. Missing screenshot evidence still requires separate verification.
-- **Image regions.** OCR, find-text and image fetches take `region` (fractions
-  of the image) or `screen_region` (a logical screen rectangle, clipped to the
-  image; exclusive with `region`). OCR result bounds are screen rectangles on
+- **Image regions.** OCR, find-text and image fetches take `region`, a
+  `RelativeRect` in 0–1 fractions of the image, or
+  `screen_region`, a `ScreenRect` in logical screen coordinates that is clipped
+  to the image. The two are exclusive. OCR result bounds are screen rectangles on
   every driver, in the space of the capture's `bounds`; `origin` maps them
   into the capture's owning space.
 - **Capture image fetch** (`GetCaptureImage`): the explicit call that moves
-  pixels to a client, optionally cropped to a normalized region, fit inside a
+  pixels to a client, optionally cropped to a relative region, fit inside a
   maximum size, and encoded as RGBA, PNG, JPEG, or lossless WebP.
 - **Image evidence artifacts** (screenshots, OCR sources, overlays) are
   lossless WebP (`image/webp`), encoded by `auv_tracing::image_artifact`.

@@ -1,5 +1,10 @@
 # Driver Platform API Crates Design
 
+> **Migration (2026-10-09):** `RatioRect` (Rust), `NormalizedRect` (Protobuf)
+> and `NormalizedRegion` (`auv-core`) are now one type, `RelativeRect`, with the
+> same fields. See Part B.4 of
+> `docs/ai/references/driver/2026-10-06-capture-references-and-positions-design.md`.
+
 Date: 2026-05-25
 
 Status: proposed design, pending review

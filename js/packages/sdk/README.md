@@ -15,6 +15,7 @@ namespaced client over the same functions.
 - [Call Runner capabilities](#call-runner-capabilities)
 - [Typed capability invocation](#typed-capability-invocation)
 - [Discover extension operations](#discover-extension-operations)
+- [Mock Runner](#mock-runner)
 - [Cancellation](#cancellation)
 - [Tests](#tests)
 
@@ -281,11 +282,24 @@ current frame on the Runner, so OCR results need no manual offset:
 const { matches } = await window.findText('Continue', { signal })
 await window.click(matches[0]!) // delivered to this window
 await runner.input.click({ x: 640, y: 400 }) // a global click in screen space
-await runner.input.click({ coordinateSpace: { case: 'displayId', value: displays[0]!.id }, x: 10, y: 10 })
+await runner.input.click(Position.display(displays[0]!, 10, 10)) // relative to the display's origin
 ```
 
 A global click (screen or display position on `input`) has no target window,
 so the Runner rejects `policy` and `windowStrategy` there.
+
+Small pure helpers cover the geometry these calls return. They take any
+object with the right fields (`ScreenRect`, a window `frame`, a match's
+`bounds`) and never convert coordinate spaces:
+
+```ts
+import { center, contains, intersect, Position } from '@auv-js/sdk'
+
+Position.screen(640, 400) // also Position.window(window, x, y), Position.display(display, x, y)
+center(matches[0]!.bounds!) // { x, y }
+contains(window.window.frame!, center(matches[0]!.bounds!)) // edges count as inside
+intersect(area, window.window.frame!) // the overlap, or undefined
+```
 
 Keyboard input can name its window too. `typeText`, `pressKeys` and
 `pasteText` on a `WindowClient` send `InputService/InputKeyboard` with that
@@ -439,6 +453,48 @@ complete gRPC Reflection method surface remains private to the discovery
 implementation. Dynamic ProtoJSON invocation supports unary and
 server-streaming APIs. Generated clients are still preferable when the
 extension API is known at build time.
+
+Methods describe themselves. `presentation` comes with the descriptors: an API
+name (`window.find_text`, which `camelCaseName` spells `window.findText`), a
+title and a one-paragraph description. Long-form Markdown docs and examples are
+fetched on request; `docs()` resolves `undefined` when a method has none:
+
+```ts
+const core = await auv.runners.discover({ runnerClass: 'auv.core.local' })
+const findText = core.describeMethod('/auv.api.driver.v1.TextRecognitionService/FindWindowText')
+findText?.presentation // { name: 'window.find_text', title: 'Find text in a window', description: '…' }
+const docs = await findText?.docs() // { markdown, examples: [{ language: 'ts', title, code }, …] }
+```
+
+## Mock Runner
+
+`createMockTransport` builds a Runner in memory: an ordinary `Transport` that
+answers Runner RPCs from typed implementations of the generated services, so
+clients, discovery and tests run without a device. Methods you leave out
+answer `UNIMPLEMENTED`; throw `AuvRpcError` to fail a call. The registration
+style follows Connect-ES's `createRouterTransport`.
+
+```ts
+import { AuvRpcError, connect, createAuv, createMockTransport, serveMockDaemon, WindowService } from '@auv-js/sdk'
+
+const transport = createMockTransport((router) => {
+  serveMockDaemon(router, { id: 'mock', name: 'Mock desktop' }) // one Device and Runs
+  router.service(WindowService, {
+    listWindows: () => ({ windows: [{ ref: { windowId: 'w-1' }, title: 'Inbox' }] }),
+    resolveWindow: () => {
+      throw new AuvRpcError(5, 'no window matches')
+    },
+  })
+})
+const runner = createAuv(await connect({ transport })).runner({ runnerClass: 'auv.core.local' })
+await runner.windows.list() // [WindowClient for w-1]
+```
+
+Requests arrive decoded and typed, results are checked against the response
+message type, and streaming methods are async generators. The mock also
+answers gRPC Reflection for the services it registers, so `discoverRunner`
+reports their effects and `presentation`. The REPL playground's mock desktop
+is built this way (`apps/repl-playground/src/backend/mock-runner.ts`).
 
 ## Cancellation
 

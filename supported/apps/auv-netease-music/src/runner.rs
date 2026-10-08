@@ -449,13 +449,18 @@ fn seek_playback(_position: std::time::Duration, _app_id: &str) -> Result<(), St
 
 #[cfg(unix)]
 pub async fn serve_inherited() -> Result<(), String> {
-  let (incoming, parent_disconnected) = auv_api_server::runner_transport::inherited_transport()?.into_parts();
+  let (incoming, shutdown) = auv_api_server::runner_transport::inherited_transport()?.into_parts();
   let (health_reporter, health) = tonic_health::server::health_reporter();
   health_reporter.set_serving::<ApplicationServiceServer<Service>>().await;
   health_reporter.set_serving::<PlayerServiceServer<Service>>().await;
   health_reporter.set_serving::<PlaylistServiceServer<Service>>().await;
   health_reporter.set_serving::<RecommendationServiceServer<Service>>().await;
   health_reporter.set_serving::<SongServiceServer<Service>>().await;
+  // TODO(app-runner-method-docs): this Runner's methods carry no
+  // `presentation` and it serves no `MethodDocsService` yet. Annotate them and
+  // register `auv_api_server::method_docs::service` with app docs when the
+  // NetEase methods get docs; see
+  // docs/ai/references/session-api/2026-10-09-method-presentation-and-docs.md.
   let reflection = auv_api_server::reflection::service(crate::api::FILE_DESCRIPTOR_SET)
     .map_err(|error| format!("failed to build NetEase Runner reflection: {error}"))?;
   tonic::transport::Server::builder()
@@ -466,7 +471,7 @@ pub async fn serve_inherited() -> Result<(), String> {
     .add_service(PlaylistServiceServer::new(Service))
     .add_service(RecommendationServiceServer::new(Service))
     .add_service(SongServiceServer::new(Service))
-    .serve_with_incoming_shutdown(incoming, parent_disconnected)
+    .serve_with_incoming_shutdown(incoming, shutdown)
     .await
     .map_err(|error| format!("NetEase Runner transport failed: {error}"))
 }
