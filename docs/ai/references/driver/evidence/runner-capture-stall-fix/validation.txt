@@ -1,0 +1,28 @@
+Final verification (2026-10-08)
+
+cargo build --release -p auv-cli: PASS
+cargo fmt --check: PASS
+cargo check --workspace: PASS
+cargo test --workspace: PASS; 1166 passed, 0 failed, 20 ignored across 140 targets
+swift build --build-system native (auv-driver-macos native/swift): PASS
+  Restored original Swift source after a rejected experiment; no final FFI changes.
+git diff --check: PASS
+auv invoke --help: PASS
+skill-creator quick_validate.py (bundled and installed skill): PASS
+
+Focused regressions in workspace:
+recognition_yields_the_runner_event_thread
+screen_capture_owner_survives_frames_and_releases_with_its_process_handle
+local_device_is_visible_through_discovered_and_explicit_endpoints
+scan_fixture_validation_stays_local_with_an_endpoint
+
+Live CLI regression:
+8/8 searches completed; all full oracle rows verified in original saved images.
+20/20 reused native captures; zero fallback.
+Competing process rejected in 0.083668 seconds.
+
+Tested binary SHA256: 79f55ecee5b167cc89719f08cb9e36d0e069852bcc54c105e34badec636a4344
+Same build installed in ~/.local/bin/auv, ahead of Homebrew in existing PATH.
+Bundled and installed skill files match byte-for-byte.
+Owned fixture exited; private test daemons stopped.
+No full model/token benchmark performed.

@@ -19,7 +19,7 @@ Read only `auv invoke <command-id> --help` for the operation you need, once for 
 
 Use installed help and connected tool schemas as the contract; never invent command names, flags, or support. Read [references/operations.md](references/operations.md) only for setup, field editing, popups, plugins, or remote workflows that need its details. Do not install a wrapper, SDK, or daemon for a one-off local invoke.
 
-For repeated capture/OCR, prefer a connected MCP/SDK client or persistent Runner over fresh local invocations. CLI routing needs both `AUV_ENDPOINT` and `--device-id`; retain them across calls. Read [reuse details](references/operations.md#reuse-for-repeated-work) for Device selection or task-owned startup. Include startup in timing; reuse does not eliminate every first-call stall.
+For repeated capture/OCR, prefer a connected MCP/SDK client or persistent Runner over fresh local invocations. Set `AUV_ENDPOINT` to reuse that daemon; retain `--device-id` when the Device is known. Read [reuse details](references/operations.md#reuse-for-repeated-work) for Device selection or task-owned startup. Include startup in timing; reuse does not eliminate every first-call stall.
 
 ## Act and verify
 
@@ -31,6 +31,6 @@ Use `--compact-json` when help offers it, otherwise `--json`. Keep complete stdo
 
 Choose the input policy deliberately. Foreground input may raise the app; background posting may not be consumed and must honor its stated fallback policy. After ineffective input, inspect partial progress, correct focus/target, and allow one recovery for simple navigation. If unresolved, use a permitted supported alternative or report failure. Never blindly retry insertion, submission, or effects that could duplicate work, grant permissions, bypass denied access, or change a remote task to local.
 
-If a shell tool yields a running session, wait for it before issuing more input or recovery to the same window.
+If a shell tool yields a running session, wait for it before issuing more input or recovery to the same window. If macOS capture ownership is busy, reuse the owning Runner; a second native client can stall the capture service.
 
 Reuse verified operations and session help; batch only actions safe without intermediate checks. Finish with the observed outcome, evidence, and any remaining failure. Measure total tokens and successful completion before claiming savings.

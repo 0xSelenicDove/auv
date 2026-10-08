@@ -1,0 +1,313 @@
+{
+  "binary_sha256": "79f55ecee5b167cc89719f08cb9e36d0e069852bcc54c105e34badec636a4344",
+  "searches": [
+    {
+      "name": "Birch transfer",
+      "seconds": 2.1011565829394385,
+      "status": "completed",
+      "reason": "text_visible",
+      "steps": 1,
+      "expected_row": "Birch transfer | BK-1600 | Stored",
+      "artifact": "search-01.webp",
+      "sha256": "b15bd949e113a84a2cb3cf38b10c26dd030093de611b7689eabb5ffde6f593d5",
+      "image_size": [
+        900,
+        682
+      ],
+      "source_attributes": {
+        "image.scale_factor": 2.0,
+        "image.source_height": 1364,
+        "image.source_width": 1800
+      },
+      "row_verified_in_saved_image": true,
+      "ocr_rows": [
+        "AUV Repeated Search - Synthetic Benchmark",
+        "Reset to top",
+        "Synthetic records drawn on a canvas; read-only benchmark",
+        "\u0442\u0435\u0441\u043e\u0442\u0430 \u043e0\u043e \u0442 \u0448L-2001 \u0442 \u043a\u0435\u0430d\u0443",
+        "ror revIew",
+        "Archive record 007 HN-6940 Approved",
+        "Archive record 008 | HN-1043 | Ready for review",
+        "Archive record 009 | JP-9939 | Stored",
+        "Archive record 010 | HN-9957 | Stored",
+        "Archive record 011 | BK-2427 | Stored",
+        "Birch transfer | BK-1600 | Stored",
+        "Archive record 013 | WS-2878 | Ready for review",
+        "Archive record 014 | BK-6294 | Stored",
+        "Archive record 015 | BK-8546 | Pending audit"
+      ]
+    },
+    {
+      "name": "Cobalt dispatch",
+      "seconds": 4.70226966694463,
+      "status": "completed",
+      "reason": "text_visible",
+      "steps": 5,
+      "expected_row": "Cobalt dispatch | BK-5738 | Pending audit",
+      "artifact": "search-02.webp",
+      "sha256": "a98aa550120b1408e746c5de0ac14d7d254c3202f364c8246389f361c5038b02",
+      "image_size": [
+        900,
+        682
+      ],
+      "source_attributes": {
+        "image.scale_factor": 2.0,
+        "image.source_height": 1364,
+        "image.source_width": 1800
+      },
+      "row_verified_in_saved_image": true,
+      "ocr_rows": [
+        "AUV Repeated Search - Synthetic Benchmark",
+        "Reset to top",
+        "Synthetic records drawn on a canvas; read-only benchmark",
+        "Archive record 028 HN-5415 | Ready for review",
+        "Archive record 029 | BK-9322 | Ready for review",
+        "Archive record 030 | JP-1957 | Pending audit",
+        "Archive record 031 | CT-2010 | Pending audit",
+        "Archive record 032 | EL-9311 | Ready for review",
+        "Archive record 033 | QV-7456 | Ready for review",
+        "Cobalt dispatch | BK-5738 | Pending audit",
+        "Archive record 035 QV-1213 Stored",
+        "Archive record 036 | EL-5492 | Pending audit",
+        "Archive record 037 CT-2926 Approved"
+      ]
+    },
+    {
+      "name": "Ember review",
+      "seconds": 8.183135624974966,
+      "status": "completed",
+      "reason": "text_visible",
+      "steps": 9,
+      "expected_row": "Ember review | BK-5856 | Stored",
+      "artifact": "search-03.webp",
+      "sha256": "c60c1f0652a008ff166087317abb7ca071e54401c572e3d1381ce3b0df9f141f",
+      "image_size": [
+        900,
+        682
+      ],
+      "source_attributes": {
+        "image.scale_factor": 2.0,
+        "image.source_height": 1364,
+        "image.source_width": 1800
+      },
+      "row_verified_in_saved_image": true,
+      "ocr_rows": [
+        "AUV Repeated Search - Synthetic Benchmark",
+        "Reset to top",
+        "Synthetic records drawn on a canvas; read-only benchmark",
+        "Archive record 050 | CT-3360 | Ready for review",
+        "Archive record 051 | HN-3715 | Approved",
+        "Archive record 052 BK-8854 Stored",
+        "Archive record 053 | EL-1406 | Approved",
+        "Archive record 054 | JP-5751 | Pending audit",
+        "Archive record 055 | HN-8903 | Pending audit",
+        "Ember review | BK-5856 Stored",
+        "Archive record 057 JP-4106 Stored",
+        "Archive record 058 | QV-5388 | Pending audit",
+        "Archive record 059 | LR-3562 | Approved"
+      ]
+    },
+    {
+      "name": "Harbor receipt",
+      "seconds": 13.587706667021848,
+      "status": "completed",
+      "reason": "text_visible",
+      "steps": 13,
+      "expected_row": "Harbor receipt | WS-9195 | Pending audit",
+      "artifact": "search-04.webp",
+      "sha256": "d59a2384aea0f939096a480718828704c6aa68171c7ba6d22f7977e3a39ddba8",
+      "image_size": [
+        900,
+        682
+      ],
+      "source_attributes": {
+        "image.scale_factor": 2.0,
+        "image.source_height": 1364,
+        "image.source_width": 1800
+      },
+      "row_verified_in_saved_image": true,
+      "ocr_rows": [
+        "AUV Repeated Search - Synthetic Benchmark",
+        "Reset to top",
+        "Synthetic records drawn on a canvas; read-only benchmark",
+        "Archive record 072 | QV-8975 | Pending audit",
+        "Archive record 073 | QV-2185 | Approved",
+        "Archive record 074 | WS-8099 | Pending audit",
+        "Archive record 075 | JP-8768 | Approved",
+        "Archive record 076 | EL-8775 | Approved",
+        "Archive record 077 | WS-8926 | Ready for review",
+        "Harbor receipt | WS-9195 | Pending audit",
+        "Archive record 079 BK-3452 Approved",
+        "Archive record 080 QV-9595 Approved"
+      ]
+    },
+    {
+      "name": "Juniper request",
+      "seconds": 21.61392570892349,
+      "status": "completed",
+      "reason": "text_visible",
+      "steps": 17,
+      "expected_row": "Juniper request | WS-1191 | Ready for review",
+      "artifact": "search-05.webp",
+      "sha256": "fdc802fe61d899fdc8d28593fde8ed2589e9a60298b123b5d48e3bf71ceb5bee",
+      "image_size": [
+        900,
+        682
+      ],
+      "source_attributes": {
+        "image.scale_factor": 2.0,
+        "image.source_height": 1364,
+        "image.source_width": 1800
+      },
+      "row_verified_in_saved_image": true,
+      "ocr_rows": [
+        "AUV Repeated Search - Synthetic Benchmark",
+        "Reset to top",
+        "Synthetic records drawn on a canvas; read-only benchmark",
+        "Archive record 094 | QV-6209 | Stored",
+        "Archive record 095 | QV-1026 | Ready for review",
+        "Archive record 096 | JP-6896 | Stored",
+        "Archive record 097 | CT-4892 | Ready for review",
+        "Archive record 098 | QV-4363 | Ready for review",
+        "Archive record 099 | EL-1355 | Stored",
+        "Juniper request | WS-1191 | Ready for review",
+        "Archive record 101 | WS-5358 | Pending audit",
+        "Archive record 102 | QV-1500 | Approved"
+      ]
+    },
+    {
+      "name": "Linden handoff",
+      "seconds": 25.29214462498203,
+      "status": "completed",
+      "reason": "text_visible",
+      "steps": 21,
+      "expected_row": "Linden handoff | JP-6711 | Ready for review",
+      "artifact": "search-06.webp",
+      "sha256": "d2e0390e6c2e6c88d95f26b90c3957e30b01df98cb67abd626e94665a50b89a9",
+      "image_size": [
+        900,
+        682
+      ],
+      "source_attributes": {
+        "image.scale_factor": 2.0,
+        "image.source_height": 1364,
+        "image.source_width": 1800
+      },
+      "row_verified_in_saved_image": true,
+      "ocr_rows": [
+        "Reset to topr",
+        "AUV Repeated Search - Synthetic Benchmark",
+        "Synthetic records drawn on a canvas; read-only benchmark",
+        "Archive record 116 CT-6792 Approved",
+        "Archive record 117 | HN-4435 | Stored",
+        "Archive record 118 | BK-8067 | Approved",
+        "Archive record 119 | LR-3288 | Stored",
+        "Archive record 120 | HN-5227 | Stored",
+        "Archive record 121 | CT-7986 | Ready for review",
+        "Linden handoff | JP-6711 | Ready for review",
+        "Archive record 123 | BK-1028 | Approved",
+        "Archive record 124 | WS-4771 | Pending audit"
+      ]
+    },
+    {
+      "name": "Quartz audit",
+      "seconds": 23.836367666022852,
+      "status": "completed",
+      "reason": "text_visible",
+      "steps": 25,
+      "expected_row": "Quartz audit | HN-3250 | Approved",
+      "artifact": "search-07.webp",
+      "sha256": "ae38787ea9be4e55a9550feedff6b6cd6163ff791e1887c81a42a7c7b19f267f",
+      "image_size": [
+        900,
+        682
+      ],
+      "source_attributes": {
+        "image.scale_factor": 2.0,
+        "image.source_height": 1364,
+        "image.source_width": 1800
+      },
+      "row_verified_in_saved_image": true,
+      "ocr_rows": [
+        "AUV Repeated Search - Synthetic Benchmark",
+        "Reset to top",
+        "Synthetic records drawn on a canvas; read-only benchmark",
+        "Archive record 138 | HN-5538 | Pending audit",
+        "Archive record 139 | HN-1374 | Pending audit",
+        "Archive record 140 | HN-5984 | Stored",
+        "Archive record 141 | HN-9156 | Approved",
+        "Archive record 142 | CT-9486 | Stored",
+        "Archive record 143 | QV-7482 | Pending audit",
+        "Quartz audit | HN-3250 | Approved",
+        "Archive record 145 | BK-7094 | Ready for review",
+        "Archive record 146 | HN-1597 | Ready for review"
+      ]
+    },
+    {
+      "name": "Willow release",
+      "seconds": 27.41434716701042,
+      "status": "completed",
+      "reason": "text_visible",
+      "steps": 29,
+      "expected_row": "Willow release | WS-1353 | Approved",
+      "artifact": "search-08.webp",
+      "sha256": "46f546c5e4c9b03d0334be2583c4dd66a89f86d82765df8aae00e3b4ec7c100e",
+      "image_size": [
+        900,
+        682
+      ],
+      "source_attributes": {
+        "image.scale_factor": 2.0,
+        "image.source_height": 1364,
+        "image.source_width": 1800
+      },
+      "row_verified_in_saved_image": true,
+      "ocr_rows": [
+        "AUV Repeated Search - Synthetic Benchmark",
+        "Reset to top",
+        "Synthetic records drawn on a canvas; read-only benchmark",
+        "Archive record 160 BK-4606 Stored",
+        "Archive record 161 | QV-9742 | Approved",
+        "Archive record 162 | LR-8476 | Ready for review",
+        "Archive record 163 | HN-3307 | Ready for review",
+        "Archive record 164 | LR-4393 | Ready for review",
+        "Archive record 165 | LR-6920 | Ready for review",
+        "Willow release | WS-1353 | Approved",
+        "Archive record 167 | EL-1719 | Ready for review",
+        "Archive record 168 | QV-3943 | Stored"
+      ]
+    }
+  ],
+  "search_total_seconds": 126.73105370881967,
+  "reused_capture_count": 20,
+  "reused_capture_seconds": [
+    0.2725769999669865,
+    0.20742250001057982,
+    0.2862059168983251,
+    0.30451945890672505,
+    0.3385425000451505,
+    0.29855870897881687,
+    0.3238636669702828,
+    0.35672212508507073,
+    0.3535823749843985,
+    0.3615026669576764,
+    0.32817337510641664,
+    0.3897701660171151,
+    0.4398893329780549,
+    0.5627908339956775,
+    0.39800616702996194,
+    0.3642187089426443,
+    0.33898645895533264,
+    0.3293715419713408,
+    0.27967524994164705,
+    0.2845952500356361
+  ],
+  "reused_capture_backend": "macos.screencapturekit.ffi",
+  "reused_capture_fallback_count": 0,
+  "competing_process_rejection": {
+    "seconds": 0.08366800006479025,
+    "returncode": 1,
+    "status": "failed",
+    "failure": "WindowService/ResolveWindow or CaptureService/CaptureWindow failed: Runner capability RPC failed: code: 'The service is currently unavailable', message: \"another AUV process owns macOS screen capture; reuse its Runner with --device-id or --run, or wait for that process to exit\""
+  }
+}

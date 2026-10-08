@@ -5,6 +5,7 @@ use super::types::AuvResult;
 
 #[cfg(target_os = "macos")]
 pub fn probe_native_permissions() -> AuvResult<NativePermissionProbe> {
+  super::capture::claim_screen_capture()?;
   Ok(NativePermissionProbe::from(probe_permissions()))
 }
 

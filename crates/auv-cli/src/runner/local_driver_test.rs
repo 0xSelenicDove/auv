@@ -4,6 +4,34 @@ fn test_capture_store() -> CaptureStore {
   CaptureStore::new(CaptureStoreOptions::default())
 }
 
+#[cfg(target_os = "macos")]
+#[tokio::test(flavor = "current_thread")]
+async fn recognition_yields_the_runner_event_thread() {
+  // ROOT CAUSE:
+  // Native capture/OCR ran synchronously on the single Runner event thread,
+  // preventing other RPCs and cancellation from being polled during OS waits.
+  // Exercise the actual OCR RPC on stored pixels without UI or permissions.
+  let captures = test_capture_store();
+  let id = captures.insert(gradient_capture(512, 512));
+  let service = LocalTextRecognitionService {
+    session: auv_driver::open_local().unwrap(),
+    captures,
+  };
+  let (started, ready) = tokio::sync::oneshot::channel();
+  let work = tokio::spawn(async move {
+    started.send(()).unwrap();
+    service
+      .recognize_text(Request::new(proto::RecognizeTextRequest {
+        source: Some(proto::recognize_text_request::Source::CaptureRef(proto::CaptureRef { capture_id: id })),
+        ..Default::default()
+      }))
+      .await
+  });
+  ready.await.unwrap();
+  assert!(!work.is_finished(), "OCR monopolized the current-thread Runner until completion");
+  work.await.unwrap().unwrap();
+}
+
 #[tokio::test]
 async fn streamed_mouse_motion_rejects_cancel_before_begin() {
   let mut requests = tokio_stream::iter([Ok(proto::StreamMouseMotionRequest {

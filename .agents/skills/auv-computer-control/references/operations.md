@@ -80,7 +80,8 @@ started. Preserve the selected machine and reobserve stale app/window targets.
 
 For repeated CLI work with an available daemon, discover its Devices once and
 select the exact Device for every invocation. `AUV_ENDPOINT` selects the daemon
-but does not by itself route an unqualified `invoke` through its Runner:
+and routes live unqualified `invoke` through its Runner. Pin a known Device
+to preserve the selected machine:
 
 ```sh
 auv devices list --endpoint "$auv_endpoint" --json

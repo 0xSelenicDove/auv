@@ -2,7 +2,10 @@ use clap::Args;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use auv_cli_invoke::{InvokeCliParse, InvokeRequest, command::TargetPolicy};
+use auv_cli_invoke::{
+  InvokeCliParse, InvokeRequest,
+  command::{InvokeNamespace, TargetPolicy},
+};
 
 /// Invoke one core computer-use capability and record its run.
 #[derive(Clone, Debug, Args)]
@@ -79,7 +82,13 @@ async fn execute(
   // validation depends on the selected driver, even for explicit global input.
   // Use the command's shared keyboard contract so new commands cannot fall
   // through a second, frontend-only command-ID list.
-  let selected_context = if !selection.is_empty() && (!request.dry_run || command.target == TargetPolicy::OptionalKeyboard) {
+  // An explicit daemon endpoint is an instruction to reuse its Runner. Opening
+  // a second native capture client here can stall the existing macOS client.
+  // Hermetic scan fixtures remain local unless explicitly selected.
+  let selected_context = if (!selection.is_empty()
+    || (command.namespace != InvokeNamespace::Scan && std::env::var_os("AUV_ENDPOINT").is_some()))
+    && (!request.dry_run || command.target == TargetPolicy::OptionalKeyboard)
+  {
     Some(crate::commands::plugin::resolve_invoke_context(selection).await?)
   } else {
     None

@@ -30,6 +30,29 @@ fn invoke_dry_run_writes_append_only_trace_records() {
   assert!(records.iter().any(|envelope| envelope["record"]["type"] == "event"));
 }
 
+// A daemon endpoint must not turn an unselected hermetic fixture into a
+// live Runner operation: fixture validation still runs without a daemon.
+#[test]
+fn scan_fixture_validation_stays_local_with_an_endpoint() {
+  let store = tempfile::tempdir().unwrap();
+  let output = Command::new(env!("CARGO_BIN_EXE_auv"))
+    .env("AUV_ENDPOINT", format!("unix://{}", store.path().join("missing.sock").display()))
+    .args([
+      "invoke",
+      "scan.frame",
+      "--fixture-dir",
+      store.path().join("missing-fixture").to_str().unwrap(),
+      "--compact-json",
+      "--store-root",
+      store.path().to_str().unwrap(),
+    ])
+    .output()
+    .unwrap();
+  assert!(!output.status.success());
+  let direct: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+  assert!(direct["failure"].as_str().unwrap().contains("fixture directory does not exist"), "{direct}");
+}
+
 // ROOT CAUSE:
 // Runner scrollUntil discarded its final streamed CaptureRef, so the invoke
 // result lacked the screenshot and clients had to capture a different frame.

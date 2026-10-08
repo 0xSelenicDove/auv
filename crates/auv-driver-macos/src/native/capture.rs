@@ -2,6 +2,48 @@
 use super::binding::ffi::{NativeWindowCaptureRequest, NativeWindowCaptureResponse, capture_window_image, window_ax_size};
 use super::types::AuvResult;
 
+#[cfg(target_os = "macos")]
+static SCREEN_CAPTURE_OWNER: std::sync::Mutex<Option<std::fs::File>> = std::sync::Mutex::new(None);
+
+/// ScreenCaptureKit's connection is process-lived, even between screenshots.
+#[cfg(target_os = "macos")]
+pub(crate) fn claim_screen_capture() -> AuvResult<()> {
+  retain_capture_owner(&SCREEN_CAPTURE_OWNER, &std::env::temp_dir().join("auv-macos-screen-capture-owner.lock"))
+}
+
+#[cfg(target_os = "macos")]
+fn retain_capture_owner(owner: &std::sync::Mutex<Option<std::fs::File>>, path: &std::path::Path) -> AuvResult<()> {
+  use std::os::unix::fs::OpenOptionsExt;
+  let mut owner = owner.lock().map_err(|error| format!("screen capture ownership lock failed: {error}"))?;
+  if owner.is_some() {
+    return Ok(());
+  }
+  let file = std::fs::OpenOptions::new()
+    .read(true)
+    .write(true)
+    .create(true)
+    .truncate(false)
+    .mode(0o600)
+    .open(path)
+    .map_err(|error| format!("screen capture ownership file failed: {error}"))?;
+  match file.try_lock() {
+    Ok(()) => {
+      // NOTICE: two live AUV capture clients reproducibly caused replayd
+      // connection-reset loops and 40-second failures, even with one idle.
+      // Keep ownership until process exit: SCScreenshotManager has no public
+      // connection-close API. Never unlink an advisory lock's shared inode.
+      // ponytail: one owner per user; relax when concurrent-client probes pass.
+      // See `docs/ai/references/driver/2026-10-07-runner-capture-stall-fix.md`.
+      *owner = Some(file);
+      Ok(())
+    }
+    Err(std::fs::TryLockError::WouldBlock) => Err(
+      "another AUV process owns macOS screen capture; reuse its Runner with --device-id or --run, or wait for that process to exit".into(),
+    ),
+    Err(std::fs::TryLockError::Error(error)) => Err(format!("screen capture ownership failed: {error}")),
+  }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct NativeWindowCapture {
   pub image_width: i64,
@@ -70,11 +112,32 @@ pub fn window_ax_size_for(pid: u32, window_number: i64) -> Option<WindowAxSize> 
 
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
+  // ROOT CAUSE:
+  // Releasing a lock after a frame would admit a second client while the
+  // first process's ScreenCaptureKit connection remained alive.
+  #[test]
+  fn screen_capture_owner_survives_frames_and_releases_with_its_process_handle() {
+    let path = std::env::temp_dir().join(format!(
+      "auv-capture-owner-test-{}-{}.lock",
+      std::process::id(),
+      std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+    ));
+    let first = std::sync::Mutex::new(None);
+    let second = std::sync::Mutex::new(None);
+    super::retain_capture_owner(&first, &path).unwrap();
+    super::retain_capture_owner(&first, &path).unwrap();
+    assert!(super::retain_capture_owner(&second, &path).unwrap_err().contains("reuse its Runner"));
+    drop(first);
+    super::retain_capture_owner(&second, &path).unwrap();
+    drop(second);
+    std::fs::remove_file(path).unwrap();
+  }
   // Live capture regression for the canvas benchmark failures. Exercise the
   // native boundary without input, OCR, tracing or overlapping recovery.
   #[test]
   #[ignore = "requires a capturable synthetic window; set AUV_CAPTURE_TEST_WINDOW_ID"]
   fn repeated_window_capture_completes_without_backend_failure() {
+    super::claim_screen_capture().unwrap();
     let id = std::env::var("AUV_CAPTURE_TEST_WINDOW_ID").unwrap().parse().unwrap();
     // Match first-party callers: initialize WindowServer via window resolution.
     super::super::window::list_windows(super::super::window::ListWindowsOptions::app(256, "local.auv.RepeatedSearchFixture")).unwrap();

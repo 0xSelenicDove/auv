@@ -7,7 +7,7 @@ Executable GUI evaluations live in
 test objects, tasks, and cases. Rust runs evaluations; shared desktop receivers
 use TypeScript. Raw run output stays local.
 
-Count: **84**
+Count: **85**
 
 - [`2026-05-20-macos-driver-namespace-after-window-screen-design.md`](2026-05-20-macos-driver-namespace-after-window-screen-design.md)
 - [`2026-05-20-macos-osascript-backend-design.md`](2026-05-20-macos-osascript-backend-design.md)
@@ -142,3 +142,5 @@ Count: **84**
 - [Runner evidence matched benchmark](2026-10-07-runner-evidence-benchmark.md): four full model sessions; capture failures prevent a performance conclusion.
 
 - [Capture deadline fix](2026-10-07-capture-deadline-fix.md): late callback lifecycle regression, background search evidence, and unresolved OS stall limits.
+
+- [Runner capture stall fix](2026-10-07-runner-capture-stall-fix.md): Reproduced competing macOS capture clients, process-lived ownership admission, endpoint reuse, responsive native RPC scheduling, and live regression evidence.

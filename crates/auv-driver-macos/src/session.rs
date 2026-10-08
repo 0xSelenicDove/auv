@@ -1937,6 +1937,7 @@ fn list_display_targets() -> DriverResult<Vec<MacosDisplayTarget>> {
 
 #[cfg(target_os = "macos")]
 fn capture_display_xcap(selector: Option<&str>) -> DriverResult<DisplayCapture> {
+  crate::native::capture::claim_screen_capture().map_err(backend)?;
   let monitors = xcap::Monitor::all().map_err(|error| backend(format!("failed to enumerate displays: {error}")))?;
   let targets = display_targets_from_monitors(&monitors)?;
   let target = resolve_display_target(&targets, selector)?;
@@ -1965,6 +1966,7 @@ fn capture_display_xcap(_selector: Option<&str>) -> DriverResult<DisplayCapture>
 
 #[cfg(target_os = "macos")]
 fn capture_region_xcap(selector: Option<&str>, region: Rect) -> DriverResult<RegionCapture> {
+  crate::native::capture::claim_screen_capture().map_err(backend)?;
   let monitors = xcap::Monitor::all().map_err(|error| backend(format!("failed to enumerate displays: {error}")))?;
   let targets = display_targets_from_monitors(&monitors)?;
   let target = resolve_display_for_global_region(&targets, selector, region)?;
@@ -2076,6 +2078,9 @@ fn integral_positive_capture_dimension(name: &str, value: f64) -> DriverResult<u
 
 #[cfg(target_os = "macos")]
 fn capture_window(window: &Window, resolution: CaptureResolution) -> DriverResult<Capture> {
+  // Refuse a competing process before either backend contacts ScreenCaptureKit;
+  // xcap window capture also routes through that service on current macOS.
+  crate::native::capture::claim_screen_capture().map_err(backend)?;
   // Prefer the Swift FFI ScreenCaptureKit path for typed window capture.
   //
   // Why this path exists instead of shelling out to `screencapture` or using

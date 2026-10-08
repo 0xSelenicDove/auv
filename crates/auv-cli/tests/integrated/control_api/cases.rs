@@ -64,6 +64,33 @@ async fn local_device_is_visible_through_discovered_and_explicit_endpoints() {
   assert!(explicit.status.success(), "explicit endpoint stderr: {}", String::from_utf8_lossy(&explicit.stderr));
   assert!(String::from_utf8_lossy(&explicit.stdout).contains(&device_id[..12]));
 
+  // ROOT CAUSE:
+  // AUV_ENDPOINT was ignored by unqualified invoke, so recovery opened a new
+  // native capture client beside the daemon's existing ScreenCaptureKit client.
+  // Assert the public CLI creates its Run on that daemon, without UI input.
+  let invoked = Command::new(env!("CARGO_BIN_EXE_auv"))
+    .args([
+      "invoke",
+      "display.list",
+      "--compact-json",
+      "--store-root",
+      store.path().join("frontend").to_str().unwrap(),
+    ])
+    .env("AUV_ENDPOINT", &endpoint)
+    .env("AUV_DISCOVERY_FILE", store.path().join("missing.json"))
+    .env("AUV_CONFIG_PROFILES_FILE", &profiles_file)
+    .output()
+    .await
+    .expect("invoke through explicit endpoint without a Device flag");
+  let direct: serde_json::Value = serde_json::from_slice(&invoked.stdout)
+    .unwrap_or_else(|error| panic!("invoke output: {error}; stderr: {}", String::from_utf8_lossy(&invoked.stderr)));
+  let runs = client.runs().list_runs().await.expect("daemon Runs after invoke");
+  assert_eq!(runs.len(), 1, "unqualified invoke ignored AUV_ENDPOINT");
+  assert_eq!(
+    uuid::Uuid::parse_str(&runs[0].r#ref.as_ref().unwrap().run_id).unwrap(),
+    uuid::Uuid::parse_str(direct["run_id"].as_str().unwrap()).unwrap(),
+  );
+
   child.kill().await.expect("stop API server");
   let _ = child.wait().await;
 }

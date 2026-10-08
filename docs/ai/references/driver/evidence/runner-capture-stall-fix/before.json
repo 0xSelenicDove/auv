@@ -1,0 +1,51 @@
+{
+  "binary_sha256": "b66663f84902f15ac760f51ee8a53b4e9e1cced416289b682dddcb4d84296c85",
+  "searches": [
+    {
+      "name": "Birch transfer",
+      "seconds": 1.4069076249143109,
+      "status": "completed"
+    },
+    {
+      "name": "Cobalt dispatch",
+      "seconds": 3.802183625055477,
+      "status": "completed"
+    },
+    {
+      "name": "Ember review",
+      "seconds": 7.497976333019324,
+      "status": "completed"
+    },
+    {
+      "name": "Harbor receipt",
+      "seconds": 9.125513082952239,
+      "status": "completed"
+    },
+    {
+      "name": "Juniper request",
+      "seconds": 11.645388709031977,
+      "status": "completed"
+    },
+    {
+      "name": "Linden handoff",
+      "seconds": 14.329608000000007,
+      "status": "completed"
+    },
+    {
+      "name": "Quartz audit",
+      "seconds": 16.7086639580084,
+      "status": "completed"
+    },
+    {
+      "name": "Willow release",
+      "seconds": 42.65103891596664,
+      "status": "failed"
+    }
+  ],
+  "idle_owner_peer_capture": {
+    "capture_seconds": 40.13916274998337,
+    "ping_seconds": 0.05670045793522149,
+    "status": "failed",
+    "failure": "WindowService/ResolveWindow or CaptureService/CaptureWindow failed: Runner capability RPC failed: code: 'The service is currently unavailable', message: \"native Swift window capture failed before xcap fallback: macos native capture_window_image failed: ScreenCaptureKit window capture failed: Error Domain=AuvMacosNative.Capture Code=4 \\\"screenshot delivery timed out before the capture deadline\\\" UserInfo={NSLocalizedDescription=screenshot delivery timed out before the capture deadline}; recovery=check the reported capture stage and target window; permission denial requires user authorization; xcap fallback also failed: failed to capture window 27801: Failed to copy data\""
+  }
+}

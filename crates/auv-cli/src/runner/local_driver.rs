@@ -522,7 +522,11 @@ impl PermissionService for LocalPermissionService {
   ) -> Result<Response<macos_proto::ProbePermissionsResponse>, Status> {
     #[cfg(target_os = "macos")]
     {
-      let probe = self.session.permission().probe().map_err(driver_status)?;
+      let session = self.session.clone();
+      let probe = tokio::task::spawn_blocking(move || session.permission().probe())
+        .await
+        .map_err(|error| Status::internal(format!("permission probe task failed: {error}")))?
+        .map_err(driver_status)?;
       Ok(Response::new(permission_probe_to_proto(probe)))
     }
     #[cfg(not(target_os = "macos"))]
@@ -1969,11 +1973,19 @@ impl TextRecognitionService for LocalTextRecognitionService {
       None => return Err(Status::invalid_argument("capture_ref or image is required")),
     };
     let region = image_region_from_proto(request.region, request.screen_region, capture.bounds)?;
-    let recognition = self
-      .session
-      .vision()
-      .recognize_text_in_capture_with_options(&capture, region, recognition_options(request.custom_words, request.recognition_languages))
-      .map_err(driver_status)?;
+    let session = self.session.clone();
+    // Native OCR and capture can wait on OS callbacks. Keep the single Runner
+    // event thread available for RPC progress, cancellation and overlay calls.
+    let recognition = tokio::task::spawn_blocking(move || {
+      session.vision().recognize_text_in_capture_with_options(
+        &capture,
+        region,
+        recognition_options(request.custom_words, request.recognition_languages),
+      )
+    })
+    .await
+    .map_err(|error| Status::internal(format!("recognition task failed: {error}")))?
+    .map_err(driver_status)?;
     if let Some(id) = cached_as {
       self.captures.remember_recognition(&id, cache_key, recognition.clone());
     }
@@ -1989,18 +2001,24 @@ impl TextRecognitionService for LocalTextRecognitionService {
       return Err(Status::invalid_argument("query is required"));
     }
     let window = resolve_window_ref(&self.session, request.window.ok_or_else(|| Status::invalid_argument("window is required"))?)?;
-    let capture = self.session.window().capture(&window).map_err(driver_status)?;
-    let region = image_region_from_proto(request.region, request.screen_region, capture.bounds)?;
-    let matches = self
-      .session
-      .vision()
-      .find_text_in_capture_with_options(
-        &capture,
-        &request.query,
-        region,
-        recognition_options(request.custom_words, request.recognition_languages),
-      )
-      .map_err(driver_status)?;
+    let session = self.session.clone();
+    let target = window.clone();
+    let (capture, matches) = tokio::task::spawn_blocking(move || {
+      let capture = session.window().capture(&target).map_err(driver_status)?;
+      let region = image_region_from_proto(request.region, request.screen_region, capture.bounds)?;
+      let matches = session
+        .vision()
+        .find_text_in_capture_with_options(
+          &capture,
+          &request.query,
+          region,
+          recognition_options(request.custom_words, request.recognition_languages),
+        )
+        .map_err(driver_status)?;
+      Ok::<_, Status>((capture, matches))
+    })
+    .await
+    .map_err(|error| Status::internal(format!("find-text task failed: {error}")))??;
     Ok(Response::new(proto::FindWindowTextResponse {
       window: Some(window_to_proto(window)),
       matches: matches
@@ -2025,25 +2043,29 @@ impl TextRecognitionService for LocalTextRecognitionService {
       return Err(Status::invalid_argument("query is required"));
     }
     let display = display_selector_from_proto(request.selector)?;
-    let captured = self
-      .session
-      .display()
-      .capture(auv_driver::CaptureOptions {
-        display,
-        ..Default::default()
-      })
-      .map_err(driver_status)?;
-    let region = image_region_from_proto(request.region, request.screen_region, captured.capture.bounds)?;
-    let matches = self
-      .session
-      .vision()
-      .find_text_in_capture_with_options(
-        &captured.capture,
-        &request.query,
-        region,
-        recognition_options(request.custom_words, request.recognition_languages),
-      )
-      .map_err(driver_status)?;
+    let session = self.session.clone();
+    let (captured, matches) = tokio::task::spawn_blocking(move || {
+      let captured = session
+        .display()
+        .capture(auv_driver::CaptureOptions {
+          display,
+          ..Default::default()
+        })
+        .map_err(driver_status)?;
+      let region = image_region_from_proto(request.region, request.screen_region, captured.capture.bounds)?;
+      let matches = session
+        .vision()
+        .find_text_in_capture_with_options(
+          &captured.capture,
+          &request.query,
+          region,
+          recognition_options(request.custom_words, request.recognition_languages),
+        )
+        .map_err(driver_status)?;
+      Ok::<_, Status>((captured, matches))
+    })
+    .await
+    .map_err(|error| Status::internal(format!("find-text task failed: {error}")))??;
     Ok(Response::new(proto::FindDisplayTextResponse {
       display: Some(display_to_proto(captured.display)),
       matches: matches
@@ -2359,7 +2381,12 @@ impl CaptureService for LocalCaptureService {
       resolution: capture_resolution_from_proto(request.resolution)?,
       ..Default::default()
     };
-    let capture = self.session.window().capture_with(&window, options).map_err(driver_status)?;
+    let session = self.session.clone();
+    let target = window.clone();
+    let capture = tokio::task::spawn_blocking(move || session.window().capture_with(&target, options))
+      .await
+      .map_err(|error| Status::internal(format!("capture task failed: {error}")))?
+      .map_err(driver_status)?;
     Ok(Response::new(proto::CaptureWindowResponse {
       window: Some(window_to_proto(window)),
       capture: Some(stored_capture_to_proto(&self.captures, capture)),
@@ -2372,14 +2399,15 @@ impl CaptureService for LocalCaptureService {
   ) -> Result<Response<proto::CaptureDisplayResponse>, Status> {
     let request = request.into_inner();
     let display = display_selector_from_proto(request.selector)?;
-    let captured = self
-      .session
-      .display()
-      .capture(auv_driver::CaptureOptions {
-        display,
-        resolution: capture_resolution_from_proto(request.resolution)?,
-        ..Default::default()
-      })
+    let session = self.session.clone();
+    let options = auv_driver::CaptureOptions {
+      display,
+      resolution: capture_resolution_from_proto(request.resolution)?,
+      ..Default::default()
+    };
+    let captured = tokio::task::spawn_blocking(move || session.display().capture(options))
+      .await
+      .map_err(|error| Status::internal(format!("capture task failed: {error}")))?
       .map_err(driver_status)?;
     Ok(Response::new(proto::CaptureDisplayResponse {
       display: Some(display_to_proto(captured.display)),
@@ -2391,15 +2419,16 @@ impl CaptureService for LocalCaptureService {
     let request = request.into_inner();
     let display = display_selector_from_proto(request.selector)?;
     let region = rect_from_proto(request.region.ok_or_else(|| Status::invalid_argument("region is required"))?, "region")?;
-    let captured = self
-      .session
-      .display()
-      .capture_region(auv_driver::CaptureOptions {
-        display,
-        region: Some(region),
-        resolution: capture_resolution_from_proto(request.resolution)?,
-        ..Default::default()
-      })
+    let session = self.session.clone();
+    let options = auv_driver::CaptureOptions {
+      display,
+      region: Some(region),
+      resolution: capture_resolution_from_proto(request.resolution)?,
+      ..Default::default()
+    };
+    let captured = tokio::task::spawn_blocking(move || session.display().capture_region(options))
+      .await
+      .map_err(|error| Status::internal(format!("capture task failed: {error}")))?
       .map_err(driver_status)?;
     Ok(Response::new(proto::CaptureRegionResponse {
       display: Some(display_to_proto(captured.display)),
