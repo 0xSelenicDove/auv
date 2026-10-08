@@ -100,7 +100,10 @@ fn first_party_runner_runtimes(store_root: &std::path::Path) -> Result<auv_daemo
   let runner_state_root = store_root.join("runner-state").join("auv.core.local");
   let runner_state_root =
     runner_state_root.to_str().ok_or_else(|| format!("local Runner state path is not valid UTF-8: {}", runner_state_root.display()))?;
-  let environment = BTreeMap::from([(crate::runner::STATE_ROOT_ENV.to_string(), runner_state_root.to_string())]);
+  let environment = BTreeMap::from([
+    (crate::runner::STATE_ROOT_ENV.to_string(), runner_state_root.to_string()),
+    (crate::runner::STORE_ROOT_ENV.to_string(), store_root.to_str().ok_or("Runner store path is not valid UTF-8")?.to_string()),
+  ]);
   Ok(auv_daemon::runner_provider::FirstPartyRunnerRuntimes {
     local_driver: Some(RunnerRuntime::Executable(ExecutableRunnerRuntime {
       executable,

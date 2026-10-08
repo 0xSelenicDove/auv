@@ -136,3 +136,5 @@ Count: **84**
 - [Post-fix repeated visual search benchmark](2026-10-07-post-fix-benchmark.md): Six verified sessions; focus failure absent, current skill still slower and more costly than successful pre-merge case B, variable native controls and audit exceptions retained.
 
 - [Rejected evidence reuse guidance candidate](2026-10-07-skill-evidence-candidate.md): One verified case B follow-up regressed tokens and time; incumbent restored and missing Runner final-artifact boundary identified.
+
+- [Runner scroll search final-observation evidence](2026-10-07-runner-scroll-evidence.md): Runner-side capture recording with metadata-only receipts, matched-frame regressions, different-store live verification and recording-error separation; no new token-saving claim.

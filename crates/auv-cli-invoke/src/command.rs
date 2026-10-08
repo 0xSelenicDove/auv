@@ -154,6 +154,7 @@ pub struct InvokeCommandOutput {
   pub report: Option<InvokeReport>,
   result: Option<serde_json::Value>,
   artifacts: Vec<ArtifactMetadata>,
+  artifact_paths: BTreeMap<auv_tracing::ArtifactUri, PathBuf>,
 }
 
 impl InvokeCommandOutput {
@@ -169,6 +170,7 @@ impl InvokeCommandOutput {
       report: None,
       result: Some(serde_json::to_value(result).map_err(|error| format!("failed to serialize invoke result: {error}"))?),
       artifacts: Vec::new(),
+      artifact_paths: BTreeMap::new(),
     })
   }
 
@@ -181,6 +183,18 @@ impl InvokeCommandOutput {
   pub fn with_artifacts(mut self, artifacts: impl IntoIterator<Item = ArtifactMetadata>) -> Self {
     self.artifacts.extend(artifacts);
     self
+  }
+
+  /// Attaches a durable receipt and its location on the producing Runner host.
+  /// Remote paths remain host-relative; frontends must not relabel them local.
+  pub fn with_recorded_artifact(mut self, metadata: ArtifactMetadata, path: PathBuf) -> Self {
+    self.artifact_paths.insert(metadata.uri().clone(), path);
+    self.artifacts.push(metadata);
+    self
+  }
+
+  pub fn artifact_path(&self, uri: &auv_tracing::ArtifactUri) -> Option<&PathBuf> {
+    self.artifact_paths.get(uri)
   }
 
   pub fn artifacts(&self) -> &[ArtifactMetadata] {

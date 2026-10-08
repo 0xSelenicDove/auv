@@ -23,6 +23,8 @@ For repeated capture/OCR, prefer a connected MCP/SDK client or persistent Runner
 
 ## Act and verify
 
+Inspect a returned `auv.scan.scroll_until_final_capture` artifact before capturing again after `input.scrollUntil`. Reuse it when the full requested content is visible and the UI has not changed; missing evidence, a clipped row or changed UI needs a fresh capture. A text stop alone is not verification.
+
 Use the cheapest sufficient live observation. Read exposed accessibility values or inspect one targeted image; avoid OCR searches for fields already visible. Input coordinates are logical points; capture/OCR pixels require conversion using returned bounds and scale. Reobserve after UI changes and backend switches.
 
 Use `--compact-json` when help offers it, otherwise `--json`. Keep complete stdout, stderr, failures, verification fields, and artifacts; retain stdout on nonzero exits. Use a task-local `--store-root` when needed. Open screenshot artifacts by returned `file_path`, never a guessed path. Delivery/completion flags do not prove the user's outcome: independently verify changed state, field contents before submission, and the final result.

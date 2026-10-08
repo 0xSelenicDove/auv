@@ -118,3 +118,36 @@ fn compact_json_preserves_complete_results_failures_and_artifact_paths() {
     assert_eq!(serde_json::from_str::<serde_json::Value>(&compact).unwrap(), serde_json::from_str::<serde_json::Value>(&pretty).unwrap());
   }
 }
+
+// ROOT CAUSE:
+// Frontends assumed every artifact belonged to their local store. Runner-owned
+// receipts must retain the producer path even when the frontend store differs.
+#[test]
+fn runner_artifact_path_is_preserved_in_compact_output() {
+  let run_id = RunId::new();
+  let uri = ArtifactUri::from_ids(run_id, ArtifactId::new());
+  let metadata = ArtifactMetadata::new(
+    uri.clone(),
+    "auv.scan.scroll_until_final_capture".into(),
+    "image/webp".into(),
+    Some("webp".into()),
+    ByteLength::new(10).unwrap(),
+    Sha256Digest::new([1; 32]),
+    Attributes::empty(),
+  );
+  let producer_path = std::env::temp_dir().join("runner-store").join("final.webp");
+  let other_path = std::env::temp_dir().join("client-store").join("final.webp");
+  let output = InvokeCommandOutput::completed().with_recorded_artifact(metadata, producer_path.clone());
+  let registry = default_registry();
+  let command = registry.resolve("input.scrollUntil").unwrap();
+  let result = InvokeResult::from_command_result(run_id, command, Ok(output)).with_artifact_paths([(uri, other_path)]);
+  let rendered = result
+    .render_to_string(InvokeOutputOptions {
+      compact_json: true,
+      ..Default::default()
+    })
+    .unwrap();
+  let json: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+  assert_eq!(json["artifacts"][0]["file_path"], producer_path.to_str().unwrap());
+  assert!(json["artifacts"][0].get("pixels").is_none());
+}

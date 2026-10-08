@@ -13,6 +13,7 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
+auv-tracing = { version = "0.0.31", path = "../auv-tracing" }
 auv-api-client = { version = "0.0.31", path = "../auv-api-client" }
 auv-api-proto = { version = "0.0.31", path = "../auv-api-proto" }
 auv-driver = { version = "0.0.31", path = "../auv-driver" }

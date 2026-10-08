@@ -729,8 +729,7 @@ async fn execute_hold_keys(
   crate::commands::input::targeted_keyboard_output(Some(&action)).map_err(Into::into)
 }
 
-/// Runner route for `input.drag`: the same plan and path as local invoke,
-/// resolved through Runner window/display services and one DragMouse call.
+/// Runner scroll search retains its final observation for server-side recording.
 async fn execute_scroll_until(input: crate::InvokeCommandInput, context: auv::AuvContext) -> crate::InvokeExecutionResult {
   let plan = crate::commands::input::decode_scroll_until(&input)?;
   let auv = auv::Client::from_context(context).await.map_err(|error| error.to_string())?;
@@ -744,15 +743,17 @@ async fn execute_scroll_until(input: crate::InvokeCommandInput, context: auv::Au
   }
   input.cancellation.check().map_err(|error| error.to_string())?;
   let delivery = async {
+    let mut capture = None;
     let mut stream = resolved.scroll_until(point, plan.request.clone(), plan.options.clone(), false).await?;
     while let Some(event) = stream.next().await? {
-      if let auv::client::runner::ScrollUntilEvent::Completed(result) = event {
-        return Ok(result);
+      match event {
+        auv::client::runner::ScrollUntilEvent::Update { update, .. } => capture = Some(update.capture),
+        auv::client::runner::ScrollUntilEvent::Completed(result) => return Ok((result, capture)),
       }
     }
     Err(crate::InvokeFailure::from("ScrollUntil ended without completion evidence".to_string()))
   };
-  let result = tokio::select! {
+  let (result, capture) = tokio::select! {
     _ = input.cancellation.cancelled() => return Err("invoke cancelled".to_string().into()),
     result = delivery => result?,
   };
@@ -760,9 +761,22 @@ async fn execute_scroll_until(input: crate::InvokeCommandInput, context: auv::Au
     crate::emit_input_action_result(action);
   }
   output.result = Some(result);
-  // TODO: persist final Runner capture references as artifacts in an owner-approved
-  // Runner evidence slice; this sync only adapts local recording, without fetching pixels.
-  crate::commands::input::scroll_until_output(output).map_err(Into::into)
+  let output = crate::commands::input::scroll_until_output(output)?;
+  let recording = auv_tracing::Context::current();
+  if recording.can_publish_artifacts() {
+    let purpose = "auv.scan.scroll_until_final_capture";
+    let run_id = *recording.run_id().expect("artifact recording has a Run");
+    let receipt = match capture {
+      Some(capture) => runner.captures().record_artifact(&capture.reference, run_id, purpose).await.map_err(|error| error.to_string()),
+      None => Err("ScrollUntil completed without a final capture reference".to_string()),
+    };
+    match receipt {
+      Ok((metadata, path)) => return Ok(output.with_recorded_artifact(metadata, path)),
+      // Recording failure cannot change delivered input or its direct result.
+      Err(error) => crate::artifact::emit_preparation_failure(purpose, error),
+    }
+  }
+  Ok(output)
 }
 
 /// Resolves an `app:` (optionally by title) or `window:` target through the

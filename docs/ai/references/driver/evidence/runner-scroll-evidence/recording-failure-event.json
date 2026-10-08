@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "record": {
+    "type": "event",
+    "run_id": "aee9a41b-47d0-f4e1-9d80-8a68f3e4eb1a",
+    "span_id": null,
+    "event_id": "01a119ee-f25e-73ef-b1d4-3a86859c6620",
+    "schema": {
+      "name": "auv.invoke.artifact_preparation_failed",
+      "version": 1
+    },
+    "occurred_at": {
+      "unix_seconds": 1791436452,
+      "nanoseconds": 446746000
+    },
+    "payload": {
+      "error": "Runner capability RPC failed: code: 'Operation is not implemented or not supported'",
+      "purpose": "auv.scan.scroll_until_final_capture"
+    }
+  }
+}

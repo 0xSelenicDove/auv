@@ -1375,6 +1375,7 @@ async fn fetched_images_are_cached_on_the_capture_except_raw_pixels() {
   let captures = test_capture_store();
   let id = captures.insert(gradient_capture(10, 4));
   let service = LocalCaptureService {
+    recording: None,
     session: auv_driver::open_local().unwrap(),
     captures: captures.clone(),
   };
@@ -1411,4 +1412,49 @@ async fn fetched_images_are_cached_on_the_capture_except_raw_pixels() {
     captures.image(&id, &ImageKey::new(RegionKey::new(None, None), None, image_proto::ImageEncoding::Rgba as i32)).is_none(),
     "raw pixels are not cached a second time"
   );
+}
+
+// ROOT CAUSE:
+// Runner invoke discarded the final streamed CaptureRef and returned no image.
+// Recording must persist the requested observation, even when newer captures
+// exist, without a new platform capture or OCR pass.
+#[tokio::test]
+async fn record_capture_artifact_persists_requested_frame_and_rejects_invalid_identity() {
+  use auv_tracing::{ArtifactUri, FileTracingStore, RunId};
+  let root = tempfile::tempdir().unwrap();
+  let store = std::sync::Arc::new(FileTracingStore::open(root.path()).unwrap());
+  let dispatch = auv_tracing::configure().tracing_store(store.clone()).build().unwrap();
+  let captures = test_capture_store();
+  let expected = gradient_capture(10, 4);
+  let id = captures.insert(expected.clone());
+  captures.insert(gradient_capture(12, 6));
+  let service = LocalCaptureService {
+    session: auv_driver::open_local().unwrap(),
+    captures,
+    recording: Some((store, dispatch)),
+  };
+  let run_id = RunId::new();
+  let request = |capture_id: &str, run: &str| {
+    Request::new(proto::RecordCaptureArtifactRequest {
+      capture: Some(proto::CaptureRef {
+        capture_id: capture_id.into(),
+      }),
+      recording_run_id: run.into(),
+      purpose: "auv.scan.scroll_until_final_capture".into(),
+    })
+  };
+  let result = service.record_capture_artifact(request(&id, &run_id.to_string())).await.unwrap().into_inner();
+  let uri: ArtifactUri = result.artifact_uri.parse().unwrap();
+  assert_eq!(uri.run_id(), run_id);
+  assert_eq!(result.purpose, "auv.scan.scroll_until_final_capture");
+  let bytes = std::fs::read(&result.file_path).unwrap();
+  assert_eq!(bytes.len() as u64, result.byte_length);
+  let image = image::load_from_memory(&bytes).unwrap().into_rgba8();
+  assert_eq!(image.dimensions(), (5, 2));
+  assert_eq!(image.get_pixel(0, 0).0, [1, 1, 0, 255]);
+  assert_eq!(image.get_pixel(4, 1).0, [9, 3, 0, 255]);
+  let source = result.source_pixel_size.as_ref().unwrap();
+  assert_eq!((source.width, source.height, result.scale_factor), (10, 4, 2.0));
+  assert_eq!(service.record_capture_artifact(request("missing", &run_id.to_string())).await.unwrap_err().code(), tonic::Code::NotFound);
+  assert_eq!(service.record_capture_artifact(request(&id, "../../elsewhere")).await.unwrap_err().code(), tonic::Code::InvalidArgument);
 }

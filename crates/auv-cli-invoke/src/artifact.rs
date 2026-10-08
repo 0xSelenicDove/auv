@@ -49,7 +49,7 @@ fn prepare_capture(purpose: &str, capture: &auv_driver::Capture) -> Result<auv_t
   Ok(auv_tracing::emit_artifact(artifact))
 }
 
-fn emit_preparation_failure(purpose: &str, error: String) {
+pub(crate) fn emit_preparation_failure(purpose: &str, error: String) {
   auv_tracing::emit_event!(ArtifactPreparationFailed {
     purpose: purpose.to_string(),
     error,

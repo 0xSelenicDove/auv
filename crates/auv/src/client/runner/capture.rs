@@ -129,6 +129,28 @@ pub struct CapturesClient {
 }
 
 impl CapturesClient {
+  /// Persists this Runner's capture without fetching pixels or capturing again.
+  /// The returned path belongs to the Runner host, not necessarily this client.
+  pub async fn record_artifact(
+    &self,
+    capture: &CaptureRef,
+    run_id: auv_tracing::RunId,
+    purpose: &str,
+  ) -> Result<(auv_tracing::ArtifactMetadata, std::path::PathBuf), CapabilityError> {
+    let response = proto::capture_service_client::CaptureServiceClient::new(self.runner.transport()?)
+      .record_capture_artifact(proto::RecordCaptureArtifactRequest {
+        capture: Some(proto::CaptureRef {
+          capture_id: capture.id().to_string(),
+        }),
+        recording_run_id: run_id.to_string(),
+        purpose: purpose.to_string(),
+      })
+      .await
+      .map_err(capability_status)?
+      .into_inner();
+    recorded_capture_from_proto(response, run_id, purpose)
+  }
+
   /// Fetches a capture's pixels, cropped, bounded and encoded as requested.
   pub async fn image(&self, capture: &CaptureRef, options: CaptureImageOptions) -> Result<CaptureImage, CapabilityError> {
     let response = proto::capture_service_client::CaptureServiceClient::new(self.runner.transport()?)
@@ -206,5 +228,72 @@ fn encoding_from_proto(value: i32) -> Result<CaptureImageEncoding, CapabilityErr
     Ok(image_proto::ImageEncoding::Jpeg) => Ok(CaptureImageEncoding::Jpeg),
     Ok(image_proto::ImageEncoding::Webp) => Ok(CaptureImageEncoding::Webp),
     _ => Err(CapabilityError::InvalidResponse("capture image has an unknown encoding".into())),
+  }
+}
+
+/// Validates receipt identity before exposing a path or attaching run evidence.
+fn recorded_capture_from_proto(
+  value: proto::RecordCaptureArtifactResponse,
+  run_id: auv_tracing::RunId,
+  purpose: &str,
+) -> Result<(auv_tracing::ArtifactMetadata, std::path::PathBuf), CapabilityError> {
+  use auv_tracing::{ArtifactMetadata, ArtifactUri, AttributeValue, Attributes, ByteLength};
+  let invalid = |error: String| CapabilityError::InvalidResponse(error);
+  let uri: ArtifactUri = value.artifact_uri.parse().map_err(|error: auv_tracing::ValidationError| invalid(error.to_string()))?;
+  if uri.run_id() != run_id || value.purpose != purpose || value.file_path.is_empty() {
+    return Err(invalid("recorded capture receipt has wrong run, purpose or empty host path".into()));
+  }
+  let attributes = match value.source_pixel_size {
+    Some(size) if size.width > 0 && size.height > 0 && value.scale_factor.is_finite() && value.scale_factor > 1.0 => {
+      Attributes::from_iter([
+        ("image.source_width", AttributeValue::integer(i64::from(size.width))),
+        ("image.source_height", AttributeValue::integer(i64::from(size.height))),
+        ("image.scale_factor", AttributeValue::float(value.scale_factor).map_err(|error| invalid(error.to_string()))?),
+      ])
+    }
+    Some(_) => return Err(invalid("recorded capture has invalid source dimensions or scale".into())),
+    None => Attributes::empty(),
+  };
+  let sha256 = value.sha256.parse().map_err(|error: auv_tracing::ValidationError| invalid(error.to_string()))?;
+  Ok((
+    ArtifactMetadata::new(
+      uri,
+      value.purpose.into(),
+      "image/webp".into(),
+      Some("webp".into()),
+      ByteLength::new(value.byte_length).map_err(|error| invalid(error.to_string()))?,
+      sha256,
+      attributes,
+    ),
+    value.file_path.into(),
+  ))
+}
+
+#[cfg(test)]
+mod recording_tests {
+  use super::*;
+
+  #[test]
+  fn recorded_capture_receipt_preserves_metadata_and_rejects_another_run() {
+    let run_id = auv_tracing::RunId::new();
+    let purpose = "auv.scan.scroll_until_final_capture";
+    let receipt = proto::RecordCaptureArtifactResponse {
+      artifact_uri: auv_tracing::ArtifactUri::from_ids(run_id, auv_tracing::ArtifactId::new()).to_string(),
+      purpose: purpose.into(),
+      byte_length: 100,
+      sha256: "ab".repeat(32),
+      source_pixel_size: Some(image_proto::PixelSize {
+        width: 1800,
+        height: 1364,
+      }),
+      scale_factor: 2.0,
+      file_path: std::env::temp_dir().join("recorded.webp").to_str().unwrap().into(),
+    };
+    let (metadata, path) = recorded_capture_from_proto(receipt.clone(), run_id, purpose).unwrap();
+    assert_eq!(metadata.uri().run_id(), run_id);
+    assert_eq!(metadata.attributes().get("image.source_width"), Some(&auv_tracing::AttributeValue::integer(1800)));
+    assert_eq!(metadata.content_type().to_string(), "image/webp");
+    assert_eq!(path, std::env::temp_dir().join("recorded.webp"));
+    assert!(recorded_capture_from_proto(receipt, auv_tracing::RunId::new(), purpose).is_err());
   }
 }

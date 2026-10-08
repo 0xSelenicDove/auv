@@ -56,7 +56,17 @@ impl InvokeResult {
         terminal: InvokeTerminal::Completed {
           result: output.result().cloned(),
           report: output.report.clone(),
-          artifacts: output.artifacts().iter().cloned().map(InvokeArtifactResult::new).collect(),
+          artifacts: output
+            .artifacts()
+            .iter()
+            .cloned()
+            .map(|metadata| {
+              let file_path = output.artifact_path(metadata.uri()).cloned();
+              let mut artifact = InvokeArtifactResult::new(metadata);
+              artifact.file_path = file_path;
+              artifact
+            })
+            .collect(),
         },
       },
       Err(error) => Self {
@@ -89,12 +99,15 @@ impl InvokeResult {
     }
   }
 
-  /// Adds file-backed locations supplied by the frontend's concrete store.
+  /// Fills missing file-backed locations from the frontend store, preserving
+  /// locations supplied by a producing Runner (which belong to its host).
   pub fn with_artifact_paths(mut self, paths: impl IntoIterator<Item = (ArtifactUri, PathBuf)>) -> Self {
     let paths = paths.into_iter().collect::<BTreeMap<_, _>>();
     if let InvokeTerminal::Completed { artifacts, .. } = &mut self.terminal {
       for artifact in artifacts {
-        artifact.file_path = paths.get(artifact.metadata.uri()).cloned();
+        if artifact.file_path.is_none() {
+          artifact.file_path = paths.get(artifact.metadata.uri()).cloned();
+        }
       }
     }
     self

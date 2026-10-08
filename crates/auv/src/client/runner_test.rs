@@ -28,6 +28,13 @@ fn large_capture_metadata() -> proto::CapturedFrame {
 
 #[tonic::async_trait]
 impl proto::capture_service_server::CaptureService for LargeCaptureService {
+  async fn record_capture_artifact(
+    &self,
+    _: tonic::Request<proto::RecordCaptureArtifactRequest>,
+  ) -> Result<tonic::Response<proto::RecordCaptureArtifactResponse>, tonic::Status> {
+    Err(tonic::Status::unimplemented("not used by this regression"))
+  }
+
   async fn capture_window(
     &self,
     _request: tonic::Request<proto::CaptureWindowRequest>,

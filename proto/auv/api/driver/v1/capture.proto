@@ -23,6 +23,13 @@ service CaptureService {
     option (auv.api.annotations.v1.discoverable) = true;
     option (auv.api.annotations.v1.effect) = METHOD_EFFECT_READ_ONLY;
   }
+  // Persists a Runner-owned capture in the configured run store. Only a
+  // receipt crosses the client boundary; no capture or OCR is performed.
+  // NOTICE: explicit SDK recording only; automatic invoke discovery is
+  // deferred until an owner-approved standalone capture-recording command.
+  rpc RecordCaptureArtifact(RecordCaptureArtifactRequest) returns (RecordCaptureArtifactResponse) {
+    option (auv.api.annotations.v1.effect) = METHOD_EFFECT_MUTATION;
+  }
   // Returns the pixels of a stored capture, optionally cropped, bounded and
   // encoded. This is the only call that moves AUV-produced pixels to a client.
   rpc GetCaptureImage(GetCaptureImageRequest) returns (GetCaptureImageResponse) {
@@ -144,4 +151,26 @@ message CaptureRegionRequest {
 message CaptureRegionResponse {
   Display display = 1;
   CapturedFrame capture = 2;
+}
+
+// Explicit recording request. The destination is configured by the Runner host,
+// never chosen by a client path. The capture must belong to this routed Runner.
+message RecordCaptureArtifactRequest {
+  CaptureRef capture = 1;
+  // Canonical lowercase hyphenated tracing Run UUID, not a daemon RunRef.
+  string recording_run_id = 2;
+  string purpose = 3;
+}
+
+// Durable logical-resolution WebP receipt, not pixels. The metadata maps to
+// auv-tracing ArtifactMetadata. Source dimensions are set only when downscaled.
+message RecordCaptureArtifactResponse {
+  string artifact_uri = 1;
+  string purpose = 2;
+  uint64 byte_length = 3;
+  string sha256 = 4;
+  optional auv.api.image.v1.PixelSize source_pixel_size = 5;
+  double scale_factor = 6;
+  // Path on the producing Runner host. It is not a path on a remote client.
+  string file_path = 7;
 }

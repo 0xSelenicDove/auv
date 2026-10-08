@@ -1,0 +1,21 @@
+{
+  "base_revision": "75260c50",
+  "classification": "approved Runner final-observation recording feature and regression fix",
+  "binary_sha256": "f2f63d5ab740a44760b192b9764dfc0c30b1b7362c84b5151354af6b06c09d7c",
+  "scope": "one final-release background-only live search and one unavailable-recording-RPC probe; no model-token benchmark",
+  "checks": {
+    "rust_passed": 1162,
+    "rust_failed": 0,
+    "rust_ignored": 19,
+    "sdk_passed": 77,
+    "sdk_skipped": 1,
+    "buf_lint": true,
+    "buf_generation": true,
+    "buf_breaking_against_main": true,
+    "cargo_check": true,
+    "cargo_fmt": true,
+    "invoke_help": true,
+    "live_cli_regression_passed": 1
+  },
+  "original_probe_harness_correction": "Initial development probe expected the entire frontend artifact directory to be absent. Argument artifacts legitimately create it. The exact screenshot file is absent from the frontend store; corrected check passed on the final release."
+}

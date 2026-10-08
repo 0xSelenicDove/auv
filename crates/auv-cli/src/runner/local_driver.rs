@@ -36,6 +36,7 @@ struct LocalWindowService {
 struct LocalCaptureService {
   session: auv_driver::LocalDriverSession,
   captures: CaptureStore,
+  recording: Option<(std::sync::Arc<auv_tracing::FileTracingStore>, auv_tracing::Dispatch)>,
 }
 
 struct LocalTextRecognitionService {
@@ -2256,6 +2257,63 @@ fn rect_to_proto(rect: auv_driver::Rect) -> proto::ScreenRect {
 
 #[tonic::async_trait]
 impl CaptureService for LocalCaptureService {
+  async fn record_capture_artifact(
+    &self,
+    request: Request<proto::RecordCaptureArtifactRequest>,
+  ) -> Result<Response<proto::RecordCaptureArtifactResponse>, Status> {
+    let request = request.into_inner();
+    let run_id: auv_tracing::RunId =
+      request.recording_run_id.parse().map_err(|error: auv_tracing::ValidationError| Status::invalid_argument(error.to_string()))?;
+    if request.purpose.is_empty() || request.purpose.len() > 256 {
+      return Err(Status::invalid_argument("purpose must contain 1..=256 bytes"));
+    }
+    let reference = request.capture.ok_or_else(|| Status::invalid_argument("capture is required"))?;
+    let capture = self.captures.get(&reference.capture_id).ok_or_else(|| Status::not_found("capture expired, evicted or unknown"))?;
+    let (store, dispatch) = self.recording.as_ref().ok_or_else(|| Status::failed_precondition("Runner has no configured artifact store"))?;
+    // Encode the retained observation, never call the capture driver or OCR.
+    // Clone only the Arc: native pixels stay owned by the capture store.
+    let purpose = request.purpose;
+    let artifact = tokio::task::spawn_blocking(move || {
+      auv_tracing::image_artifact(
+        auv_tracing::EmitBytesOptions::new().with_purpose(purpose.as_str()),
+        &capture.image,
+        auv_tracing::ImageResolution::Logical(capture.scale_factor),
+      )
+      .map_err(|error| Status::internal(error.to_string()))
+    })
+    .await
+    .map_err(|error| Status::internal(error.to_string()))??;
+    let context = auv_tracing::dispatcher::with_default(dispatch, || auv_tracing::Context::root(run_id));
+    let metadata = context
+      .in_scope(|| auv_tracing::emit_artifact(artifact))
+      .await
+      .map_err(|error| Status::internal(error.to_string()))?
+      .ok_or_else(|| Status::internal("capture artifact recording was disabled"))?;
+    dispatch.flush().await.map_err(|error| Status::internal(error.to_string()))?;
+    let source_pixel_size = match (metadata.attributes().get("image.source_width"), metadata.attributes().get("image.source_height")) {
+      (Some(auv_tracing::AttributeValue::I64(width)), Some(auv_tracing::AttributeValue::I64(height))) => {
+        Some(auv_api_proto::auv::api::image::v1::PixelSize {
+          width: *width as u32,
+          height: *height as u32,
+        })
+      }
+      _ => None,
+    };
+    let scale_factor = match metadata.attributes().get("image.scale_factor") {
+      Some(auv_tracing::AttributeValue::F64(scale)) => scale.get(),
+      _ => 1.0,
+    };
+    Ok(Response::new(proto::RecordCaptureArtifactResponse {
+      artifact_uri: metadata.uri().to_string(),
+      purpose: metadata.purpose().to_string(),
+      byte_length: metadata.byte_length().get(),
+      sha256: metadata.sha256().to_string(),
+      source_pixel_size,
+      scale_factor,
+      file_path: store.artifact_path(&metadata).to_str().ok_or_else(|| Status::internal("artifact path is not valid UTF-8"))?.to_string(),
+    }))
+  }
+
   async fn get_capture_image(
     &self,
     request: Request<proto::GetCaptureImageRequest>,
@@ -2580,8 +2638,19 @@ pub(super) async fn serve_inherited() -> Result<(), String> {
   });
   let recent_frames_service = super::recent_frames::Service::new(session.clone());
   // GetCaptureImage can return full-resolution RGBA on explicit request.
-  let capture = CaptureServiceServer::new(LocalCaptureService { session, captures })
-    .max_encoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED);
+  let recording = std::env::var_os(super::STORE_ROOT_ENV)
+    .map(|root| {
+      let store = std::sync::Arc::new(auv_tracing::FileTracingStore::open(root).map_err(|error| error.to_string())?);
+      let dispatch = auv_tracing::configure().tracing_store(store.clone()).build().map_err(|error| error.to_string())?;
+      Ok::<_, String>((store, dispatch))
+    })
+    .transpose()?;
+  let capture = CaptureServiceServer::new(LocalCaptureService {
+    session,
+    captures,
+    recording,
+  })
+  .max_encoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED);
   let recent_frames = RecentFramesServiceServer::new(recent_frames_service.clone())
     .max_decoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED)
     .max_encoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED);

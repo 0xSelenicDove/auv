@@ -609,6 +609,7 @@ dependencies = [
  "auv-driver-overlay-common",
  "auv-media-macos",
  "auv-scan",
+ "auv-tracing",
  "directories",
  "fs2",
  "futures-util",

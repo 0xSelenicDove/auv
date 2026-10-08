@@ -1338,6 +1338,20 @@ Across the Runner API, a capture frame stays in the Runner that produced it
   fetched images are cached on the pixels; pixels idle for 30 s are packed
   losslessly (QOI). Over budget, the store drops cached results first, then
   packs, then evicts.
+- **Capture artifact recording.** `RecordCaptureArtifact` persists an existing
+  `CaptureRef` through the Runner host's configured `auv-tracing` file store,
+  without another capture, OCR pass or client pixel transfer. The explicit
+  request carries a canonical tracing Run UUID and purpose; it never carries
+  a client-selected destination path. The receipt identifies a durable logical
+  WebP artifact and its path on the producing host. That path is not a local
+  path for a remote client. An unknown/expired reference is `NOT_FOUND`, and an
+  unconfigured store is `FAILED_PRECONDITION`; neither causes a fresh capture.
+  Recorded Runner `input.scrollUntil` invocations persist the last streamed
+  observation as `auv.scan.scroll_until_final_capture`, matching local invoke.
+  Dry runs and calls without artifact recording emit no screenshot artifact.
+  If optional recording fails, invoke retains the direct scroll result and emits
+  `auv.invoke.artifact_preparation_failed`; it never repeats input to recover
+  evidence. Missing screenshot evidence still requires separate verification.
 - **Image regions.** OCR, find-text and image fetches take `region` (fractions
   of the image) or `screen_region` (a logical screen rectangle, clipped to the
   image; exclusive with `region`). OCR result bounds are screen rectangles on

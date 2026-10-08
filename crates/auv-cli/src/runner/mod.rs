@@ -6,6 +6,8 @@ mod recent_frames;
 
 pub(crate) const INTERNAL_SENTINEL: &str = "__auv-internal-runner";
 pub(crate) const LOCAL_DRIVER_ROLE: &str = "local-driver";
+pub(crate) const STORE_ROOT_ENV: &str = "AUV_RUNNER_STORE_ROOT";
+
 pub(crate) const STATE_ROOT_ENV: &str = "AUV_RUNNER_STATE_ROOT";
 
 /// Runs an internal Runner role before the ordinary CLI runtime is created.
