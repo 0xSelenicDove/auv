@@ -1,0 +1,43 @@
+{
+  "startup_seconds": 0.08543137495871633,
+  "order": [
+    "direct",
+    "runner",
+    "runner",
+    "direct"
+  ],
+  "rows": [
+    {
+      "attempt": 1,
+      "mode": "direct",
+      "seconds": 0.7344045420177281,
+      "exit_code": 0,
+      "stdout": "{\"run_id\":\"01a11918-7d1c-7377-88b4-34615eb418e7\",\"status\":\"completed\",\"command_id\":\"window.findText\",\"result\":{\"matches\":{\"matches\":[{\"bounds\":{\"origin\":{\"x\":230.0,\"y\":619.5},\"size\":{\"height\":23.0,\"width\":492.0}},\"confidence\":1.0,\"text\":\"Kestrel handoff | VK-7392 | Ready for review\"}]},\"window\":{\"app_bundle_id\":\"local.auv.CanvasFixture\",\"app_name\":\"AUVCanvasFixture\",\"coordinate_space\":\"screen\",\"frame\":{\"origin\":{\"x\":200.0,\"y\":94.0},\"size\":{\"height\":682.0,\"width\":900.0}},\"is_main\":false,\"is_visible\":true,\"process_id\":44129,\"reference\":{\"id\":\"25316\"},\"title\":\"AUV Canvas Ledger - Synthetic Benchmark\"}}}\n",
+      "stderr": ""
+    },
+    {
+      "attempt": 2,
+      "mode": "runner",
+      "seconds": 0.7673236670671031,
+      "exit_code": 0,
+      "stdout": "{\"run_id\":\"053f7b19-a65a-e084-c799-cf267672c3cd\",\"status\":\"completed\",\"command_id\":\"window.findText\",\"result\":{\"matches\":{\"matches\":[{\"bounds\":{\"origin\":{\"x\":230.0,\"y\":619.5},\"size\":{\"height\":23.0,\"width\":492.0}},\"confidence\":1.0,\"text\":\"Kestrel handoff | VK-7392 | Ready for review\"}]},\"window\":{\"app_bundle_id\":\"local.auv.CanvasFixture\",\"app_name\":\"AUVCanvasFixture\",\"coordinate_space\":\"screen\",\"frame\":{\"origin\":{\"x\":200.0,\"y\":94.0},\"size\":{\"height\":682.0,\"width\":900.0}},\"is_main\":false,\"is_visible\":true,\"process_id\":44129,\"reference\":{\"id\":\"25316\"},\"title\":\"AUV Canvas Ledger - Synthetic Benchmark\"}}}\n",
+      "stderr": ""
+    },
+    {
+      "attempt": 3,
+      "mode": "runner",
+      "seconds": 0.6005195840261877,
+      "exit_code": 0,
+      "stdout": "{\"run_id\":\"f68c5841-c648-abff-7961-f527877bb49b\",\"status\":\"completed\",\"command_id\":\"window.findText\",\"result\":{\"matches\":{\"matches\":[{\"bounds\":{\"origin\":{\"x\":230.0,\"y\":619.5},\"size\":{\"height\":23.0,\"width\":492.0}},\"confidence\":1.0,\"text\":\"Kestrel handoff | VK-7392 | Ready for review\"}]},\"window\":{\"app_bundle_id\":\"local.auv.CanvasFixture\",\"app_name\":\"AUVCanvasFixture\",\"coordinate_space\":\"screen\",\"frame\":{\"origin\":{\"x\":200.0,\"y\":94.0},\"size\":{\"height\":682.0,\"width\":900.0}},\"is_main\":false,\"is_visible\":true,\"process_id\":44129,\"reference\":{\"id\":\"25316\"},\"title\":\"AUV Canvas Ledger - Synthetic Benchmark\"}}}\n",
+      "stderr": ""
+    },
+    {
+      "attempt": 4,
+      "mode": "direct",
+      "seconds": 40.08966066595167,
+      "exit_code": 1,
+      "stdout": "{\"run_id\":\"01a11918-8551-733b-b382-56f264c229d1\",\"status\":\"failed\",\"command_id\":\"window.findText\",\"result\":null,\"failure\":\"native Swift window capture failed before xcap fallback: macos native capture_window_image failed: ScreenCaptureKit window capture timed out after 10s; recovery=verify Screen Recording permission and retry; xcap fallback also failed: failed to capture window 25316: Failed to copy data\",\"failure_details\":{\"code\":\"command_failed\",\"message\":\"native Swift window capture failed before xcap fallback: macos native capture_window_image failed: ScreenCaptureKit window capture timed out after 10s; recovery=verify Screen Recording permission and retry; xcap fallback also failed: failed to capture window 25316: Failed to copy data\"}}\n",
+      "stderr": ""
+    }
+  ]
+}

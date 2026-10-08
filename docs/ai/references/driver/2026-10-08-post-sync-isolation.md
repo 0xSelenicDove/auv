@@ -9,6 +9,10 @@ probes do not establish a newly introduced focus regression. Fixed-operation
 timings show substantial variance in both versions; they do not explain the
 full model-session token and time spike by themselves.
 
+The subsequent [focus fix](2026-10-07-focus-badge-fix.md) identified the
+captured-window sharing badge as the focus blocker and verified a repaired
+foreground workflow. It retains the still-unresolved capture/OCR stalls.
+
 ## Focus reproduction
 
 The target was the existing `local.auv.RepeatedSearchFixture` window, selected

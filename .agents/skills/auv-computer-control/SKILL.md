@@ -19,7 +19,7 @@ Read only `auv invoke <command-id> --help` for the operation you need, once for 
 
 Use installed help and connected tool schemas as the contract; never invent command names, flags, or support. Read [references/operations.md](references/operations.md) only for setup, field editing, popups, plugins, or remote workflows that need its details. Do not install a wrapper, SDK, or daemon for a one-off local invoke.
 
-For repeated operations, reuse a connected MCP or SDK client. With an existing daemon, retain its endpoint and explicit Device selection across CLI calls; read [reuse details](references/operations.md#reuse-for-repeated-work) when needed.
+For repeated capture/OCR, prefer a connected MCP/SDK client or persistent Runner over fresh local invocations. CLI routing needs both `AUV_ENDPOINT` and `--device-id`; retain them across calls. Read [reuse details](references/operations.md#reuse-for-repeated-work) for Device selection or task-owned startup. Include startup in timing; reuse does not eliminate every first-call stall.
 
 ## Act and verify
 

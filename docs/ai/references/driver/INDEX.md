@@ -130,3 +130,5 @@ Count: **84**
 - [Post-sync repeated visual search benchmark](2026-10-08-post-sync-benchmark.md): Six retained sessions on the merged fork; native wins both tasks, foreground-focus failure retained, total and uncached tokens distinguished.
 
 - [Post-sync focus and runtime isolation](2026-10-08-post-sync-isolation.md): Focus rejection reproduces in both binaries; fixed searches and capture probes retain timeouts, timing variance and one disclosed overlap.
+
+- [Captured-window focus fix](2026-10-07-focus-badge-fix.md): Sharing-badge rejection reproduced and repaired; verified foreground search/reset, first-OCR stall profiled, and repeated-work routing clarified without token-saving claims.

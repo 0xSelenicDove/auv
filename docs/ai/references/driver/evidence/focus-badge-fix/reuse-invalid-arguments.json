@@ -1,0 +1,43 @@
+{
+  "startup_seconds": 0.07606466696597636,
+  "order": [
+    "direct",
+    "runner",
+    "runner",
+    "direct"
+  ],
+  "rows": [
+    {
+      "attempt": 1,
+      "mode": "direct",
+      "seconds": 25.801469666999765,
+      "exit_code": 0,
+      "stdout": "{\"run_id\":\"01a11917-a41c-711e-b085-36e00d885f8d\",\"status\":\"completed\",\"command_id\":\"window.findText\",\"result\":{\"matches\":{\"matches\":[{\"bounds\":{\"origin\":{\"x\":230.0,\"y\":619.5},\"size\":{\"height\":23.0,\"width\":492.0}},\"confidence\":1.0,\"text\":\"Kestrel handoff | VK-7392 | Ready for review\"}]},\"window\":{\"app_bundle_id\":\"local.auv.CanvasFixture\",\"app_name\":\"AUVCanvasFixture\",\"coordinate_space\":\"screen\",\"frame\":{\"origin\":{\"x\":200.0,\"y\":94.0},\"size\":{\"height\":682.0,\"width\":900.0}},\"is_main\":false,\"is_visible\":true,\"process_id\":44129,\"reference\":{\"id\":\"25316\"},\"title\":\"AUV Canvas Ledger - Synthetic Benchmark\"}}}\n",
+      "stderr": ""
+    },
+    {
+      "attempt": 2,
+      "mode": "runner",
+      "seconds": 0.010816249996423721,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "error: error: unexpected argument '--endpoint' found\n\nUsage: auv [OPTIONS] [COMMAND]\n\nFor more information, try '--help'.\n\n"
+    },
+    {
+      "attempt": 3,
+      "mode": "runner",
+      "seconds": 0.006687082932330668,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "error: error: unexpected argument '--endpoint' found\n\nUsage: auv [OPTIONS] [COMMAND]\n\nFor more information, try '--help'.\n\n"
+    },
+    {
+      "attempt": 4,
+      "mode": "direct",
+      "seconds": 0.724760124925524,
+      "exit_code": 0,
+      "stdout": "{\"run_id\":\"01a11918-08f4-73a7-9668-2627af5c89b1\",\"status\":\"completed\",\"command_id\":\"window.findText\",\"result\":{\"matches\":{\"matches\":[{\"bounds\":{\"origin\":{\"x\":230.0,\"y\":619.5},\"size\":{\"height\":23.0,\"width\":492.0}},\"confidence\":1.0,\"text\":\"Kestrel handoff | VK-7392 | Ready for review\"}]},\"window\":{\"app_bundle_id\":\"local.auv.CanvasFixture\",\"app_name\":\"AUVCanvasFixture\",\"coordinate_space\":\"screen\",\"frame\":{\"origin\":{\"x\":200.0,\"y\":94.0},\"size\":{\"height\":682.0,\"width\":900.0}},\"is_main\":false,\"is_visible\":true,\"process_id\":44129,\"reference\":{\"id\":\"25316\"},\"title\":\"AUV Canvas Ledger - Synthetic Benchmark\"}}}\n",
+      "stderr": ""
+    }
+  ]
+}

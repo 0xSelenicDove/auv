@@ -1,0 +1,10 @@
+{
+  "classification": "bug fix and narrow skill routing change",
+  "base_revision": "878fe4c4",
+  "binary_sha256": "f837b61cf2d6000df7007262a7ee5463fefb53578768e5e3ee3b42ce546cfe5b",
+  "skill_sha256": "23318b9057ed8a2ffac1f6003aef9bc4468dc559474988d7b98c0500c7248624",
+  "model_sessions": 0,
+  "provider_token_totals_measured": false,
+  "baseline_reproduction": "foreground_preparation_confirms_repeated_search_window failed: target=26875; preceding window=26879, same owner=98271, bounds66x20, AXDialog, modal=0, focused=0; target AXStandardWindow focused=1. Test passed after fix, including another-app rejection. Initial detailed diagnostic strings were removed.",
+  "cleanup": "Private daemons shut down by SIGINT; previously open CanvasFixture restored to scrollbar zero; task-owned RepeatedSearchFixture closed."
+}
