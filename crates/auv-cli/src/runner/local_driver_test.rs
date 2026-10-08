@@ -123,7 +123,7 @@ fn application_activation_mapper_preserves_each_verification_variant() {
       observed_bundle_id: "com.example.Other".to_string(),
     },
     auv_driver::ApplicationActivationVerification::Unavailable {
-      reason: "observation unavailable".to_string(),
+      reason: "update unavailable".to_string(),
     },
   ];
   for verification in cases {
@@ -1049,7 +1049,7 @@ fn scroll_until_rpc_decodes_step_condition_and_region() {
   );
   assert_eq!(request.settle, std::time::Duration::from_millis(400));
   assert_eq!(request.motion_region, Some(auv_driver::RatioRect::new(0.0, 0.1, 1.0, 0.8)));
-  assert_eq!(request.observe, auv_scan::ScrollUntilObserve { text: true }, "payloads are opt-out");
+  assert_eq!(request.output, auv_scan::ScrollUntilOutputOptions { text: true }, "payloads are opt-out");
   assert!(request.validate().is_ok());
 
   let opted_out = scroll_until_request_from_proto(proto::ScrollUntilBegin {
@@ -1058,11 +1058,11 @@ fn scroll_until_rpc_decodes_step_condition_and_region() {
       delta_y: 10.0,
     })),
     condition: Some(proto::scroll_until_begin::Condition::End(proto::ScrollUntilEnd {})),
-    observe: Some(proto::ScrollUntilObserve { omit_text: true }),
+    output: Some(proto::ScrollUntilOutputOptions { omit_text: true }),
     ..Default::default()
   })
   .unwrap();
-  assert_eq!(opted_out.observe, auv_scan::ScrollUntilObserve { text: false });
+  assert_eq!(opted_out.output, auv_scan::ScrollUntilOutputOptions { text: false });
 
   for malformed in [
     proto::ScrollUntilBegin {
@@ -1096,9 +1096,9 @@ fn scroll_until_rpc_decodes_step_condition_and_region() {
 }
 
 #[test]
-fn scroll_until_observation_carries_capture_ref_text_and_stop_reason() {
+fn scroll_until_update_carries_capture_ref_text_and_stop_reason() {
   let captures = test_capture_store();
-  let observation = |capture_bytes: u32, text, stop| auv_scan::ScrollUntilObservation {
+  let update = |capture_bytes: u32, text, stop| auv_scan::ScrollUntilUpdate {
     steps: 3,
     delivered: auv_driver::Scroll::new(0.0, 1500.0),
     motion: Some(auv_scan::ViewportPixelMotion {
@@ -1118,8 +1118,8 @@ fn scroll_until_observation_carries_capture_ref_text_and_stop_reason() {
     text,
     stop,
   };
-  let proto = scroll_until_observation_to_proto(
-    observation(
+  let proto = scroll_until_update_to_proto(
+    update(
       2,
       Some(auv_driver::TextRecognition {
         origin: None,
@@ -1139,7 +1139,7 @@ fn scroll_until_observation_carries_capture_ref_text_and_stop_reason() {
   assert_eq!(proto.text.map(|text| text.text).as_deref(), Some("END OF FEED"));
   assert!(!proto.awaiting_decision);
 
-  let proto = scroll_until_observation_to_proto(observation(1, None, None), true, &captures);
+  let proto = scroll_until_update_to_proto(update(1, None, None), true, &captures);
   assert_eq!(proto.stop, proto::ScrollUntilStopReason::Unspecified as i32);
   assert!(proto.awaiting_decision && proto.text.is_none());
 }
@@ -1327,4 +1327,88 @@ async fn dropped_feedback_relay_wakes_and_releases_native_hold() {
   relay.abort();
   assert!(relay.await.unwrap_err().is_cancelled());
   tokio::time::timeout(std::time::Duration::from_secs(5), receiver.released.notified()).await.unwrap();
+}
+
+#[test]
+fn screen_regions_map_into_the_image_and_clip_to_it() {
+  // A window capture at (100, 200), 400x300 points.
+  let bounds = auv_driver::Rect::new(100.0, 200.0, 400.0, 300.0);
+  let screen = |x, y, width, height| {
+    Some(proto::ScreenRect {
+      x,
+      y,
+      width,
+      height,
+    })
+  };
+
+  assert_eq!(
+    image_region_from_proto(None, screen(200.0, 260.0, 100.0, 150.0), bounds).unwrap(),
+    auv_driver::RatioRect::new(0.25, 0.2, 0.25, 0.5)
+  );
+  // Clipped to the image: only the overlapping right half remains.
+  assert_eq!(
+    image_region_from_proto(None, screen(400.0, 200.0, 400.0, 300.0), bounds).unwrap(),
+    auv_driver::RatioRect::new(0.75, 0.0, 0.25, 1.0)
+  );
+  assert_eq!(image_region_from_proto(None, None, bounds).unwrap(), auv_driver::RatioRect::new(0.0, 0.0, 1.0, 1.0));
+
+  let outside = image_region_from_proto(None, screen(0.0, 0.0, 50.0, 50.0), bounds).unwrap_err();
+  assert_eq!(outside.code(), tonic::Code::InvalidArgument);
+  let both = image_region_from_proto(
+    Some(auv_api_proto::auv::api::image::v1::NormalizedRect {
+      x: 0.0,
+      y: 0.0,
+      width: 1.0,
+      height: 1.0,
+    }),
+    screen(100.0, 200.0, 10.0, 10.0),
+    bounds,
+  )
+  .unwrap_err();
+  assert!(both.message().contains("exclusive"), "{}", both.message());
+}
+
+#[tokio::test]
+async fn fetched_images_are_cached_on_the_capture_except_raw_pixels() {
+  use auv_api_proto::auv::api::image::v1 as image_proto;
+  let captures = test_capture_store();
+  let id = captures.insert(gradient_capture(10, 4));
+  let service = LocalCaptureService {
+    session: auv_driver::open_local().unwrap(),
+    captures: captures.clone(),
+  };
+  let request = |encoding: image_proto::ImageEncoding, max_size: Option<image_proto::PixelSize>| {
+    Request::new(proto::GetCaptureImageRequest {
+      capture: Some(proto::CaptureRef {
+        capture_id: id.clone(),
+      }),
+      region: None,
+      screen_region: None,
+      max_size,
+      encoding: encoding as i32,
+    })
+  };
+
+  let thumbnail = service
+    .get_capture_image(request(
+      image_proto::ImageEncoding::Jpeg,
+      Some(image_proto::PixelSize {
+        width: 5,
+        height: 5,
+      }),
+    ))
+    .await
+    .unwrap()
+    .into_inner();
+  let cached = captures
+    .image(&id, &ImageKey::new(RegionKey::new(None, None), Some((5, 5)), image_proto::ImageEncoding::Jpeg as i32))
+    .expect("cached JPEG");
+  assert_eq!(Some(cached.as_ref()), thumbnail.image.as_ref());
+
+  service.get_capture_image(request(image_proto::ImageEncoding::Rgba, None)).await.unwrap();
+  assert!(
+    captures.image(&id, &ImageKey::new(RegionKey::new(None, None), None, image_proto::ImageEncoding::Rgba as i32)).is_none(),
+    "raw pixels are not cached a second time"
+  );
 }

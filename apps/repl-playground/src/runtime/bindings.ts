@@ -1,5 +1,5 @@
-import type { Backend, CapturedFrame, DisplayInfo, InputReceipt, NormalizedRect, ScrollUntilRequest, TextSearchResult, WindowInfo } from '../backend/types'
-import type { ClickOptions, DisplayHandle, FrameHandle, InputHandle, Point, Rect, ScrollDelta, ScrollObservation, TextHandle, WindowSelector } from '../script-api/api'
+import type { Backend, CapturedFrame, DisplayInfo, InputReceipt, ScrollUntilRequest, TextSearchResult, WindowInfo } from '../backend/types'
+import type { ClickOptions, DisplayHandle, FrameHandle, InputHandle, Point, Rect, ScrollDelta, ScrollUntilUpdate, TextHandle, WindowSelector } from '../script-api/api'
 import type { Effect, Resource, WindowData } from '../store'
 import type { WireValue } from './protocol'
 
@@ -104,7 +104,7 @@ const BINDINGS: Record<string, Binding> = {
   'displays.capture': read(async (backend, scope, [display]) => scope.frame(await backend.captureDisplay(displayId(display)))),
   'displays.findText': read(async (backend, scope, [query, display, options]) => {
     const within = searchArea(options, displayBounds(display))
-    return scope.text(await backend.findDisplayText(String(query), displayId(display), within?.region), String(query), undefined, within?.area)
+    return scope.text(await backend.findDisplayText(String(query), displayId(display), within?.area), String(query), undefined, within?.area)
   }),
   'displays.list': read(async (backend, scope) => (await backend.listDisplays()).map(info => scope.display(info))),
   'input.click': input(async (backend, scope, [target, options]) => scope.input('click', await backend.clickScreen(clickPoint(target), options as ClickOptions | undefined))),
@@ -113,13 +113,13 @@ const BINDINGS: Record<string, Binding> = {
   'text.recognize': read(async (backend, scope, [frame, options]) => {
     const source = resolveFrame(frame)
     const within = searchArea(options, source.handle.bounds)
-    return scope.text(await backend.recognizeText(source.frame, within?.region), undefined, source.handle, within?.area)
+    return scope.text(await backend.recognizeText(source.frame, within?.area), undefined, source.handle, within?.area)
   }),
   'windows.capture': read(async (backend, scope, [window]) => scope.frame(await backend.captureWindow(windowId(window)))),
   'windows.click': input(async (backend, scope, [window, point, options]) => scope.input('click', await backend.clickWindow(windowId(window), asPoint(point), options as ClickOptions | undefined))),
   'windows.findText': read(async (backend, scope, [window, query, options]) => {
     const within = searchArea(options, windowBounds(window))
-    return scope.text(await backend.findWindowText(windowId(window), String(query), within?.region), String(query), undefined, within?.area)
+    return scope.text(await backend.findWindowText(windowId(window), String(query), within?.area), String(query), undefined, within?.area)
   }),
   'windows.list': read(async (backend, scope) => (await backend.listWindows()).map(info => scope.window(info))),
   'windows.resolve': read(async (backend, scope, [selector]) => scope.window(await backend.resolveWindow((selector ?? {}) as WindowSelector))),
@@ -132,7 +132,7 @@ const BINDINGS: Record<string, Binding> = {
   'windows.scrollUntil': input(async (backend, scope, [window, at, options], context) => {
     const local = windowPoint(window, at)
     const { decide, request } = scrollUntilRequest(options, context)
-    // TODO(repl-scroll-observations): only the last observation's capture and
+    // TODO(repl-scroll-updates): only the last update's capture and
     // OCR become resources; record every step (with its own seq) when the
     // timeline should replay a scan step by step.
     const outcome = await backend.scrollWindowUntil(windowId(window), local.point, request, decide)
@@ -149,8 +149,8 @@ const BINDINGS: Record<string, Binding> = {
 }
 
 export interface CallContext {
-  /** Asks the script worker's `scrollUntil` predicate `predicateId` about an observation. */
-  decide?: (predicateId: number, observation: ScrollObservation) => Promise<boolean>
+  /** Asks the script worker's `scrollUntil` predicate `predicateId` about an update. */
+  decide?: (predicateId: number, update: ScrollUntilUpdate) => Promise<boolean>
   /** 1-based hit count of the calling line (loop iteration). */
   hit: number
   line: null | number
@@ -256,7 +256,7 @@ function scrollDelta(value: WireValue): ScrollDelta {
  * `scrollUntil` options with defaults applied; a `{ $predicate }` placeholder
  * from the worker becomes a `decide` callback back into the script.
  */
-function scrollUntilRequest(value: WireValue, context: CallContext): { decide?: (observation: ScrollObservation) => Promise<boolean>, request: ScrollUntilRequest } {
+function scrollUntilRequest(value: WireValue, context: CallContext): { decide?: (update: ScrollUntilUpdate) => Promise<boolean>, request: ScrollUntilRequest } {
   const options = (value ?? {}) as ScrollDelta & { confirmations?: number, maxSteps?: number, settle?: number, text?: string, until?: { $predicate?: number } }
   const delta = scrollDelta(options)
   if (delta.dx !== 0 && delta.dy !== 0)
@@ -264,7 +264,7 @@ function scrollUntilRequest(value: WireValue, context: CallContext): { decide?: 
   const predicateId = options.until?.$predicate
   const decide = context.decide
   return {
-    decide: predicateId === undefined || !decide ? undefined : observation => decide(predicateId, observation),
+    decide: predicateId === undefined || !decide ? undefined : update => decide(predicateId, update),
     request: {
       confirmations: options.confirmations ?? SCROLL_UNTIL_DEFAULTS.confirmations,
       delta,
@@ -276,10 +276,10 @@ function scrollUntilRequest(value: WireValue, context: CallContext): { decide?: 
 }
 
 /**
- * `within` from text-search options, clipped to `bounds` (the searched image)
- * and expressed as the fractions AUV expects (`NormalizedRect`).
+ * `within` from text-search options: a screen area clipped to `bounds` (the
+ * searched image).
  */
-function searchArea(options: WireValue, bounds: Rect): undefined | { area: Rect, region: NormalizedRect } {
+function searchArea(options: WireValue, bounds: Rect): undefined | { area: Rect } {
   const within = (options as undefined | { within?: Partial<Rect> })?.within
   if (within === undefined)
     return undefined
@@ -291,11 +291,9 @@ function searchArea(options: WireValue, bounds: Rect): undefined | { area: Rect,
   const bottom = Math.min(within.y + within.height, bounds.y + bounds.height)
   if (right <= x || bottom <= y)
     throw new RangeError('within: the area does not overlap the searched window, display or frame')
-  const area = { height: bottom - y, width: right - x, x, y }
-  return {
-    area,
-    region: { height: area.height / bounds.height, width: area.width / bounds.width, x: (x - bounds.x) / bounds.width, y: (y - bounds.y) / bounds.height },
-  }
+  // The device takes the screen area directly (`screenRegion`); clipping here
+  // gives the same area for drawing the search on the canvas.
+  return { area: { height: bottom - y, width: right - x, x, y } }
 }
 
 /** Screen frame of a window handle as last reported by the device. */

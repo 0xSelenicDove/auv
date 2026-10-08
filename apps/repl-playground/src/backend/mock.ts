@@ -1,5 +1,5 @@
-import type { ClickOptions, Point, Rect, ScrollDelta, ScrollObservation, TextMatch, WindowSelector } from '../script-api/api'
-import type { AxNode, Backend, CapturedFrame, DisplayInfo, InputReceipt, NormalizedRect, ScrollUntilOutcome, ScrollUntilRequest, TextSearchResult, WindowInfo } from './types'
+import type { ClickOptions, Point, Rect, ScrollDelta, ScrollUntilUpdate, TextMatch, WindowSelector } from '../script-api/api'
+import type { AxNode, Backend, CapturedFrame, DisplayInfo, InputReceipt, ScrollUntilOutcome, ScrollUntilRequest, TextSearchResult, WindowInfo } from './types'
 
 interface MockWindow extends WindowInfo {
   background: string
@@ -76,6 +76,13 @@ const DISPLAYS: DisplayInfo[] = [
 
 const FONT = '"Inter", "Helvetica Neue", Arial, sans-serif'
 
+/** `rect` clipped to `to`; callers check the areas overlap. */
+function clip(rect: Rect, to: Rect): Rect {
+  const x = Math.max(rect.x, to.x)
+  const y = Math.max(rect.y, to.y)
+  return { height: Math.min(rect.y + rect.height, to.y + to.height) - y, width: Math.min(rect.x + rect.width, to.x + to.width) - x, x, y }
+}
+
 function includes(text: string, query: string): boolean {
   return text.toLowerCase().includes(query.toLowerCase())
 }
@@ -83,7 +90,7 @@ function includes(text: string, query: string): boolean {
 /**
  * A deterministic in-browser desktop: two displays, a todo app, a counter and
  * a music app whose song list scrolls.
- * Clicks and keys mutate the scene so scripts observe real state changes;
+ * Clicks and keys mutate the scene so scripts output real state changes;
  * OCR returns exact text geometry from the scene graph.
  */
 export class MockBackend implements Backend {
@@ -182,10 +189,10 @@ export class MockBackend implements Backend {
     return undefined
   }
 
-  async captureDisplay(displayId?: string): Promise<CapturedFrame> {
+  async captureDisplay(displayId?: string, options?: { logical?: boolean }): Promise<CapturedFrame> {
     const display = this.#display(displayId)
     await delay(40)
-    return this.#render(display.frame, display.scale, `display:${display.id}`)
+    return this.#render(display.frame, options?.logical ? 1 : display.scale, `display:${display.id}`)
   }
 
   async captureImage(frame: CapturedFrame, maxSize: { height: number, width: number }): Promise<Blob> {
@@ -220,16 +227,16 @@ export class MockBackend implements Backend {
 
   async endRun(): Promise<void> {}
 
-  async findDisplayText(query: string, displayId?: string, region?: NormalizedRect): Promise<TextSearchResult> {
+  async findDisplayText(query: string, displayId?: string, area?: Rect): Promise<TextSearchResult> {
     const capture = await this.captureDisplay(displayId)
     await delay(120)
-    return { capture, matches: this.#text(capture.bounds, region).filter(match => includes(match.text, query)) }
+    return { capture, matches: this.#text(capture.bounds, area).filter(match => includes(match.text, query)) }
   }
 
-  async findWindowText(windowId: string, query: string, region?: NormalizedRect): Promise<TextSearchResult> {
+  async findWindowText(windowId: string, query: string, area?: Rect): Promise<TextSearchResult> {
     const capture = await this.captureWindow(windowId)
     await delay(90)
-    return { capture, matches: this.#text(capture.bounds, region).filter(match => includes(match.text, query)) }
+    return { capture, matches: this.#text(capture.bounds, area).filter(match => includes(match.text, query)) }
   }
 
   async listDisplays(): Promise<DisplayInfo[]> {
@@ -249,9 +256,9 @@ export class MockBackend implements Backend {
     return { path: 'mock-keyboard' }
   }
 
-  async recognizeText(frame: CapturedFrame, region?: NormalizedRect): Promise<TextSearchResult> {
+  async recognizeText(frame: CapturedFrame, area?: Rect): Promise<TextSearchResult> {
     await delay(100)
-    const matches = this.#text(frame.bounds, region)
+    const matches = this.#text(frame.bounds, area)
     return { matches, text: matches.map(match => match.text).join('\n') }
   }
 
@@ -280,7 +287,7 @@ export class MockBackend implements Backend {
    * and the budget, then the client predicate. Only the Music song list
    * scrolls; elsewhere every step observes no motion.
    */
-  async scrollWindowUntil(windowId: string, point: Point, request: ScrollUntilRequest, decide?: (observation: ScrollObservation) => Promise<boolean>): Promise<ScrollUntilOutcome> {
+  async scrollWindowUntil(windowId: string, point: Point, request: ScrollUntilRequest, decide?: (update: ScrollUntilUpdate) => Promise<boolean>): Promise<ScrollUntilOutcome> {
     let streak = 0
     let receipt: InputReceipt | undefined
     for (let steps = 1; ; steps++) {
@@ -510,10 +517,9 @@ export class MockBackend implements Backend {
 
   /** OCR ground truth: every widget label intersecting `area`, in screen space. */
   /** Text visible in `bounds`, or only in its `region` (fractions of `bounds`) when given. */
-  #text(bounds: Rect, region?: NormalizedRect): TextMatch[] {
-    const area = region
-      ? { height: bounds.height * region.height, width: bounds.width * region.width, x: bounds.x + bounds.width * region.x, y: bounds.y + bounds.height * region.y }
-      : bounds
+  /** Text visible in `bounds`, limited to the screen-space `within` area. */
+  #text(bounds: Rect, within?: Rect): TextMatch[] {
+    const area = within ? clip(within, bounds) : bounds
     const matches: TextMatch[] = []
     const measure = new OffscreenCanvas(1, 1).getContext('2d')!
     for (const window of this.#windows) {

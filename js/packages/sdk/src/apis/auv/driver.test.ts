@@ -3,7 +3,7 @@ import type { UnaryCall } from '../../transport/types'
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf'
 import { describe, expect, it } from 'vitest'
 
-import { CaptureWindowRequestSchema, CaptureWindowResponseSchema, GetCaptureImageRequestSchema, GetCaptureImageResponseSchema } from '../../gen/auv/api/driver/v1/capture_pb'
+import { CaptureResolution, CaptureWindowRequestSchema, CaptureWindowResponseSchema, GetCaptureImageRequestSchema, GetCaptureImageResponseSchema } from '../../gen/auv/api/driver/v1/capture_pb'
 import { ListDisplaysResponseSchema } from '../../gen/auv/api/driver/v1/display_pb'
 import { ClickScreenPointRequestSchema, ClickScreenPointResponseSchema, ClickWindowPointRequestSchema, ClickWindowPointResponseSchema, CreateMouseResponseSchema, DragMouseRequestSchema, DragMouseResponseSchema, HoldKeysRequestSchema, HoldKeysResponseSchema, InputPolicy, KeyDownRequestSchema, KeyDownResponseSchema, KeyUpRequestSchema, KeyUpResponseSchema, MouseButton, MouseDownRequestSchema, MouseDownResponseSchema, MouseUpRequestSchema, MouseUpResponseSchema, ScrollDeliveryCandidate, ScrollUntilRequestSchema, ScrollUntilResponseSchema, ScrollUntilStopReason, ScrollWindowPointMotionRequestSchema, ScrollWindowPointMotionResponseSchema, ScrollWindowPointRequestSchema, ScrollWindowPointResponseSchema, StandardMotionTimingFunction, StreamScrollRequestSchema, StreamScrollResponseSchema } from '../../gen/auv/api/driver/v1/input_pb'
 import { RecognizeTextRequestSchema, RecognizeTextResponseSchema } from '../../gen/auv/api/driver/v1/text_recognition_pb'
@@ -43,9 +43,12 @@ describe('runner Driver control surface', () => {
     expect(recognize.source).toEqual({ case: 'captureRef', value: expect.objectContaining({ captureId: 'cap-1' }) })
     expect(recognize.region?.height).toBe(0.5)
 
+    await runner.recognizeText(frame, { screenRegion: { height: 40, width: 300, x: 20, y: 10 } })
+    expect(fromBinary(RecognizeTextRequestSchema, calls[1]!.body).screenRegion).toMatchObject({ height: 40, width: 300, x: 20, y: 10 })
+
     const image = await runner.captures.image('cap-1', { encoding: ImageEncoding.JPEG, maxSize: { height: 100, width: 100 } })
     expect(image).toMatchObject({ encoding: ImageEncoding.JPEG, height: 50, width: 80 })
-    const fetch = fromBinary(GetCaptureImageRequestSchema, calls[1]!.body)
+    const fetch = fromBinary(GetCaptureImageRequestSchema, calls[2]!.body)
     expect(fetch.capture?.captureId).toBe('cap-1')
     expect(fetch.maxSize).toMatchObject({ height: 100, width: 100 })
 
@@ -220,7 +223,7 @@ describe('runner Driver control surface', () => {
     expect(request.motion?.timing.case).toBe('fixedDuration')
   })
 
-  it('answers scroll-until observations with a client predicate', async () => {
+  it('answers scroll-until updates with a client predicate', async () => {
     const sent: Uint8Array[] = []
     let streamedMethod = ''
     const decisions: Array<(stop: boolean) => void> = []
@@ -239,7 +242,7 @@ describe('runner Driver control surface', () => {
               for (const [steps, line] of [[0, 'feed item 1'], [1, 'TARGET ROW 137']] as const) {
                 const decision = nextDecision()
                 yield toBinary(ScrollUntilResponseSchema, create(ScrollUntilResponseSchema, {
-                  event: { case: 'observation', value: { awaitingDecision: true, steps, text: { text: line } } },
+                  event: { case: 'update', value: { awaitingDecision: true, steps, text: { text: line } } },
                 }))
                 if (await decision) {
                   yield toBinary(ScrollUntilResponseSchema, create(ScrollUntilResponseSchema, {
@@ -274,8 +277,8 @@ describe('runner Driver control surface', () => {
       settle: { nanos: 400_000_000 },
       step: { case: 'instant', value: { deltaY: 600 } },
     }, {
-      onObservation: observation => void seen.push(observation.steps),
-      until: async observation => observation.text?.text.includes('TARGET') ?? false,
+      onUpdate: update => void seen.push(update.steps),
+      until: async update => update.text?.text.includes('TARGET') ?? false,
     })
 
     expect(streamedMethod).toBe('/auv.api.driver.v1.InputService/ScrollUntil')
@@ -303,10 +306,10 @@ describe('runner Driver control surface', () => {
             async halfClose() {},
             responses: (async function* () {
               yield toBinary(ScrollUntilResponseSchema, create(ScrollUntilResponseSchema, {
-                event: { case: 'observation', value: { steps: 0 } },
+                event: { case: 'update', value: { steps: 0 } },
               }))
               yield toBinary(ScrollUntilResponseSchema, create(ScrollUntilResponseSchema, {
-                event: { case: 'observation', value: { steps: 1, stop: ScrollUntilStopReason.TEXT_VISIBLE } },
+                event: { case: 'update', value: { steps: 1, stop: ScrollUntilStopReason.TEXT_VISIBLE } },
               }))
               yield toBinary(ScrollUntilResponseSchema, create(ScrollUntilResponseSchema, {
                 event: { case: 'completed', value: { reason: ScrollUntilStopReason.TEXT_VISIBLE, steps: 1 } },
@@ -328,9 +331,9 @@ describe('runner Driver control surface', () => {
 
     const completed = await window.scrollUntil({ x: 10, y: 20 }, {
       condition: { case: 'textVisible', value: { query: 'Load more' } },
-      observe: { omitText: true },
+      output: { omitText: true },
       step: { case: 'instant', value: { deltaY: 600 } },
-    }, { onObservation: observation => void stops.push(observation.stop) })
+    }, { onUpdate: update => void stops.push(update.stop) })
 
     expect(completed.reason).toBe(ScrollUntilStopReason.TEXT_VISIBLE)
     expect(stops).toEqual([ScrollUntilStopReason.UNSPECIFIED, ScrollUntilStopReason.TEXT_VISIBLE])
@@ -338,7 +341,7 @@ describe('runner Driver control surface', () => {
     expect(requests.map(event => event.case)).toEqual(['begin'])
     const begin = requests[0]!
     expect(begin.case === 'begin' && begin.value.awaitDecisions).toBe(false)
-    expect(begin.case === 'begin' && begin.value.observe?.omitText).toBe(true)
+    expect(begin.case === 'begin' && begin.value.output?.omitText).toBe(true)
     expect(begin.case === 'begin' && begin.value.condition.case === 'textVisible' && begin.value.condition.value.query).toBe('Load more')
   })
 
@@ -447,7 +450,7 @@ describe('runner Driver control surface', () => {
     await connection.close()
   })
 
-  it('binds a resolved window by ID and refreshes observations through each capability call', async () => {
+  it('binds a resolved window by ID and refreshes updates through each capability call', async () => {
     const calls: UnaryCall[] = []
     const connection = await connect({
       local: true,
@@ -497,6 +500,10 @@ describe('runner Driver control surface', () => {
     expect(resolve.selector?.application).toEqual({ case: 'applicationBundleId', value: 'com.example.App' })
     const captureRequest = fromBinary(CaptureWindowRequestSchema, calls[1]!.body)
     expect(captureRequest.window?.windowId).toBe('window-42')
+    expect(captureRequest.resolution, 'native by default').toBe(CaptureResolution.UNSPECIFIED)
+
+    await window.capture({ resolution: CaptureResolution.LOGICAL })
+    expect(fromBinary(CaptureWindowRequestSchema, calls[2]!.body).resolution).toBe(CaptureResolution.LOGICAL)
     expect(calls.every(call => call.headers.get('auv-runner-class') === 'auv.core.local')).toBe(true)
   })
 

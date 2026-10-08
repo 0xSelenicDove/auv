@@ -21,7 +21,7 @@ use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
-use super::capture_store::{CaptureStore, CaptureStoreOptions};
+use super::capture_store::{CaptureStore, CaptureStoreOptions, ImageKey, RecognitionKey, RegionKey};
 
 use auv_driver::{Driver as _, WindowInput as _};
 
@@ -1330,7 +1330,7 @@ fn scroll_stream_stop_reason_to_proto(reason: auv_driver::ScrollStreamStopReason
 /// (latest value) and the completion. Dropping this future (client
 /// disconnect) aborts the native task, whose cancellation guard stops the
 /// next wait.
-/// Runs the observation loop on the blocking input pool. Every observation is
+/// Runs the update loop on the blocking input pool. Every update is
 /// sent with backpressure (captures are large and each one matters to a
 /// predicate). With `await_decisions`, the loop blocks on the client's decision;
 /// a half-closed request stream or a dropped relay counts as a stop.
@@ -1368,13 +1368,13 @@ async fn relay_scroll_until(
       }
     }
   };
-  let observations = sender.clone();
+  let updates = sender.clone();
   let task = run_input_blocking(move || {
     let mut surface = auv_scan::WindowScrollUntilSurface::new(&session, window, point, options);
-    auv_scan::scroll_until(&mut surface, &until, &mut |observation| {
-      let awaiting_decision = await_decisions && observation.stop.is_none();
-      let event = response(Event::Observation(scroll_until_observation_to_proto(observation, awaiting_decision, &captures)));
-      if observations.blocking_send(Ok(event)).is_err() {
+    auv_scan::scroll_until(&mut surface, &until, &mut |update| {
+      let awaiting_decision = await_decisions && update.stop.is_none();
+      let event = response(Event::Update(scroll_until_update_to_proto(update, awaiting_decision, &captures)));
+      if updates.blocking_send(Ok(event)).is_err() {
         return Err(auv_driver::DriverError::Backend {
           message: "scroll-until client disconnected".to_string(),
         });
@@ -1417,22 +1417,22 @@ async fn relay_scroll_until(
   let _ = sender.send(event).await;
 }
 
-fn scroll_until_observation_to_proto(
-  observation: auv_scan::ScrollUntilObservation,
+fn scroll_until_update_to_proto(
+  update: auv_scan::ScrollUntilUpdate,
   awaiting_decision: bool,
   captures: &CaptureStore,
-) -> proto::ScrollUntilObservation {
-  proto::ScrollUntilObservation {
-    steps: observation.steps,
+) -> proto::ScrollUntilUpdate {
+  proto::ScrollUntilUpdate {
+    steps: update.steps,
     delivered: Some(proto::Scroll {
-      delta_x: observation.delivered.delta_x,
-      delta_y: observation.delivered.delta_y,
+      delta_x: update.delivered.delta_x,
+      delta_y: update.delivered.delta_y,
     }),
-    motion: observation.motion.map(viewport_pixel_motion_to_proto),
-    no_motion_streak: observation.no_motion_streak,
-    capture: Some(stored_capture_to_proto(captures, observation.capture)),
-    text: observation.text.map(recognition_to_proto),
-    stop: observation.stop.map_or(proto::ScrollUntilStopReason::Unspecified, scroll_until_stop_reason_to_proto) as i32,
+    motion: update.motion.map(viewport_pixel_motion_to_proto),
+    no_motion_streak: update.no_motion_streak,
+    capture: Some(stored_capture_to_proto(captures, update.capture)),
+    text: update.text.map(recognition_to_proto),
+    stop: update.stop.map_or(proto::ScrollUntilStopReason::Unspecified, scroll_until_stop_reason_to_proto) as i32,
     awaiting_decision,
   }
 }
@@ -1749,8 +1749,8 @@ fn scroll_until_request_from_proto(request: proto::ScrollUntilBegin) -> Result<a
     settle: duration_from_proto(request.settle, std::time::Duration::ZERO, "settle")?,
     no_motion_confirmations: request.no_motion_confirmations,
     motion_region,
-    observe: auv_scan::ScrollUntilObserve {
-      text: !request.observe.is_some_and(|observe| observe.omit_text),
+    output: auv_scan::ScrollUntilOutputOptions {
+      text: !request.output.is_some_and(|output| output.omit_text),
     },
   })
 }
@@ -1945,17 +1945,37 @@ fn input_action_to_proto(action: auv_driver::InputActionResult) -> Result<proto:
 impl TextRecognitionService for LocalTextRecognitionService {
   async fn recognize_text(&self, request: Request<proto::RecognizeTextRequest>) -> Result<Response<proto::RecognizeTextResponse>, Status> {
     let request = request.into_inner();
-    let capture = match request.source {
-      Some(proto::recognize_text_request::Source::CaptureRef(reference)) => stored_capture(&self.captures, reference)?,
-      Some(proto::recognize_text_request::Source::Image(frame)) => std::sync::Arc::new(image_frame_from_proto(frame)?),
+    // Results for a held capture are cached on its pixels: OCR is the costly
+    // step, and agents often read the same capture again with the same region.
+    // TODO(capture-store-find-text-seed): FindWindowText/FindDisplayText run a
+    // full recognition on the capture they store but do not seed this cache;
+    // the drivers expose only find-text there. Seed it once a shared
+    // recognition -> matches helper replaces the per-platform copies.
+    let cache_key = RecognitionKey::new(
+      RegionKey::new(request.region.as_ref(), request.screen_region.as_ref()),
+      &request.custom_words,
+      &request.recognition_languages,
+    );
+    let (capture, cached_as) = match request.source {
+      Some(proto::recognize_text_request::Source::CaptureRef(reference)) => {
+        if let Some(cached) = self.captures.recognition(&reference.capture_id, &cache_key) {
+          return Ok(Response::new(recognition_to_proto(auv_driver::TextRecognition::clone(&cached))));
+        }
+        let id = reference.capture_id.clone();
+        (stored_capture(&self.captures, reference)?, Some(id))
+      }
+      Some(proto::recognize_text_request::Source::Image(frame)) => (std::sync::Arc::new(image_frame_from_proto(frame)?), None),
       None => return Err(Status::invalid_argument("capture_ref or image is required")),
     };
-    let region = ratio_rect_from_proto(request.region)?;
+    let region = image_region_from_proto(request.region, request.screen_region, capture.bounds)?;
     let recognition = self
       .session
       .vision()
       .recognize_text_in_capture_with_options(&capture, region, recognition_options(request.custom_words, request.recognition_languages))
       .map_err(driver_status)?;
+    if let Some(id) = cached_as {
+      self.captures.remember_recognition(&id, cache_key, recognition.clone());
+    }
     Ok(Response::new(recognition_to_proto(recognition)))
   }
 
@@ -1967,9 +1987,9 @@ impl TextRecognitionService for LocalTextRecognitionService {
     if request.query.trim().is_empty() {
       return Err(Status::invalid_argument("query is required"));
     }
-    let region = ratio_rect_from_proto(request.region)?;
     let window = resolve_window_ref(&self.session, request.window.ok_or_else(|| Status::invalid_argument("window is required"))?)?;
     let capture = self.session.window().capture(&window).map_err(driver_status)?;
+    let region = image_region_from_proto(request.region, request.screen_region, capture.bounds)?;
     let matches = self
       .session
       .vision()
@@ -2004,7 +2024,6 @@ impl TextRecognitionService for LocalTextRecognitionService {
       return Err(Status::invalid_argument("query is required"));
     }
     let display = display_selector_from_proto(request.selector)?;
-    let region = ratio_rect_from_proto(request.region)?;
     let captured = self
       .session
       .display()
@@ -2013,6 +2032,7 @@ impl TextRecognitionService for LocalTextRecognitionService {
         ..Default::default()
       })
       .map_err(driver_status)?;
+    let region = image_region_from_proto(request.region, request.screen_region, captured.capture.bounds)?;
     let matches = self
       .session
       .vision()
@@ -2173,6 +2193,39 @@ fn image_frame_from_proto(frame: proto::ImageFrame) -> Result<auv_driver::Captur
   })
 }
 
+/// The part of an image a request names: `region` as fractions of the image,
+/// or `screen_region` in logical screen coordinates, clipped to the image's
+/// screen `bounds`. Neither means the whole image.
+fn image_region_from_proto(
+  region: Option<auv_api_proto::auv::api::image::v1::NormalizedRect>,
+  screen_region: Option<proto::ScreenRect>,
+  bounds: auv_driver::Rect,
+) -> Result<auv_driver::RatioRect, Status> {
+  let Some(screen_region) = screen_region else {
+    return ratio_rect_from_proto(region);
+  };
+  if region.is_some() {
+    return Err(Status::invalid_argument("region and screen_region are exclusive"));
+  }
+  let area = rect_from_proto(screen_region, "screen_region")?;
+  if bounds.size.width <= 0.0 || bounds.size.height <= 0.0 {
+    return Err(Status::invalid_argument("screen_region needs an image with screen bounds"));
+  }
+  let left = area.origin.x.max(bounds.origin.x);
+  let top = area.origin.y.max(bounds.origin.y);
+  let right = (area.origin.x + area.size.width).min(bounds.origin.x + bounds.size.width);
+  let bottom = (area.origin.y + area.size.height).min(bounds.origin.y + bounds.size.height);
+  if right <= left || bottom <= top {
+    return Err(Status::invalid_argument("screen_region does not overlap the image"));
+  }
+  Ok(auv_driver::RatioRect::new(
+    (left - bounds.origin.x) / bounds.size.width,
+    (top - bounds.origin.y) / bounds.size.height,
+    (right - left) / bounds.size.width,
+    (bottom - top) / bounds.size.height,
+  ))
+}
+
 fn ratio_rect_from_proto(region: Option<auv_api_proto::auv::api::image::v1::NormalizedRect>) -> Result<auv_driver::RatioRect, Status> {
   let Some(region) = region else {
     return Ok(auv_driver::RatioRect::new(0.0, 0.0, 1.0, 1.0));
@@ -2207,23 +2260,48 @@ impl CaptureService for LocalCaptureService {
     &self,
     request: Request<proto::GetCaptureImageRequest>,
   ) -> Result<Response<proto::GetCaptureImageResponse>, Status> {
+    use auv_api_proto::auv::api::image::v1::ImageEncoding;
     let request = request.into_inner();
-    let capture = stored_capture(&self.captures, request.capture.ok_or_else(|| Status::invalid_argument("capture is required"))?)?;
-    let region = ratio_rect_from_proto(request.region)?;
-    let encoding = auv_api_proto::auv::api::image::v1::ImageEncoding::try_from(request.encoding)
-      .map_err(|_| Status::invalid_argument("encoding is not a known ImageEncoding"))?;
+    let reference = request.capture.ok_or_else(|| Status::invalid_argument("capture is required"))?;
+    let encoding =
+      ImageEncoding::try_from(request.encoding).map_err(|_| Status::invalid_argument("encoding is not a known ImageEncoding"))?;
+    // Encoded and resized images are cached on the capture's pixels, keyed by
+    // the region as requested. Raw RGBA is not: unresized it would duplicate
+    // the pixels themselves.
+    let max_size = request.max_size.filter(|size| size.width > 0 && size.height > 0);
+    let cacheable = !matches!(encoding, ImageEncoding::Unspecified | ImageEncoding::Rgba) || max_size.is_some();
+    let cache_key = ImageKey::new(
+      RegionKey::new(request.region.as_ref(), request.screen_region.as_ref()),
+      max_size.map(|size| (size.width, size.height)),
+      encoding as i32,
+    );
+    if cacheable && let Some(cached) = self.captures.image(&reference.capture_id, &cache_key) {
+      return Ok(Response::new(proto::GetCaptureImageResponse {
+        image: Some(auv_api_proto::auv::api::image::v1::EncodedImage::clone(&cached)),
+      }));
+    }
+    let id = reference.capture_id.clone();
+    let capture = stored_capture(&self.captures, reference)?;
+    let region = image_region_from_proto(request.region, request.screen_region, capture.bounds)?;
     // Encoding a Retina capture takes long enough to stall the current-thread
     // Runner runtime, so it runs on the blocking pool.
-    let response = tokio::task::spawn_blocking(move || capture_image_to_proto(&capture, region, request.max_size, encoding))
+    let response = tokio::task::spawn_blocking(move || capture_image_to_proto(&capture, region, max_size, encoding))
       .await
       .map_err(|error| Status::internal(format!("capture image task failed: {error}")))??;
+    if cacheable && let Some(image) = &response.image {
+      self.captures.remember_image(&id, cache_key, image.clone());
+    }
     Ok(Response::new(response))
   }
 
   async fn capture_window(&self, request: Request<proto::CaptureWindowRequest>) -> Result<Response<proto::CaptureWindowResponse>, Status> {
     let request = request.into_inner();
     let window = resolve_window_ref(&self.session, request.window.ok_or_else(|| Status::invalid_argument("window is required"))?)?;
-    let capture = self.session.window().capture(&window).map_err(driver_status)?;
+    let options = auv_driver::CaptureOptions {
+      resolution: capture_resolution_from_proto(request.resolution)?,
+      ..Default::default()
+    };
+    let capture = self.session.window().capture_with(&window, options).map_err(driver_status)?;
     Ok(Response::new(proto::CaptureWindowResponse {
       window: Some(window_to_proto(window)),
       capture: Some(stored_capture_to_proto(&self.captures, capture)),
@@ -2234,12 +2312,14 @@ impl CaptureService for LocalCaptureService {
     &self,
     request: Request<proto::CaptureDisplayRequest>,
   ) -> Result<Response<proto::CaptureDisplayResponse>, Status> {
-    let display = display_selector_from_proto(request.into_inner().selector)?;
+    let request = request.into_inner();
+    let display = display_selector_from_proto(request.selector)?;
     let captured = self
       .session
       .display()
       .capture(auv_driver::CaptureOptions {
         display,
+        resolution: capture_resolution_from_proto(request.resolution)?,
         ..Default::default()
       })
       .map_err(driver_status)?;
@@ -2259,6 +2339,7 @@ impl CaptureService for LocalCaptureService {
       .capture_region(auv_driver::CaptureOptions {
         display,
         region: Some(region),
+        resolution: capture_resolution_from_proto(request.resolution)?,
         ..Default::default()
       })
       .map_err(driver_status)?;
@@ -2266,6 +2347,14 @@ impl CaptureService for LocalCaptureService {
       display: Some(display_to_proto(captured.display)),
       capture: Some(stored_capture_to_proto(&self.captures, captured.capture)),
     }))
+  }
+}
+
+fn capture_resolution_from_proto(value: i32) -> Result<auv_driver::CaptureResolution, Status> {
+  match proto::CaptureResolution::try_from(value) {
+    Ok(proto::CaptureResolution::Unspecified | proto::CaptureResolution::Native) => Ok(auv_driver::CaptureResolution::Native),
+    Ok(proto::CaptureResolution::Logical) => Ok(auv_driver::CaptureResolution::Logical),
+    Err(_) => Err(Status::invalid_argument("resolution is not a known CaptureResolution")),
   }
 }
 
@@ -2424,7 +2513,7 @@ fn driver_status(error: auv_driver::DriverError) -> Status {
     auv_driver::DriverError::NotFound { .. } => Status::not_found(error.to_string()),
     auv_driver::DriverError::PermissionDenied { .. } => Status::permission_denied(error.to_string()),
     auv_driver::DriverError::InvalidInput { .. } => Status::invalid_argument(error.to_string()),
-    auv_driver::DriverError::StaleObservation { .. } | auv_driver::DriverError::RoleMismatch { .. } => {
+    auv_driver::DriverError::StaleUiReference { .. } | auv_driver::DriverError::RoleMismatch { .. } => {
       Status::failed_precondition(error.to_string())
     }
     auv_driver::DriverError::Backend { .. } => Status::unavailable(error.to_string()),

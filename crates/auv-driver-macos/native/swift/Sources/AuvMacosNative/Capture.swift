@@ -12,6 +12,10 @@ private func emptyWindowCaptureResponse(
   NativeWindowCaptureResponse(
     image_width: 0,
     image_height: 0,
+    window_x: 0,
+    window_y: 0,
+    window_width: 0,
+    window_height: 0,
     rgba_bytes: RustVec<UInt8>(),
     error_message: message.intoRustString(),
     recovery_hint: recovery.intoRustString()
@@ -20,9 +24,11 @@ private func emptyWindowCaptureResponse(
 
 func capture_window_image(request: NativeWindowCaptureRequest) -> NativeWindowCaptureResponse {
   var capturedImage: CGImage?
+  var capturedFrame = CGRect.zero
   var captureError: Error?
-  let status = nativeCaptureWindowForAuv(windowID: UInt32(max(request.window_id, 0))) { image, error in
+  let status = nativeCaptureWindowForAuv(windowID: UInt32(max(request.window_id, 0)), logical: request.logical) { image, frame, error in
     capturedImage = image
+    capturedFrame = frame
     captureError = error
   }
   if status == .timedOut {
@@ -52,6 +58,10 @@ func capture_window_image(request: NativeWindowCaptureRequest) -> NativeWindowCa
   return NativeWindowCaptureResponse(
     image_width: Int64(image.width),
     image_height: Int64(image.height),
+    window_x: Double(capturedFrame.minX),
+    window_y: Double(capturedFrame.minY),
+    window_width: Double(capturedFrame.width),
+    window_height: Double(capturedFrame.height),
     rgba_bytes: nativeByteVec(rgba),
     error_message: nil,
     recovery_hint: nil
@@ -60,12 +70,13 @@ func capture_window_image(request: NativeWindowCaptureRequest) -> NativeWindowCa
 
 private func nativeCaptureWindowForAuv(
   windowID: UInt32,
-  completion: @escaping (CGImage?, Error?) -> Void
+  logical: Bool,
+  completion: @escaping (CGImage?, CGRect, Error?) -> Void
 ) -> DispatchTimeoutResult {
   let semaphore = DispatchSemaphore(value: 0)
 
   guard #available(macOS 14.0, *) else {
-    completion(nil, NSError(
+    completion(nil, .zero, NSError(
       domain: "AuvMacosNative.Capture",
       code: 3,
       userInfo: [NSLocalizedDescriptionKey: "ScreenCaptureKit screenshot capture requires macOS 14.0 or newer"]
@@ -76,12 +87,12 @@ private func nativeCaptureWindowForAuv(
 
   SCShareableContent.getWithCompletionHandler { content, error in
     if let error {
-      completion(nil, error)
+      completion(nil, .zero, error)
       semaphore.signal()
       return
     }
     guard let window = content?.windows.first(where: { $0.windowID == windowID }) else {
-      completion(nil, NSError(
+      completion(nil, .zero, NSError(
         domain: "AuvMacosNative.Capture",
         code: 1,
         userInfo: [NSLocalizedDescriptionKey: "window \(windowID) not found"]
@@ -92,8 +103,15 @@ private func nativeCaptureWindowForAuv(
 
     let filter = SCContentFilter(desktopIndependentWindow: window)
     let config = SCStreamConfiguration()
-    config.width = max(1, Int(window.frame.width.rounded()))
-    config.height = max(1, Int(window.frame.height.rounded()))
+    // NOTICE(window-capture-pixel-scale): SCStreamConfiguration.width/height
+    // are output pixels, while SCWindow.frame is in points. Passing points
+    // captured Retina windows at 1x while display captures were 2x (measured
+    // 2026-10-07). `pointPixelScale` (macOS 14+) is the backing scale of the
+    // filtered content; see
+    // https://developer.apple.com/documentation/screencapturekit/scshareablecontentinfo.
+    let scale = logical ? 1.0 : CGFloat(SCShareableContent.info(for: filter).pointPixelScale)
+    config.width = max(1, Int((window.frame.width * scale).rounded()))
+    config.height = max(1, Int((window.frame.height * scale).rounded()))
     config.pixelFormat = kCVPixelFormatType_32BGRA
     config.colorSpaceName = CGColorSpace.sRGB
     config.showsCursor = false
@@ -103,7 +121,7 @@ private func nativeCaptureWindowForAuv(
       configuration: config
     ) { sampleBuffer, captureError in
       if let captureError {
-        completion(nil, captureError)
+        completion(nil, .zero, captureError)
         semaphore.signal()
         return
       }
@@ -111,7 +129,7 @@ private func nativeCaptureWindowForAuv(
         let sampleBuffer,
         let image = nativeImageFromSampleBuffer(sampleBuffer)
       else {
-        completion(nil, NSError(
+        completion(nil, .zero, NSError(
           domain: "AuvMacosNative.Capture",
           code: 2,
           userInfo: [NSLocalizedDescriptionKey: "window capture returned no image sample"]
@@ -119,7 +137,7 @@ private func nativeCaptureWindowForAuv(
         semaphore.signal()
         return
       }
-      completion(image, nil)
+      completion(image, window.frame, nil)
       semaphore.signal()
     }
   }

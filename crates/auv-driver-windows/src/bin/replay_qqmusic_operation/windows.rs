@@ -1,4 +1,4 @@
-//! Replay harness for compiled QQ Music operation with hot-path optimizations.
+//! Replay harness for compiled QQ Music operation with hot-path optimizations and granular profiling.
 //!
 //! Executes the compiled operation ("qqmusic.prepare_playback") repeatedly
 //! with strictly ZERO VLM calls and ZERO reasoning tokens.
@@ -8,18 +8,30 @@
 //! - `verified`: Optimized execution with semantic title change confirmation
 //! - `fast`: Optimized execution with action dispatch only (eventual consistency)
 //!
-//! Measures four non-overlapping split latency metrics:
-//! - `discovery_ms`: Resource lookup & resolution (SMTC session, window, CoreAudio volume)
-//! - `dispatch_ms`: Action command dispatches (play, volume set, skip_next)
-//! - `verification_ms`: Semantic verification gates & polling (playback status, title change)
-//! - `wgc_ms`: WGC window health verification
+//! Measures ten granular split latency metrics:
+//! - `manager_discovery_ms`: SMTC session manager acquisition
+//! - `session_discovery_ms`: `GetCurrentSession()` fast-path vs `GetSessions()` scan
+//! - `window_discovery_ms`: HWND enumeration & matching
+//! - `audio_lookup_ms`: CoreAudio endpoint + ISimpleAudioVolume resolution
+//! - `volume_rw_ms`: Volume read/write duration in Step 2
+//! - `dispatch_ms`: SMTC command dispatch latency
+//! - `verification_ms`: Metadata refresh wait & identity confirmation
+//! - `wgc_ms`: WGC window health check
+//! - `serialization_ms`: JSONL serialization time
+//! - `pacing_ms`: Inter-iteration pacing (strictly isolated from total_duration_ms)
 #![cfg(target_os = "windows")]
 
 use auv_driver_common::error::{DriverError, DriverResult};
 use auv_driver_common::window::Window;
 use auv_driver_windows::desktop::ensure_input_desktop;
-use auv_driver_windows::media::{AudioVolumeController, MediaPlaybackStatus, ProcessAudioVolume, SmtcMediaManager, SmtcSession};
-use auv_driver_windows::wgc::{capture_window_health, capture_window_wgc};
+use auv_driver_windows::media::{
+  AudioLookupStats, AudioLookupStatus, AudioVolumeController, MediaPlaybackStatus, ProcessAudioVolume, SmtcMediaManager, SmtcSession,
+};
+use auv_driver_windows::playback_guard::{
+  DEFAULT_PLAY_POLL_TIMEOUT, DEFAULT_TARGET_VOLUME, DEFAULT_VOLUME_TOLERANCE, Step2Options, execute_step2_real_with_prestate,
+};
+use auv_driver_windows::track_identity::{TrackChangeVerdict, TrackIdentity, evaluate_track_change};
+use auv_driver_windows::wgc::{capture_window_health, capture_window_wgc, prewarm_wgc, prewarm_wgc_window, reset_d3d_context};
 use auv_driver_windows::window::list_windows;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -81,16 +93,53 @@ struct ReplayRecord {
   mode: String,
   vlm_calls: usize,
   tokens_used: usize,
-  total_duration_ms: f64,
-  discovery_ms: f64,
-  dispatch_ms: f64,
-  verification_ms: f64,
-  wgc_ms: f64,
-  success: bool,
-  confirmed: bool,
-  fault_injected: Option<String>,
-  escalated_to_vlm: bool,
-  steps: Vec<StepRecord>,
+
+  // 10-field granular timing metrics
+  pub total_duration_ms: f64,
+  pub discovery_ms: f64,
+  pub manager_discovery_ms: f64,
+  pub session_discovery_ms: f64,
+  pub window_discovery_ms: f64,
+  pub audio_lookup_ms: f64,
+  pub volume_rw_ms: f64,
+  pub dispatch_ms: f64,
+  pub verification_ms: f64,
+  pub wgc_ms: f64,
+  pub wgc_init_ms: f64,
+  pub wgc_capture_ms: f64,
+  pub serialization_ms: f64,
+  pub pacing_ms: f64,
+
+  // 4 profiling dimensions & metadata
+  pub cache_state: String,
+  pub window_state: String,
+  pub frame_health: String,
+  pub identity_level: Option<String>,
+
+  // Idempotency & command counts
+  pub skipped_volume_write: bool,
+  pub skipped_play_write: bool,
+  pub play_dispatched: bool,
+  pub volume_set_calls: usize,
+  pub play_calls: usize,
+
+  // Audio lookup statistics
+  pub audio_lookup_status: Option<String>,
+  pub audio_endpoint_count: Option<usize>,
+
+  pub success: bool,
+  pub confirmed: bool,
+  pub fault_injected: Option<String>,
+  pub escalated_to_vlm: bool,
+  pub steps: Vec<StepRecord>,
+}
+
+struct DiscoveryTimings {
+  manager_discovery_ms: f64,
+  session_discovery_ms: f64,
+  window_discovery_ms: f64,
+  audio_lookup_ms: f64,
+  audio_lookup_stats: Option<AudioLookupStats>,
 }
 
 /// Holds resolved resources for a single operation execution lifecycle.
@@ -100,70 +149,102 @@ struct WindowsOperationContext {
   pid: u32,
   window: Window,
   audio: Option<ProcessAudioVolume>,
+  endpoint_id: Option<String>,
+  timings: DiscoveryTimings,
 }
 
 impl WindowsOperationContext {
-  fn resolve() -> DriverResult<Self> {
+  fn resolve(cached_endpoint_id: Option<&str>) -> DriverResult<Self> {
+    let t_mgr = Instant::now();
     let manager = SmtcMediaManager::new()?;
+    let manager_discovery_ms = t_mgr.elapsed().as_secs_f64() * 1000.0;
+
+    let t_sess = Instant::now();
     let session = manager.find_session("qqmusic")?.ok_or_else(|| DriverError::NotFound {
       target: "QQ Music SMTC session".to_string(),
     })?;
+    let session_discovery_ms = t_sess.elapsed().as_secs_f64() * 1000.0;
 
+    let t_win = Instant::now();
     let windows = list_windows()?;
     let window = windows.into_iter().find(|w| w.app_name.as_deref() == Some("QQMusic.exe")).ok_or_else(|| DriverError::NotFound {
       target: "QQMusic.exe window".to_string(),
     })?;
+    let window_discovery_ms = t_win.elapsed().as_secs_f64() * 1000.0;
 
     let pid = window.process_id.unwrap_or(0);
-    let audio = if pid > 0 {
-      AudioVolumeController::open_process(pid).ok()
+    let t_audio = Instant::now();
+    let (audio, audio_lookup_stats) = if pid > 0 {
+      match AudioVolumeController::open_process_cached(pid, cached_endpoint_id) {
+        Ok((vol, stats)) => (Some(vol), Some(stats)),
+        Err(_) => (None, None),
+      }
     } else {
-      None
+      (None, None)
     };
+    let audio_lookup_ms = t_audio.elapsed().as_secs_f64() * 1000.0;
+    let endpoint_id = audio_lookup_stats.as_ref().and_then(|s| s.endpoint_id.clone());
 
     Ok(Self {
       session,
       pid,
       window,
       audio,
+      endpoint_id,
+      timings: DiscoveryTimings {
+        manager_discovery_ms,
+        session_discovery_ms,
+        window_discovery_ms,
+        audio_lookup_ms,
+        audio_lookup_stats,
+      },
     })
   }
-}
-
-fn get_qq_session_and_window_baseline() -> DriverResult<(SmtcSession, u32, Window)> {
-  let manager = SmtcMediaManager::new()?;
-  let session = manager.find_session("qqmusic")?.ok_or_else(|| DriverError::NotFound {
-    target: "QQ Music SMTC session".to_string(),
-  })?;
-
-  let windows = list_windows()?;
-  let qq_win = windows.into_iter().find(|w| w.app_name.as_deref() == Some("QQMusic.exe")).ok_or_else(|| DriverError::NotFound {
-    target: "QQMusic.exe window".to_string(),
-  })?;
-
-  let pid = qq_win.process_id.unwrap_or(0);
-
-  Ok((session, pid, qq_win))
 }
 
 // ==============================================================================
 // BASELINE EXECUTION (Unoptimized with correctness fixes: no 1.2s auto-retry)
 // ==============================================================================
-fn execute_replay_baseline(iteration: usize, fault_injection: Option<&str>, allow_restore: bool) -> DriverResult<ReplayRecord> {
+fn execute_replay_baseline(
+  iteration: usize,
+  fault_injection: Option<&str>,
+  allow_restore: bool,
+  pacing_ms: f64,
+  cache_state: &str,
+  wgc_init_ms: f64,
+) -> DriverResult<ReplayRecord> {
   let start_time = Instant::now();
   let mut steps = Vec::new();
   let mut overall_success = true;
   let mut escalated = false;
 
   // Discovery phase
-  let t_disc = Instant::now();
-  let (session, pid, qq_win) = get_qq_session_and_window_baseline()?;
+  let t_mgr = Instant::now();
+  let manager = SmtcMediaManager::new()?;
+  let manager_discovery_ms = t_mgr.elapsed().as_secs_f64() * 1000.0;
+
+  let t_sess = Instant::now();
+  let session = manager.find_session("qqmusic")?.ok_or_else(|| DriverError::NotFound {
+    target: "QQ Music SMTC session".to_string(),
+  })?;
+  let session_discovery_ms = t_sess.elapsed().as_secs_f64() * 1000.0;
+
+  let t_win = Instant::now();
+  let windows = list_windows()?;
+  let qq_win = windows.into_iter().find(|w| w.app_name.as_deref() == Some("QQMusic.exe")).ok_or_else(|| DriverError::NotFound {
+    target: "QQMusic.exe window".to_string(),
+  })?;
+  let window_discovery_ms = t_win.elapsed().as_secs_f64() * 1000.0;
+
+  let pid = qq_win.process_id.unwrap_or(0);
+  let t_audio = Instant::now();
   let vol = if pid > 0 {
     AudioVolumeController::get_process_volume(pid).ok()
   } else {
     None
   };
-  let discovery_ms = t_disc.elapsed().as_secs_f64() * 1000.0;
+  let audio_lookup_ms = t_audio.elapsed().as_secs_f64() * 1000.0;
+  let discovery_ms = manager_discovery_ms + session_discovery_ms + window_discovery_ms + audio_lookup_ms;
 
   // --------------------------------------------------------------------------
   // Step 1: Query Playback State
@@ -203,12 +284,17 @@ fn execute_replay_baseline(iteration: usize, fault_injection: Option<&str>, allo
   let target_vol = 0.40f32;
 
   let t_s2_disp = Instant::now();
+  let mut vol_calls = 0usize;
+  let mut play_calls = 0usize;
+
   if fault_injection == Some("volume") {
     if pid > 0 {
       let _ = AudioVolumeController::set_process_volume(pid, 0.10);
+      vol_calls += 1;
     }
   } else if pid > 0 {
     AudioVolumeController::set_process_volume(pid, target_vol)?;
+    vol_calls += 1;
   }
 
   if fault_injection == Some("pause") {
@@ -218,9 +304,11 @@ fn execute_replay_baseline(iteration: usize, fault_injection: Option<&str>, allo
     let current_st = session.playback_status().unwrap_or(MediaPlaybackStatus::Closed);
     if current_st != MediaPlaybackStatus::Playing && current_st != MediaPlaybackStatus::Changing {
       let _ = session.play();
+      play_calls += 1;
     }
   }
   let s2_disp_ms = t_s2_disp.elapsed().as_secs_f64() * 1000.0;
+  let volume_rw_ms = s2_disp_ms;
 
   // Polling with fixed 80ms sleep
   let t_s2_verif = Instant::now();
@@ -240,6 +328,7 @@ fn execute_replay_baseline(iteration: usize, fault_injection: Option<&str>, allo
       s2_status = st;
       if s2_status == MediaPlaybackStatus::Paused && fault_injection.is_none() {
         let _ = session.play();
+        play_calls += 1;
       }
     }
   }
@@ -349,11 +438,13 @@ fn execute_replay_baseline(iteration: usize, fault_injection: Option<&str>, allo
 
   let is_still_minimized = hwnd_opt.map(|hwnd| unsafe { IsIconic(hwnd).as_bool() }).unwrap_or(false);
 
-  let (s4_dur, s4_gate_passed, s4_details) = if is_still_minimized {
+  let (s4_dur, s4_gate_passed, frame_health, window_state, s4_details) = if is_still_minimized {
     let dur = s4_start.elapsed().as_secs_f64() * 1000.0;
     (
       dur,
       true,
+      "skipped_minimized".to_string(),
+      "minimized".to_string(),
       serde_json::json!({
         "status": "skipped_minimized",
         "reason": "window_minimized (zero-window-mutation redline preserves user state)",
@@ -366,7 +457,7 @@ fn execute_replay_baseline(iteration: usize, fault_injection: Option<&str>, allo
         let total = (cap.image.width() * cap.image.height()) as usize;
         let raw = cap.image.as_raw();
         let mut non_black = 0usize;
-        for chunk in raw.chunks_exact(4) {
+        for chunk in raw.as_chunks::<4>().0 {
           if chunk[0] > 10 || chunk[1] > 10 || chunk[2] > 10 {
             non_black += 1;
           }
@@ -381,6 +472,12 @@ fn execute_replay_baseline(iteration: usize, fault_injection: Option<&str>, allo
         (
           dur,
           alive,
+          if alive {
+            "fresh".to_string()
+          } else {
+            "stale".to_string()
+          },
+          "active".to_string(),
           serde_json::json!({
             "status": "captured_full",
             "width": cap.image.width(),
@@ -395,6 +492,8 @@ fn execute_replay_baseline(iteration: usize, fault_injection: Option<&str>, allo
         (
           dur,
           false,
+          "error".to_string(),
+          "active".to_string(),
           serde_json::json!({
             "status": "error",
             "error": format!("{e:?}"),
@@ -426,7 +525,8 @@ fn execute_replay_baseline(iteration: usize, fault_injection: Option<&str>, allo
   let total_duration_ms = start_time.elapsed().as_secs_f64() * 1000.0;
   let dispatch_ms = s2_disp_ms + s3_disp_ms;
   let verification_ms = s1_verif_ms + s2_verif_ms + s3_verif_ms;
-  let wgc_ms = s4_dur;
+  let wgc_capture_ms = s4_dur;
+  let wgc_ms = wgc_capture_ms;
 
   Ok(ReplayRecord {
     iteration,
@@ -437,9 +537,29 @@ fn execute_replay_baseline(iteration: usize, fault_injection: Option<&str>, allo
     tokens_used: 0,
     total_duration_ms,
     discovery_ms,
+    manager_discovery_ms,
+    session_discovery_ms,
+    window_discovery_ms,
+    audio_lookup_ms,
+    volume_rw_ms,
     dispatch_ms,
     verification_ms,
     wgc_ms,
+    wgc_init_ms,
+    wgc_capture_ms,
+    serialization_ms: 0.0,
+    pacing_ms,
+    cache_state: cache_state.to_string(),
+    window_state,
+    frame_health,
+    identity_level: Some("title_only".to_string()),
+    skipped_volume_write: false,
+    skipped_play_write: false,
+    play_dispatched: play_calls > 0,
+    volume_set_calls: vol_calls,
+    play_calls,
+    audio_lookup_status: None,
+    audio_endpoint_count: None,
     success: overall_success,
     confirmed: s3_gate_passed,
     fault_injected: fault_injection.map(ToString::to_string),
@@ -451,21 +571,26 @@ fn execute_replay_baseline(iteration: usize, fault_injection: Option<&str>, allo
 // ==============================================================================
 // OPTIMIZED EXECUTION (Context reuse + Idempotency + Event/Adaptive polling + Lightweight WGC)
 // ==============================================================================
+#[allow(clippy::too_many_arguments)]
 fn execute_replay_optimized(
   iteration: usize,
   fault_injection: Option<&str>,
   allow_restore: bool,
   is_fast_mode: bool,
-) -> DriverResult<ReplayRecord> {
+  pacing_ms: f64,
+  cache_state: &str,
+  cached_endpoint_id: Option<&str>,
+  wgc_init_ms: f64,
+) -> DriverResult<(ReplayRecord, Option<String>)> {
   let start_time = Instant::now();
   let mut steps = Vec::new();
   let mut overall_success = true;
   let mut escalated = false;
 
-  // Single operation context resolution
-  let t_disc = Instant::now();
-  let ctx = WindowsOperationContext::resolve()?;
-  let discovery_ms = t_disc.elapsed().as_secs_f64() * 1000.0;
+  // Single operation context resolution with cached endpoint support
+  let ctx = WindowsOperationContext::resolve(cached_endpoint_id)?;
+  let discovery_ms =
+    ctx.timings.manager_discovery_ms + ctx.timings.session_discovery_ms + ctx.timings.window_discovery_ms + ctx.timings.audio_lookup_ms;
 
   // --------------------------------------------------------------------------
   // Step 1: Query Playback State (reusing resolved context)
@@ -473,7 +598,7 @@ fn execute_replay_optimized(
   let s1_start = Instant::now();
   let meta = ctx.session.track_metadata()?;
   let status = ctx.session.playback_status()?;
-  let vol = ctx.audio.as_ref().and_then(|a| a.get_volume().ok());
+  let pre_vol = ctx.audio.as_ref().and_then(|a| a.get_volume().ok()).unwrap_or(0.0);
   let s1_verif_ms = s1_start.elapsed().as_secs_f64() * 1000.0;
 
   let s1_gate_passed = !meta.title.is_empty();
@@ -494,80 +619,56 @@ fn execute_replay_optimized(
     details: serde_json::json!({
       "title": meta.title,
       "artist": meta.artist,
+      "album": meta.album_title,
       "status": format!("{:?}", status),
-      "volume": vol,
+      "volume": pre_vol,
+      "audio_lookup_status": ctx.timings.audio_lookup_stats.as_ref().map(|s| s.status),
+      "audio_endpoint_count": ctx.timings.audio_lookup_stats.as_ref().map(|s| s.endpoint_count),
     }),
   });
 
   // --------------------------------------------------------------------------
-  // Step 2: Ensure Playing & Volume 40% (Idempotency Guard)
+  // Step 2: Ensure Playing & Volume 40% (Phase 4 Command Counting & Batch Guard)
   // --------------------------------------------------------------------------
   let s2_start = Instant::now();
-  let target_vol = 0.40f32;
-  let mut skipped_volume_write = false;
-  let mut skipped_play_write = false;
+  let step2_opts = Step2Options {
+    target_volume: DEFAULT_TARGET_VOLUME,
+    volume_tolerance: DEFAULT_VOLUME_TOLERANCE,
+    play_poll_timeout: if fault_injection.is_some() {
+      Duration::from_millis(200)
+    } else {
+      DEFAULT_PLAY_POLL_TIMEOUT
+    },
+    fire_and_forget_play: is_fast_mode,
+  };
 
-  let t_s2_disp = Instant::now();
-  if fault_injection == Some("volume") {
+  let (s2_result, volume_rw_ms) = if fault_injection == Some("volume") {
     if let Some(ref audio) = ctx.audio {
       let _ = audio.set_volume(0.10);
     }
-  } else {
-    let curr_vol = ctx.audio.as_ref().and_then(|a| a.get_volume().ok()).unwrap_or(0.0);
-    if (curr_vol - target_vol).abs() <= 0.05 {
-      skipped_volume_write = true;
-    } else if let Some(ref audio) = ctx.audio {
-      audio.set_volume(target_vol)?;
-    }
-  }
-
-  if fault_injection == Some("pause") {
+    let res = execute_step2_real_with_prestate(ctx.audio.as_ref(), &ctx.session, 0.10, status, step2_opts)?;
+    (res, s2_start.elapsed().as_secs_f64() * 1000.0)
+  } else if fault_injection == Some("pause") {
     let _ = ctx.session.pause();
     std::thread::sleep(Duration::from_millis(150));
+    let res = execute_step2_real_with_prestate(ctx.audio.as_ref(), &ctx.session, pre_vol, MediaPlaybackStatus::Paused, step2_opts)?;
+    (res, s2_start.elapsed().as_secs_f64() * 1000.0)
   } else {
-    let current_st = ctx.session.playback_status().unwrap_or(MediaPlaybackStatus::Closed);
-    if current_st == MediaPlaybackStatus::Playing {
-      skipped_play_write = true;
-    } else if current_st != MediaPlaybackStatus::Changing {
-      let _ = ctx.session.play();
-    }
-  }
-  let s2_disp_ms = t_s2_disp.elapsed().as_secs_f64() * 1000.0;
+    let t_rw = Instant::now();
+    let res = execute_step2_real_with_prestate(ctx.audio.as_ref(), &ctx.session, pre_vol, status, step2_opts)?;
+    let rw_ms = t_rw.elapsed().as_secs_f64() * 1000.0;
+    (res, rw_ms)
+  };
 
-  // Verification Gate 2: Adaptive backoff polling
-  let t_s2_verif = Instant::now();
-  let mut s2_status = ctx.session.playback_status()?;
-  if !skipped_play_write || fault_injection.is_some() {
-    let s2_timeout = if fault_injection.is_some() {
-      Duration::from_millis(200)
-    } else {
-      Duration::from_millis(2000)
-    };
-    let s2_poll_start = Instant::now();
-    let mut backoff = Duration::from_millis(10);
-    while s2_poll_start.elapsed() < s2_timeout {
-      if s2_status == MediaPlaybackStatus::Playing {
-        break;
-      }
-      std::thread::sleep(backoff);
-      backoff = (backoff * 2).min(Duration::from_millis(80));
-      if let Ok(st) = ctx.session.playback_status() {
-        s2_status = st;
-        if s2_status == MediaPlaybackStatus::Paused && fault_injection.is_none() {
-          let _ = ctx.session.play();
-        }
-      }
-    }
-  }
-  let s2_vol = ctx.audio.as_ref().and_then(|a| a.get_volume().ok()).unwrap_or(0.0);
-  let s2_verif_ms = t_s2_verif.elapsed().as_secs_f64() * 1000.0;
   let s2_dur = s2_start.elapsed().as_secs_f64() * 1000.0;
+  let s2_disp_ms = if s2_result.skipped_volume_write && s2_result.skipped_play_write {
+    0.0
+  } else {
+    volume_rw_ms
+  };
+  let s2_verif_ms = (s2_dur - s2_disp_ms).max(0.0);
 
-  let vol_ok = (s2_vol - target_vol).abs() <= 0.05;
-  let status_ok = s2_status == MediaPlaybackStatus::Playing;
-  let s2_gate_passed = vol_ok && status_ok;
-
-  if !s2_gate_passed {
+  if !s2_result.gate_passed {
     overall_success = false;
     escalated = true;
   }
@@ -576,74 +677,123 @@ fn execute_replay_optimized(
     step_id: "step_2_ensure_playing_and_volume".to_string(),
     duration_ms: s2_dur,
     success: true,
-    gate_passed: s2_gate_passed,
-    escalation: if s2_gate_passed {
+    gate_passed: s2_result.gate_passed,
+    escalation: if s2_result.gate_passed {
       None
     } else {
       Some("would escalate to VLM".to_string())
     },
     details: serde_json::json!({
-      "status": format!("{:?}", s2_status),
-      "volume": s2_vol,
-      "target_volume": target_vol,
-      "skipped_volume_write": skipped_volume_write,
-      "skipped_play_write": skipped_play_write,
-      "vol_check": vol_ok,
-      "status_check": status_ok,
+      "final_status": format!("{:?}", s2_result.final_status),
+      "final_volume": s2_result.final_volume,
+      "skipped_volume_write": s2_result.skipped_volume_write,
+      "skipped_play_write": s2_result.skipped_play_write,
+      "command_counts": {
+        "set_volume": s2_result.command_counts.set_volume_calls,
+        "play": s2_result.command_counts.play_calls,
+      },
+      "gate_passed": s2_result.gate_passed,
     }),
   });
 
   // --------------------------------------------------------------------------
-  // Step 3: Skip Next Track (Action/Verification separation)
+  // Step 3: Skip Next Track (Phase 2A Track Identity + Phase 2B 2-Stage Wait)
   // --------------------------------------------------------------------------
   let s3_start = Instant::now();
   let prev_meta = ctx.session.track_metadata()?;
+  let prev_identity = TrackIdentity::from(&prev_meta);
 
   // Dispatch action
   let t_s3_disp = Instant::now();
   let _ = ctx.session.skip_next();
   let s3_disp_ms = t_s3_disp.elapsed().as_secs_f64() * 1000.0;
 
-  let (s3_verif_ms, s3_gate_passed, confirmed, new_title) = if is_fast_mode {
-    // Fast / action mode: command dispatched successfully, return immediately
-    (0.0, true, false, prev_meta.title.clone())
+  let (s3_verif_ms, s3_gate_passed, confirmed, identity_level, s3_details) = if is_fast_mode {
+    // Fast / action mode: command dispatched successfully, return immediately without confirmation
+    (
+      0.0,
+      true,
+      false,
+      Some(prev_identity.level().to_string()),
+      serde_json::json!({
+        "mode": "fast",
+        "dispatched": true,
+        "confirmed": false,
+        "previous_identity": prev_identity,
+        "dispatch_ms": s3_disp_ms,
+      }),
+    )
   } else {
-    // Verified mode: event listener + adaptive backoff polling
+    // Verified mode: Phase 2B Two-stage wait (MediaPropertiesChanged + PlaybackInfoChanged)
     let t_s3_verif = Instant::now();
-    let (tx, rx) = std::sync::mpsc::sync_channel::<()>(4);
-    let token = ctx
+    let (tx, rx) = std::sync::mpsc::sync_channel::<()>(8);
+
+    let tx_prop = tx.clone();
+    let token_prop = ctx
       .session
       .on_media_properties_changed(move || {
-        let _ = tx.try_send(());
+        let _ = tx_prop.try_send(());
+      })
+      .ok();
+
+    let tx_play = tx;
+    let token_play = ctx
+      .session
+      .on_playback_info_changed(move || {
+        let _ = tx_play.try_send(());
       })
       .ok();
 
     let s3_timeout = Duration::from_millis(3000);
-    let mut updated_title = prev_meta.title.clone();
+    let mut curr_identity = prev_identity.clone();
+    let mut change_verdict = TrackChangeVerdict::Unchanged;
+    let mut resolved_level = prev_identity.level();
     let mut backoff = Duration::from_millis(10);
 
     while t_s3_verif.elapsed() < s3_timeout {
       // Sleep until event arrives or backoff interval elapses
       let _ = rx.recv_timeout(backoff);
 
-      if let Ok(curr) = ctx.session.track_metadata()
-        && curr.title != prev_meta.title
-        && !curr.title.is_empty()
-      {
-        updated_title = curr.title;
-        break;
+      if let Ok(curr_meta) = ctx.session.track_metadata() {
+        curr_identity = TrackIdentity::from(&curr_meta);
+        let (verdict, level) = evaluate_track_change(&prev_identity, &curr_identity, false);
+        resolved_level = level;
+        change_verdict = verdict;
+
+        if verdict == TrackChangeVerdict::Changed {
+          break;
+        }
       }
 
       backoff = (backoff * 2).min(Duration::from_millis(80));
     }
 
-    if let Some(tok) = token {
+    if let Some(tok) = token_prop {
       let _ = ctx.session.remove_media_properties_changed(tok);
+    }
+    if let Some(tok) = token_play {
+      let _ = ctx.session.remove_playback_info_changed(tok);
     }
 
     let verif_ms = t_s3_verif.elapsed().as_secs_f64() * 1000.0;
-    let title_changed = updated_title != prev_meta.title;
-    (verif_ms, title_changed, title_changed, updated_title)
+    let is_confirmed = change_verdict == TrackChangeVerdict::Changed;
+
+    (
+      verif_ms,
+      is_confirmed,
+      is_confirmed,
+      Some(resolved_level.to_string()),
+      serde_json::json!({
+        "mode": "verified",
+        "previous_identity": prev_identity,
+        "current_identity": curr_identity,
+        "verdict": change_verdict.to_string(),
+        "identity_level": resolved_level.to_string(),
+        "confirmed": is_confirmed,
+        "dispatch_ms": s3_disp_ms,
+        "verification_ms": verif_ms,
+      }),
+    )
   };
 
   let s3_dur = s3_start.elapsed().as_secs_f64() * 1000.0;
@@ -662,18 +812,11 @@ fn execute_replay_optimized(
     } else {
       Some("would escalate to VLM".to_string())
     },
-    details: serde_json::json!({
-      "previous_title": prev_meta.title,
-      "new_title": new_title,
-      "confirmed": confirmed,
-      "fast_mode": is_fast_mode,
-      "dispatch_ms": s3_disp_ms,
-      "verification_ms": s3_verif_ms,
-    }),
+    details: s3_details,
   });
 
   // --------------------------------------------------------------------------
-  // Step 4: Verify Window Alive (Lightweight WGC health check)
+  // Step 4: Verify Window Alive (Phase 5 Lightweight WGC health check)
   // --------------------------------------------------------------------------
   let s4_start = Instant::now();
   let hwnd_opt = ctx.window.reference.id.parse::<isize>().ok().map(|h| HWND(h as _));
@@ -691,11 +834,13 @@ fn execute_replay_optimized(
 
   let is_still_minimized = hwnd_opt.map(|hwnd| unsafe { IsIconic(hwnd).as_bool() }).unwrap_or(false);
 
-  let (s4_dur, s4_gate_passed, s4_details) = if is_still_minimized {
+  let (s4_dur, s4_gate_passed, frame_health, window_state, s4_details) = if is_still_minimized {
     let dur = s4_start.elapsed().as_secs_f64() * 1000.0;
     (
       dur,
       true,
+      "skipped_minimized".to_string(),
+      "minimized".to_string(),
       serde_json::json!({
         "status": "skipped_minimized",
         "reason": "window_minimized (zero-window-mutation redline preserves user state)",
@@ -706,9 +851,16 @@ fn execute_replay_optimized(
     match capture_window_health(&ctx.window) {
       Ok(health) => {
         let dur = s4_start.elapsed().as_secs_f64() * 1000.0;
+        let fh = if health.is_fresh {
+          "fresh".to_string()
+        } else {
+          "stale".to_string()
+        };
         (
           dur,
           health.alive,
+          fh,
+          "active".to_string(),
           serde_json::json!({
             "status": "captured_health",
             "width": health.width,
@@ -724,6 +876,8 @@ fn execute_replay_optimized(
         (
           dur,
           false,
+          "error".to_string(),
+          "active".to_string(),
           serde_json::json!({
             "status": "error",
             "error": format!("{e:?}"),
@@ -755,9 +909,10 @@ fn execute_replay_optimized(
   let total_duration_ms = start_time.elapsed().as_secs_f64() * 1000.0;
   let dispatch_ms = s2_disp_ms + s3_disp_ms;
   let verification_ms = s1_verif_ms + s2_verif_ms + s3_verif_ms;
-  let wgc_ms = s4_dur;
+  let wgc_capture_ms = s4_dur;
+  let wgc_ms = wgc_capture_ms;
 
-  Ok(ReplayRecord {
+  let record = ReplayRecord {
     iteration,
     timestamp: chrono_now_iso(),
     operation: "qqmusic.prepare_playback".to_string(),
@@ -770,15 +925,41 @@ fn execute_replay_optimized(
     tokens_used: 0,
     total_duration_ms,
     discovery_ms,
+    manager_discovery_ms: ctx.timings.manager_discovery_ms,
+    session_discovery_ms: ctx.timings.session_discovery_ms,
+    window_discovery_ms: ctx.timings.window_discovery_ms,
+    audio_lookup_ms: ctx.timings.audio_lookup_ms,
+    volume_rw_ms,
     dispatch_ms,
     verification_ms,
     wgc_ms,
+    wgc_init_ms,
+    wgc_capture_ms,
+    serialization_ms: 0.0,
+    pacing_ms,
+    cache_state: cache_state.to_string(),
+    window_state,
+    frame_health,
+    identity_level,
+    skipped_volume_write: s2_result.skipped_volume_write,
+    skipped_play_write: s2_result.skipped_play_write,
+    play_dispatched: s2_result.play_dispatched,
+    volume_set_calls: s2_result.command_counts.set_volume_calls,
+    play_calls: s2_result.command_counts.play_calls,
+    audio_lookup_status: ctx.timings.audio_lookup_stats.as_ref().map(|s| match s.status {
+      AudioLookupStatus::Hit => "hit".to_string(),
+      AudioLookupStatus::Miss => "miss".to_string(),
+      AudioLookupStatus::Invalidated => "invalidated".to_string(),
+    }),
+    audio_endpoint_count: ctx.timings.audio_lookup_stats.as_ref().map(|s| s.endpoint_count),
     success: overall_success,
     confirmed,
     fault_injected: fault_injection.map(ToString::to_string),
     escalated_to_vlm: escalated,
     steps,
-  })
+  };
+
+  Ok((record, ctx.endpoint_id))
 }
 
 fn chrono_now_iso() -> String {
@@ -789,16 +970,33 @@ fn chrono_now_iso() -> String {
   format!("{}.{:03}Z", secs, millis)
 }
 
-fn percentile(mut vals: Vec<f64>, p: f64) -> f64 {
-  if vals.is_empty() {
+fn linear_percentile(sorted_vals: &[f64], p: f64) -> f64 {
+  let n = sorted_vals.len();
+  if n == 0 {
     return 0.0;
   }
-  vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-  let idx = ((vals.len() as f64 - 1.0) * p).round() as usize;
-  vals[idx.min(vals.len() - 1)]
+  if n == 1 {
+    return sorted_vals[0];
+  }
+  let rank = p * (n as f64 - 1.0);
+  let low = rank.floor() as usize;
+  let high = (low + 1).min(n - 1);
+  let weight = rank - low as f64;
+  sorted_vals[low] * (1.0 - weight) + sorted_vals[high] * weight
 }
 
-fn main() {
+fn compute_stats(mut vals: Vec<f64>) -> (f64, f64, f64) {
+  if vals.is_empty() {
+    return (0.0, 0.0, 0.0);
+  }
+  vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+  let mean = vals.iter().sum::<f64>() / vals.len() as f64;
+  let p50 = linear_percentile(&vals, 0.50);
+  let p95 = linear_percentile(&vals, 0.95);
+  (p50, p95, mean)
+}
+
+pub(super) fn main() {
   ensure_input_desktop();
 
   let args: Vec<String> = env::args().collect();
@@ -807,6 +1005,8 @@ fn main() {
   let mut output_file: Option<String> = None;
   let mut fault_inject: Option<String> = None;
   let mut allow_restore = false;
+  let mut pacing_delay_ms = 50.0;
+  let mut is_single_cold_mode = false;
 
   let mut i = 1;
   while i < args.len() {
@@ -838,10 +1038,40 @@ fn main() {
       "--allow-restore" => {
         allow_restore = true;
       }
+      "--pacing-ms" => {
+        if i + 1 < args.len() {
+          pacing_delay_ms = args[i + 1].parse().unwrap_or(50.0);
+          i += 1;
+        }
+      }
+      "--cold" => {
+        is_single_cold_mode = true;
+        replays_count = 1;
+      }
       _ => {}
     }
     i += 1;
   }
+
+  // Prewarm only for prewarmed experimental groups (e.g. warm "verified" and "fast" modes).
+  // "baseline" mode and "--cold" single-run must measure the cold path without caching D3D context or WGC session.
+  let mut wgc_init_dur = Duration::ZERO;
+  if mode == "baseline" || is_single_cold_mode {
+    reset_d3d_context();
+  } else {
+    wgc_init_dur += prewarm_wgc().unwrap_or(Duration::ZERO);
+    if let Ok(windows) = list_windows()
+      && let Some(w) = windows.into_iter().find(|win| {
+        win.app_name.as_deref() == Some("QQMusic.exe")
+          || win.app_name.as_deref() == Some("QQMusic")
+          || win.title.as_deref().map(|t| t.contains("QQ音乐")).unwrap_or(false)
+      })
+      && let Ok(win_dur) = prewarm_wgc_window(&w)
+    {
+      wgc_init_dur += win_dur;
+    }
+  }
+  let wgc_init_ms = wgc_init_dur.as_secs_f64() * 1000.0;
 
   let final_output = output_file.unwrap_or_else(|| match mode.as_str() {
     "baseline" => "docs/ai/references/driver/2026-10-04-windows-hotpath-baseline-20x.jsonl".to_string(),
@@ -857,12 +1087,15 @@ fn main() {
     serde_json::from_str(&op_json).unwrap_or_else(|e| panic!("Failed to parse compiled operation JSON: {e}"));
 
   println!("================================================================================");
-  println!("QQ Music Hotpath Optimization Replay Harness (Zero VLM / Zero Token)");
+  println!("QQ Music Hotpath Profiling & Replay Harness (Zero VLM / Zero Token)");
   println!("================================================================================");
   println!("Target Operation : {} ({})", compiled_op.name, compiled_op.schema_version);
   println!("Execution Mode   : {}", mode);
   println!("Compiler Source  : {}", compiled_op.compilation_metadata.compiler);
   println!("Replays Count    : {}", replays_count);
+  println!("Pacing Delay     : {:.1}ms (isolated from total_duration_ms)", pacing_delay_ms);
+  println!("Cold Mode        : {}", is_single_cold_mode);
+  println!("WGC Prewarm      : {:.2}ms", wgc_init_ms);
   println!("Output JSONL     : {}", final_output);
   println!("Fault Injection  : {:?}", fault_inject);
   println!("Allow Restore    : {} (default false, zero-window-mutation redline)", allow_restore);
@@ -873,9 +1106,9 @@ fn main() {
   if let Some(ref fi) = fault_inject {
     println!("[FAULT INJECTION MODE] Injecting fault: {}", fi);
     let record = match mode.as_str() {
-      "baseline" => execute_replay_baseline(1, Some(fi), allow_restore),
-      "fast" => execute_replay_optimized(1, Some(fi), allow_restore, true),
-      _ => execute_replay_optimized(1, Some(fi), allow_restore, false),
+      "baseline" => execute_replay_baseline(1, Some(fi), allow_restore, 0.0, "cold", wgc_init_ms),
+      "fast" => execute_replay_optimized(1, Some(fi), allow_restore, true, 0.0, "cold", None, wgc_init_ms).map(|(r, _)| r),
+      _ => execute_replay_optimized(1, Some(fi), allow_restore, false, 0.0, "cold", None, wgc_init_ms).map(|(r, _)| r),
     }
     .expect("Failed to execute fault injection replay");
 
@@ -894,135 +1127,147 @@ fn main() {
   }
 
   // Normal execution
-  let mut records = Vec::new();
+  let mut records = Vec::with_capacity(replays_count);
   let parent_dir = Path::new(&final_output).parent().unwrap_or(Path::new("."));
   let _ = fs::create_dir_all(parent_dir);
 
-  let mut jsonl_file =
-    OpenOptions::new().create(true).write(true).truncate(true).open(&final_output).expect("Failed to open output jsonl file");
-
-  let mut discovery_durs = Vec::new();
-  let mut dispatch_durs = Vec::new();
-  let mut verif_durs = Vec::new();
-  let mut wgc_durs = Vec::new();
-  let mut total_durs = Vec::new();
-  let mut s1_durs = Vec::new();
-  let mut s2_durs = Vec::new();
-  let mut s3_durs = Vec::new();
-  let mut s4_durs = Vec::new();
+  let mut cached_ep_id: Option<String> = None;
   let mut successes = 0usize;
 
   for iter in 1..=replays_count {
-    print!("[Replay {:02}/{:02}] Executing... ", iter, replays_count);
+    let cache_state = if iter == 1 { "cold" } else { "warm" };
+    let current_pacing = if iter == 1 { 0.0 } else { pacing_delay_ms };
+
+    print!("[Replay {:02}/{:02} ({})] Executing... ", iter, replays_count, cache_state);
     std::io::stdout().flush().unwrap();
 
     let res = match mode.as_str() {
-      "baseline" => execute_replay_baseline(iter, None, allow_restore),
-      "fast" => execute_replay_optimized(iter, None, allow_restore, true),
-      _ => execute_replay_optimized(iter, None, allow_restore, false),
+      "baseline" => execute_replay_baseline(iter, None, allow_restore, current_pacing, cache_state, wgc_init_ms).map(|r| (r, None)),
+      "fast" => execute_replay_optimized(iter, None, allow_restore, true, current_pacing, cache_state, cached_ep_id.as_deref(), wgc_init_ms),
+      _ => execute_replay_optimized(iter, None, allow_restore, false, current_pacing, cache_state, cached_ep_id.as_deref(), wgc_init_ms),
     };
 
-    let record = match res {
-      Ok(r) => r,
+    let (mut record, next_ep) = match res {
+      Ok((r, ep)) => (r, ep),
       Err(e) => {
         println!("FAILED: {e:?}");
         continue;
       }
     };
 
+    if next_ep.is_some() {
+      cached_ep_id = next_ep;
+    }
+
     if record.success {
       successes += 1;
     }
 
-    discovery_durs.push(record.discovery_ms);
-    dispatch_durs.push(record.dispatch_ms);
-    verif_durs.push(record.verification_ms);
-    wgc_durs.push(record.wgc_ms);
-    total_durs.push(record.total_duration_ms);
-
-    s1_durs.push(record.steps[0].duration_ms);
-    s2_durs.push(record.steps[1].duration_ms);
-    s3_durs.push(record.steps[2].duration_ms);
-    s4_durs.push(record.steps[3].duration_ms);
-
-    let json_line = serde_json::to_string(&record).unwrap();
-    writeln!(jsonl_file, "{}", json_line).unwrap();
+    // Measure serialization timing in memory (Phase 6)
+    let t_ser = Instant::now();
+    let _ = serde_json::to_string(&record);
+    record.serialization_ms = t_ser.elapsed().as_secs_f64() * 1000.0;
 
     println!(
-      "OK ({:.1}ms) | Disc={:.1}ms, Disp={:.1}ms, Verif={:.1}ms, WGC={:.1}ms | tokens=0",
-      record.total_duration_ms, record.discovery_ms, record.dispatch_ms, record.verification_ms, record.wgc_ms
+      "OK ({:.1}ms) | Mgr={:.1}ms, Sess={:.1}ms, Win={:.1}ms, Aud={:.1}ms, Disp={:.1}ms, Verif={:.1}ms, WGC={:.1}ms | tokens=0",
+      record.total_duration_ms,
+      record.manager_discovery_ms,
+      record.session_discovery_ms,
+      record.window_discovery_ms,
+      record.audio_lookup_ms,
+      record.dispatch_ms,
+      record.verification_ms,
+      record.wgc_ms
     );
 
     records.push(record);
-    std::thread::sleep(Duration::from_millis(50));
+
+    if iter < replays_count && pacing_delay_ms > 0.0 {
+      std::thread::sleep(Duration::from_millis(pacing_delay_ms as u64));
+    }
   }
 
+  // Phase 6: Batch write to disk
+  let write_start = Instant::now();
+  let append_mode = is_single_cold_mode && Path::new(&final_output).exists();
+  let mut file = OpenOptions::new()
+    .create(true)
+    .write(true)
+    .append(append_mode)
+    .truncate(!append_mode)
+    .open(&final_output)
+    .expect("Failed to open output jsonl file");
+
+  for r in &records {
+    let line = serde_json::to_string(r).unwrap();
+    writeln!(file, "{}", line).unwrap();
+  }
+  file.flush().unwrap();
+  let total_batch_write_ms = write_start.elapsed().as_secs_f64() * 1000.0;
+
   println!("--------------------------------------------------------------------------------");
-  println!("Execution Summary (Mode: {}, N={}):", mode, records.len());
-  println!("  Total Runs      : {}", replays_count);
-  println!("  Successful Runs : {} ({:.1}%)", successes, (successes as f64 / replays_count as f64) * 100.0);
-  println!("  VLM Invocations : 0 (实测 0 调用)");
-  println!("  Tokens Used     : 0 (实测 0 token)");
+  println!("Execution Summary (Mode: {}, Total Runs: {}, Successful: {}):", mode, records.len(), successes);
+  println!("  Batch File Write : {:.2}ms for {} records", total_batch_write_ms, records.len());
+  println!("  VLM Invocations  : 0 (实测 0 调用)");
+  println!("  Tokens Used      : 0 (实测 0 token)");
   println!();
-  println!("4-Way Split Metrics Benchmark:");
-  println!("  | Metric            | P50 Latency | P95 Latency | Mean Latency | Description |");
-  println!("  |-------------------|-------------|-------------|--------------|-------------|");
+
+  // Print 10-Field Split Benchmark using standard linear interpolation
+  let extract = |f: fn(&ReplayRecord) -> f64| records.iter().map(f).collect::<Vec<f64>>();
+  let (tot_p50, tot_p95, tot_mean) = compute_stats(extract(|r| r.total_duration_ms));
+  let (disc_p50, disc_p95, disc_mean) = compute_stats(extract(|r| r.discovery_ms));
+  let (mgr_p50, mgr_p95, mgr_mean) = compute_stats(extract(|r| r.manager_discovery_ms));
+  let (sess_p50, sess_p95, sess_mean) = compute_stats(extract(|r| r.session_discovery_ms));
+  let (win_p50, win_p95, win_mean) = compute_stats(extract(|r| r.window_discovery_ms));
+  let (aud_p50, aud_p95, aud_mean) = compute_stats(extract(|r| r.audio_lookup_ms));
+  let (vrw_p50, vrw_p95, vrw_mean) = compute_stats(extract(|r| r.volume_rw_ms));
+  let (disp_p50, disp_p95, disp_mean) = compute_stats(extract(|r| r.dispatch_ms));
+  let (verif_p50, verif_p95, verif_mean) = compute_stats(extract(|r| r.verification_ms));
+  let (wgc_p50, wgc_p95, wgc_mean) = compute_stats(extract(|r| r.wgc_ms));
+  let (ser_p50, ser_p95, ser_mean) = compute_stats(extract(|r| r.serialization_ms));
+  let (pace_p50, pace_p95, pace_mean) = compute_stats(extract(|r| r.pacing_ms));
+
+  println!("10-Field Granular Split Benchmark (Standard Linear Interpolation):");
+  println!("  | Metric                 | P50 Latency | P95 Latency | Mean Latency | Description |");
+  println!("  |------------------------|-------------|-------------|--------------|-------------|");
+  println!("  | manager_discovery_ms   | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | SMTC manager acquisition    |", mgr_p50, mgr_p95, mgr_mean);
+  println!("  | session_discovery_ms   | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | GetCurrentSession vs scan   |", sess_p50, sess_p95, sess_mean);
+  println!("  | window_discovery_ms    | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | HWND enumeration & filter   |", win_p50, win_p95, win_mean);
+  println!("  | audio_lookup_ms        | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | CoreAudio endpoint/session  |", aud_p50, aud_p95, aud_mean);
+  println!("  | discovery_ms (sum)     | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | Total discovery phase       |", disc_p50, disc_p95, disc_mean);
+  println!("  | volume_rw_ms           | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | Volume read/write duration  |", vrw_p50, vrw_p95, vrw_mean);
+  println!("  | dispatch_ms            | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | Command call latency        |", disp_p50, disp_p95, disp_mean);
   println!(
-    "  | discovery_ms      | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | SMTC & window & Audio resolution |",
-    percentile(discovery_durs.clone(), 0.50),
-    percentile(discovery_durs.clone(), 0.95),
-    discovery_durs.iter().sum::<f64>() / discovery_durs.len() as f64
+    "  | verification_ms        | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | Identity polling / wait     |",
+    verif_p50, verif_p95, verif_mean
   );
-  println!(
-    "  | dispatch_ms       | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | WinRT/CoreAudio command calls    |",
-    percentile(dispatch_durs.clone(), 0.50),
-    percentile(dispatch_durs.clone(), 0.95),
-    dispatch_durs.iter().sum::<f64>() / dispatch_durs.len() as f64
-  );
-  println!(
-    "  | verification_ms   | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | Semantic check & polling latency |",
-    percentile(verif_durs.clone(), 0.50),
-    percentile(verif_durs.clone(), 0.95),
-    verif_durs.iter().sum::<f64>() / verif_durs.len() as f64
-  );
-  println!(
-    "  | wgc_ms            | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | WGC window alive check           |",
-    percentile(wgc_durs.clone(), 0.50),
-    percentile(wgc_durs.clone(), 0.95),
-    wgc_durs.iter().sum::<f64>() / wgc_durs.len() as f64
-  );
-  println!("  |-------------------|-------------|-------------|--------------|-------------|");
-  println!(
-    "  | total_duration_ms | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | End-to-end operation latency     |",
-    percentile(total_durs.clone(), 0.50),
-    percentile(total_durs.clone(), 0.95),
-    total_durs.iter().sum::<f64>() / total_durs.len() as f64
-  );
+  println!("  | wgc_ms                 | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | WGC health check            |", wgc_p50, wgc_p95, wgc_mean);
+  println!("  | serialization_ms       | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | In-memory JSON serialize    |", ser_p50, ser_p95, ser_mean);
+  println!("  | pacing_ms (isolated)   | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | Inter-iteration sleep       |", pace_p50, pace_p95, pace_mean);
+  println!("  |------------------------|-------------|-------------|--------------|-------------|");
+  println!("  | total_duration_ms      | {:>9.2}ms | {:>9.2}ms | {:>10.2}ms | End-to-end operation        |", tot_p50, tot_p95, tot_mean);
   println!();
-  println!("Per-Step Breakdown:");
+
+  // Print Command Counting Summary (Phase 4)
+  let vol_calls_total: usize = records.iter().map(|r| r.volume_set_calls).sum();
+  let play_calls_total: usize = records.iter().map(|r| r.play_calls).sum();
+  let skipped_vol_total = records.iter().filter(|r| r.skipped_volume_write).count();
+  let skipped_play_total = records.iter().filter(|r| r.skipped_play_write).count();
+
+  println!("Phase 4 Command Counting & Idempotency Proof:");
   println!(
-    "  - Step 1 (Query State): P50={:.2}ms, P95={:.2}ms, Mean={:.2}ms",
-    percentile(s1_durs.clone(), 0.50),
-    percentile(s1_durs.clone(), 0.95),
-    s1_durs.iter().sum::<f64>() / s1_durs.len() as f64
+    "  - SetMasterVolume calls : {} total across {} runs (skipped: {}/{})",
+    vol_calls_total,
+    records.len(),
+    skipped_vol_total,
+    records.len()
   );
   println!(
-    "  - Step 2 (Play & Vol):  P50={:.2}ms, P95={:.2}ms, Mean={:.2}ms",
-    percentile(s2_durs.clone(), 0.50),
-    percentile(s2_durs.clone(), 0.95),
-    s2_durs.iter().sum::<f64>() / s2_durs.len() as f64
-  );
-  println!(
-    "  - Step 3 (Skip Next):   P50={:.2}ms, P95={:.2}ms, Mean={:.2}ms",
-    percentile(s3_durs.clone(), 0.50),
-    percentile(s3_durs.clone(), 0.95),
-    s3_durs.iter().sum::<f64>() / s3_durs.len() as f64
-  );
-  println!(
-    "  - Step 4 (WGC Alive):   P50={:.2}ms, P95={:.2}ms, Mean={:.2}ms",
-    percentile(s4_durs.clone(), 0.50),
-    percentile(s4_durs.clone(), 0.95),
-    s4_durs.iter().sum::<f64>() / s4_durs.len() as f64
+    "  - Play calls            : {} total across {} runs (skipped: {}/{})",
+    play_calls_total,
+    records.len(),
+    skipped_play_total,
+    records.len()
   );
   println!("================================================================================");
 }

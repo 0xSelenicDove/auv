@@ -10,7 +10,7 @@ import type { DurationSchema } from '@bufbuild/protobuf/wkt'
 
 import type { FocusTextRequestSchema } from '../../gen/auv/api/driver/macos/v1/accessibility_pb'
 import type { ActivateBundleIdRequestSchema } from '../../gen/auv/api/driver/macos/v1/application_pb'
-import type { CaptureRefSchema, GetCaptureImageRequestSchema, ImageFrameSchema } from '../../gen/auv/api/driver/v1/capture_pb'
+import type { CaptureRefSchema, CaptureResolution, GetCaptureImageRequestSchema, ImageFrameSchema } from '../../gen/auv/api/driver/v1/capture_pb'
 import type { Display, DisplaySelectorSchema } from '../../gen/auv/api/driver/v1/display_pb'
 import type { ScreenPointSchema, ScreenRectSchema, WindowPointSchema } from '../../gen/auv/api/driver/v1/geometry_pb'
 import type {
@@ -24,7 +24,7 @@ import type {
   ScrollSchema,
   ScrollUntilBeginSchema,
   ScrollUntilCompleted,
-  ScrollUntilObservation,
+  ScrollUntilUpdate,
   ScrollVelocitySchema,
   ScrollWindowPointMotionResponse,
   StreamScrollBeginSchema,
@@ -67,6 +67,15 @@ export interface CaptureImage {
 }
 /** How `captures.image` shapes pixels: crop to `region`, fit inside `maxSize`, then encode (RGBA by default). */
 export interface CaptureImageOptions extends InputFields<typeof GetCaptureImageRequestSchema, 'capture'>, OperationOptions {}
+
+/**
+ * Capture call options. `resolution` defaults to native (backing pixels, 2x
+ * on Retina); `CaptureResolution.LOGICAL` takes one pixel per point for
+ * display and motion checks.
+ */
+export interface CaptureOptions extends OperationOptions {
+  resolution?: CaptureResolution
+}
 /**
  * A capture held by the Runner: its ID, its `CaptureRef`, or a `CapturedFrame`
  * returned by a capture, find-text, or scroll-until call (structurally typed,
@@ -97,8 +106,8 @@ export interface RunnerClient {
     image: (capture: CaptureTarget, options?: CaptureImageOptions) => Promise<CaptureImage>
   }
   readonly displays: {
-    capture: (selector?: Init<typeof DisplaySelectorSchema>, options?: OperationOptions) => Promise<Shape<typeof CaptureService.method.captureDisplay.output>>
-    captureRegion: (region: Init<typeof ScreenRectSchema>, selector?: Init<typeof DisplaySelectorSchema>, options?: OperationOptions) => Promise<Shape<typeof CaptureService.method.captureRegion.output>>
+    capture: (selector?: Init<typeof DisplaySelectorSchema>, options?: CaptureOptions) => Promise<Shape<typeof CaptureService.method.captureDisplay.output>>
+    captureRegion: (region: Init<typeof ScreenRectSchema>, selector?: Init<typeof DisplaySelectorSchema>, options?: CaptureOptions) => Promise<Shape<typeof CaptureService.method.captureRegion.output>>
     findText: (selector: Init<typeof DisplaySelectorSchema> | undefined, query: string, options?: FindDisplayTextOptions) => Promise<Shape<typeof TextRecognitionService.method.findDisplayText.output>>
     list: (options?: OperationOptions) => Promise<readonly Display[]>
   }
@@ -179,21 +188,21 @@ export interface ScrollStreamController {
 }
 
 export interface ScrollUntilCallOptions extends OperationOptions {
-  /** Receives every observation in order, including the last one. */
-  onObservation?: (observation: ScrollUntilObservation) => Promise<void> | void
+  /** Receives every update in order, including the last one. */
+  onUpdate?: (update: ScrollUntilUpdate) => Promise<void> | void
   /**
    * Client-side stop predicate. Returning `true` stops the loop with reason
    * `predicateSatisfied`. The Runner waits for each answer, and does not ask
-   * about observations it already ends itself (`observation.stop`).
+   * about updates it already ends itself (`update.stop`).
    */
-  until?: (observation: ScrollUntilObservation) => boolean | Promise<boolean>
+  until?: (update: ScrollUntilUpdate) => boolean | Promise<boolean>
 }
 
 /**
  * `scrollUntil` begin fields; the window, point, and decision mode come from
  * the call. Without a `condition`, the loop stops at the end (no visual motion).
- * Observations carry the capture by reference (fetch pixels with
- * `captures.image`) and the recognized text unless `observe.omitText` is set.
+ * Updates carry the capture by reference (fetch pixels with
+ * `captures.image`) and the recognized text unless `output.omitText` is set.
  */
 export type ScrollUntilOptions = InputFields<typeof ScrollUntilBeginSchema, 'awaitDecisions' | 'point' | 'window'>
 
@@ -205,7 +214,7 @@ export interface ScrollWithStep {
 }
 
 export interface WindowClient {
-  capture: (options?: OperationOptions) => Promise<Shape<typeof CaptureService.method.captureWindow.output>>
+  capture: (options?: CaptureOptions) => Promise<Shape<typeof CaptureService.method.captureWindow.output>>
   click: (point: Init<typeof WindowPointSchema>, clickOptions?: Init<typeof ClickOptionsSchema>, options?: OperationOptions) => Promise<Shape<typeof InputService.method.clickWindowPoint.output>>
   findText: (query: string, options?: FindWindowTextOptions) => Promise<Shape<typeof TextRecognitionService.method.findWindowText.output>>
   /** Window ID; the same as `window.ref.windowId`. */
@@ -320,7 +329,7 @@ export function createRunnerClient(connection: AuvConnection, route: RunnerRoute
     if (id === undefined || id.length === 0)
       throw new AuvProtocolError('Window omitted ref.windowId')
     return {
-      capture: options => unary(CaptureService.method.captureWindow, { window: { windowId: id } }, options),
+      capture: ({ resolution, ...options } = {}) => unary(CaptureService.method.captureWindow, { resolution, window: { windowId: id } }, options),
       click: (point, clickOptions, options) => unary(InputService.method.clickWindowPoint, {
         options: clickOptions,
         point,
@@ -349,7 +358,7 @@ export function createRunnerClient(connection: AuvConnection, route: RunnerRoute
       }, options),
       scrollStream: (begin, options) => openScrollStream(id, begin, options),
       scrollUntil: async (point, request, options = {}) => {
-        const { onObservation, until, ...operation } = options
+        const { onUpdate, until, ...operation } = options
         const call = await duplex(InputService.method.scrollUntil, operation)
         const condition = request.condition?.case === undefined ? { case: 'end' as const, value: {} } : request.condition
         await call.send({
@@ -362,9 +371,9 @@ export function createRunnerClient(connection: AuvConnection, route: RunnerRoute
           const event = response.event
           if (event.case === 'completed')
             return event.value
-          if (event.case !== 'observation')
+          if (event.case !== 'update')
             continue
-          await onObservation?.(event.value)
+          await onUpdate?.(event.value)
           if (event.value.awaitingDecision)
             await call.send({ event: { case: 'decision', value: { stop: await until?.(event.value) ?? true } } })
         }
@@ -411,8 +420,8 @@ export function createRunnerClient(connection: AuvConnection, route: RunnerRoute
       },
     },
     displays: {
-      capture: (selector, options) => unary(CaptureService.method.captureDisplay, { selector }, options),
-      captureRegion: (region, selector, options) => unary(CaptureService.method.captureRegion, { region, selector }, options),
+      capture: (selector, { resolution, ...options } = {}) => unary(CaptureService.method.captureDisplay, { resolution, selector }, options),
+      captureRegion: (region, selector, { resolution, ...options } = {}) => unary(CaptureService.method.captureRegion, { region, resolution, selector }, options),
       findText: (selector, query, options = {}) => {
         const { signal, ...request } = options
         return unary(TextRecognitionService.method.findDisplayText, { ...request, query, selector }, { signal })

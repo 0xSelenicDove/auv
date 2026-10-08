@@ -40,6 +40,24 @@ pub struct NowPlayingState {
   pub track: Option<MediaTrackMetadata>,
 }
 
+/// Status of an audio session endpoint lookup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioLookupStatus {
+  Hit,
+  Miss,
+  Invalidated,
+}
+
+/// Statistics from resolving an audio volume endpoint.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AudioLookupStats {
+  pub status: AudioLookupStatus,
+  pub endpoint_id: Option<String>,
+  pub endpoint_count: usize,
+  pub session_count: usize,
+}
+
 #[cfg(target_os = "windows")]
 mod native {
   use windows::Foundation::{EventRegistrationToken, TypedEventHandler};
@@ -48,10 +66,10 @@ mod native {
     DEVICE_STATE_ACTIVE, IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2, IMMDevice, IMMDeviceEnumerator,
     ISimpleAudioVolume, MMDeviceEnumerator, eCommunications, eMultimedia, eRender,
   };
-  use windows::Win32::System::Com::{CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize};
-  use windows::core::Interface;
+  use windows::Win32::System::Com::{CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize};
+  use windows::core::{Interface, PCWSTR};
 
-  use super::{MediaPlaybackStatus, MediaTrackMetadata, NowPlayingState};
+  use super::{AudioLookupStats, AudioLookupStatus, MediaPlaybackStatus, MediaTrackMetadata, NowPlayingState};
   use crate::error::backend;
   use auv_driver_common::error::DriverResult;
 
@@ -176,6 +194,31 @@ mod native {
         .map_err(|e| backend(format!("Failed to unregister MediaPropertiesChanged for {}: {e}", self.app_id)))
     }
 
+    /// Registers a best-effort callback on `PlaybackInfoChanged`.
+    ///
+    /// NOTE: During track skipping, playback status may remain `Playing`, so this
+    /// event is an auxiliary wakeup signal, not a primary verification gate.
+    pub fn on_playback_info_changed<F>(&self, handler: F) -> DriverResult<EventRegistrationToken>
+    where
+      F: Fn() + Send + 'static,
+    {
+      self
+        .inner
+        .PlaybackInfoChanged(&TypedEventHandler::new(move |_, _| {
+          handler();
+          Ok(())
+        }))
+        .map_err(|e| backend(format!("Failed to register PlaybackInfoChanged for {}: {e}", self.app_id)))
+    }
+
+    /// Unregisters a previously registered `PlaybackInfoChanged` token.
+    pub fn remove_playback_info_changed(&self, token: EventRegistrationToken) -> DriverResult<()> {
+      self
+        .inner
+        .RemovePlaybackInfoChanged(token)
+        .map_err(|e| backend(format!("Failed to unregister PlaybackInfoChanged for {}: {e}", self.app_id)))
+    }
+
     pub fn snapshot(&self) -> DriverResult<NowPlayingState> {
       let status = self.playback_status()?;
       let meta = self.track_metadata()?;
@@ -257,8 +300,10 @@ mod native {
   }
 
   /// Reusable process audio volume handle, avoiding repeated MMDevice and AudioSession enumeration.
+  #[derive(Debug)]
   pub struct ProcessAudioVolume {
     pid: u32,
+    endpoint_id: Option<String>,
     vol: ISimpleAudioVolume,
   }
 
@@ -267,6 +312,14 @@ mod native {
   unsafe impl Sync for ProcessAudioVolume {}
 
   impl ProcessAudioVolume {
+    pub fn endpoint_id(&self) -> Option<&str> {
+      self.endpoint_id.as_deref()
+    }
+
+    pub fn is_alive(&self) -> bool {
+      self.get_volume().is_ok()
+    }
+
     pub fn get_volume(&self) -> DriverResult<f32> {
       unsafe { self.vol.GetMasterVolume().map_err(|e| backend(format!("GetMasterVolume failed for PID {}: {e}", self.pid))) }
     }
@@ -298,11 +351,20 @@ mod native {
   impl AudioVolumeController {
     /// Opens a reusable audio volume handle for `target_pid`.
     pub fn open_process(target_pid: u32) -> DriverResult<ProcessAudioVolume> {
-      let vol = find_process_simple_volume(target_pid)?;
-      Ok(ProcessAudioVolume {
-        pid: target_pid,
-        vol,
-      })
+      Self::open_process_cached(target_pid, None).map(|(vol, _)| vol)
+    }
+
+    /// Opens a reusable audio volume handle, prioritizing `cached_endpoint_id`.
+    pub fn open_process_cached(target_pid: u32, cached_endpoint_id: Option<&str>) -> DriverResult<(ProcessAudioVolume, AudioLookupStats)> {
+      let (vol, stats) = find_process_simple_volume(target_pid, cached_endpoint_id)?;
+      Ok((
+        ProcessAudioVolume {
+          pid: target_pid,
+          endpoint_id: stats.endpoint_id.clone(),
+          vol,
+        },
+        stats,
+      ))
     }
 
     /// Returns process volume for `target_pid` in `[0.0, 1.0]`.
@@ -343,7 +405,16 @@ mod native {
     ComGuard { uninit: hr.is_ok() }
   }
 
-  unsafe fn search_device_for_process_volume(device: &IMMDevice, target_pid: u32) -> Option<ISimpleAudioVolume> {
+  unsafe fn get_device_id(device: &IMMDevice) -> Option<String> {
+    unsafe {
+      let pwstr = device.GetId().ok()?;
+      let s = pwstr.to_string().ok();
+      CoTaskMemFree(Some(pwstr.0 as _));
+      s
+    }
+  }
+
+  unsafe fn search_device_for_process_volume(device: &IMMDevice, target_pid: u32) -> Option<(ISimpleAudioVolume, usize)> {
     unsafe {
       let mgr: IAudioSessionManager2 = device.Activate(CLSCTX_ALL, None).ok()?;
       let session_enum: IAudioSessionEnumerator = mgr.GetSessionEnumerator().ok()?;
@@ -354,31 +425,82 @@ mod native {
           && ctrl2.GetProcessId().ok() == Some(target_pid)
           && let Ok(vol) = session_ctrl.cast::<ISimpleAudioVolume>()
         {
-          return Some(vol);
+          return Some((vol, count as usize));
         }
       }
       None
     }
   }
 
-  fn find_process_simple_volume(target_pid: u32) -> DriverResult<ISimpleAudioVolume> {
+  fn find_process_simple_volume(target_pid: u32, cached_endpoint_id: Option<&str>) -> DriverResult<(ISimpleAudioVolume, AudioLookupStats)> {
     let _com = init_com();
     unsafe {
       let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
         .map_err(|e| backend(format!("Failed to instantiate MMDeviceEnumerator: {e}")))?;
 
+      let mut was_invalidated = false;
+
+      // 0. Check cached endpoint first (prioritizing previously known endpoint)
+      if let Some(cached_id) = cached_endpoint_id {
+        let wide: Vec<u16> = cached_id.encode_utf16().chain(std::iter::once(0)).collect();
+        if let Ok(device) = enumerator.GetDevice(PCWSTR(wide.as_ptr()))
+          && let Some((vol, session_count)) = search_device_for_process_volume(&device, target_pid)
+        {
+          return Ok((
+            vol,
+            AudioLookupStats {
+              status: AudioLookupStatus::Hit,
+              endpoint_id: Some(cached_id.to_string()),
+              endpoint_count: 1,
+              session_count,
+            },
+          ));
+        }
+        was_invalidated = true;
+      }
+
+      let mut total_endpoints = 0usize;
+
       // 1. Check default multimedia render endpoint first (fast path for common case)
-      if let Ok(default_device) = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia)
-        && let Some(vol) = search_device_for_process_volume(&default_device, target_pid)
-      {
-        return Ok(vol);
+      if let Ok(default_device) = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia) {
+        total_endpoints += 1;
+        if let Some((vol, session_count)) = search_device_for_process_volume(&default_device, target_pid) {
+          let ep_id = get_device_id(&default_device);
+          return Ok((
+            vol,
+            AudioLookupStats {
+              status: if was_invalidated {
+                AudioLookupStatus::Invalidated
+              } else {
+                AudioLookupStatus::Miss
+              },
+              endpoint_id: ep_id,
+              endpoint_count: total_endpoints,
+              session_count,
+            },
+          ));
+        }
       }
 
       // 2. Check default communications render endpoint (for voice / communication applications)
-      if let Ok(comm_device) = enumerator.GetDefaultAudioEndpoint(eRender, eCommunications)
-        && let Some(vol) = search_device_for_process_volume(&comm_device, target_pid)
-      {
-        return Ok(vol);
+      if let Ok(comm_device) = enumerator.GetDefaultAudioEndpoint(eRender, eCommunications) {
+        total_endpoints += 1;
+        if let Some((vol, session_count)) = search_device_for_process_volume(&comm_device, target_pid) {
+          let ep_id = get_device_id(&comm_device);
+          return Ok((
+            vol,
+            AudioLookupStats {
+              status: if was_invalidated {
+                AudioLookupStatus::Invalidated
+              } else {
+                AudioLookupStatus::Miss
+              },
+              endpoint_id: ep_id,
+              endpoint_count: total_endpoints,
+              session_count,
+            },
+          ));
+        }
       }
 
       // 3. Enumerate all active render endpoints (handles processes explicitly routed to non-default devices)
@@ -386,10 +508,24 @@ mod native {
         enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE).map_err(|e| backend(format!("EnumAudioEndpoints failed: {e}")))?;
       let count = collection.GetCount().map_err(|e| backend(format!("EnumAudioEndpoints GetCount failed: {e}")))?;
       for i in 0..count {
+        total_endpoints += 1;
         if let Ok(device) = collection.Item(i)
-          && let Some(vol) = search_device_for_process_volume(&device, target_pid)
+          && let Some((vol, session_count)) = search_device_for_process_volume(&device, target_pid)
         {
-          return Ok(vol);
+          let ep_id = get_device_id(&device);
+          return Ok((
+            vol,
+            AudioLookupStats {
+              status: if was_invalidated {
+                AudioLookupStatus::Invalidated
+              } else {
+                AudioLookupStatus::Miss
+              },
+              endpoint_id: ep_id,
+              endpoint_count: total_endpoints,
+              session_count,
+            },
+          ));
         }
       }
 
@@ -405,10 +541,19 @@ pub use native::{AudioVolumeController, ProcessAudioVolume, SmtcMediaManager, Sm
 use auv_driver_common::error::{DriverError, DriverResult};
 
 #[cfg(not(target_os = "windows"))]
+#[derive(Debug)]
 pub struct ProcessAudioVolume;
 
 #[cfg(not(target_os = "windows"))]
 impl ProcessAudioVolume {
+  pub fn endpoint_id(&self) -> Option<&str> {
+    None
+  }
+
+  pub fn is_alive(&self) -> bool {
+    false
+  }
+
   pub fn get_volume(&self) -> DriverResult<f32> {
     Err(DriverError::unsupported("Audio volume control is only supported on Windows"))
   }
@@ -505,6 +650,10 @@ pub struct AudioVolumeController;
 #[cfg(not(target_os = "windows"))]
 impl AudioVolumeController {
   pub fn open_process(_target_pid: u32) -> DriverResult<ProcessAudioVolume> {
+    Err(DriverError::unsupported("Audio volume control is only supported on Windows"))
+  }
+
+  pub fn open_process_cached(_target_pid: u32, _cached_endpoint_id: Option<&str>) -> DriverResult<(ProcessAudioVolume, AudioLookupStats)> {
     Err(DriverError::unsupported("Audio volume control is only supported on Windows"))
   }
 

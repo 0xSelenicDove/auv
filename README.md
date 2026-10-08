@@ -18,6 +18,10 @@
 
 [![License](https://badgen.net/github/license/moeru-ai/auv)](LICENSE.md)
 
+<p align="center">
+  <b>English</b> | <a href="./README.zh.md">简体中文</a>
+</p>
+
 AUV (Application Use Via ...) is an open-source desktop automation runtime for
 programmable computer use. It exposes typed operations through a CLI, Model
 Context Protocol (MCP), Rust and JavaScript/TypeScript, with Run recording and
@@ -92,6 +96,11 @@ for agent-driven desktop work. The comparison below uses upstream
 [commit `472fe84b` (v0.0.30)](https://github.com/moeru-ai/auv/tree/472fe84b89d2308e2c9cd444ef91cf3aac1c9789)
 as its inspected baseline, reviewed on **2026-10-06**. It does not claim these
 changes will remain exclusive to the fork as upstream evolves.
+
+The fork now includes upstream changes through
+[commit `28aa7bf6`](https://github.com/moeru-ai/auv/commit/28aa7bf6), including
+v0.0.31. The benchmark results below describe their recorded revisions; the
+combined version has not yet been benchmarked.
 
 | Area | Upstream baseline | This fork's difference | Evidence level and limits |
 | --- | --- | --- | --- |
@@ -864,7 +873,7 @@ pnpm typecheck
 ### Documentation
 
 After you change headings in the root or package READMEs, run `pnpm docs:update`.
-This command updates all three tables of contents.
+This command updates all README tables of contents.
 
 Useful entrypoints:
 

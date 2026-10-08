@@ -1,12 +1,12 @@
 {
   "name": "@auv-js/root",
   "type": "module",
-  "version": "0.0.30",
+  "version": "0.0.31",
   "private": true,
   "packageManager": "pnpm@11.9.0",
   "scripts": {
     "build": "pnpm --filter @auv-js/api-client --filter \"./js/packages/*\" --if-present build",
-    "docs:toc": "doctoc --github --title \"## Table of Contents\" --maxlevel=2 README.md js/packages/sdk/README.md proto/sdk/js/README.md",
+    "docs:toc": "doctoc --github --title \"## Table of Contents\" --maxlevel=2 README.md js/packages/sdk/README.md proto/sdk/js/README.md && doctoc --github --title \"## 目录\" --maxlevel=2 README.zh.md",
     "docs:update": "pnpm docs:toc",
     "generate:proto": "cd proto && buf generate --template buf.gen.yaml",
     "lint:fix": "moeru-lint --fix . && pnpm --filter @auv-js/repl-playground lint:fix",

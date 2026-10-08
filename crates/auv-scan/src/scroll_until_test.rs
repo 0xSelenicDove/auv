@@ -19,6 +19,9 @@ struct FakeList {
   text_row: Option<i64>,
   scrolls: u32,
   recognitions: u32,
+  /// Backing pixels per point for native captures.
+  scale: u32,
+  resolutions: Vec<CaptureResolution>,
 }
 
 impl FakeList {
@@ -33,6 +36,8 @@ impl FakeList {
       text_row: None,
       scrolls: 0,
       recognitions: 0,
+      scale: 1,
+      resolutions: Vec::new(),
     }
   }
 
@@ -62,10 +67,17 @@ impl ScrollUntilSurface for FakeList {
     Ok((action(), step.delta()))
   }
 
-  fn capture(&mut self) -> DriverResult<Capture> {
+  fn capture(&mut self, resolution: CaptureResolution) -> DriverResult<Capture> {
+    self.resolutions.push(resolution);
     let position = self.position;
-    let image = RgbaImage::from_fn(40, self.viewport as u32, |_, y| {
-      let value = (((position + i64::from(y)) * 37).rem_euclid(251)) as u8;
+    let scale = if resolution == CaptureResolution::Native {
+      self.scale
+    } else {
+      1
+    };
+    // Each logical row spans `scale` backing rows.
+    let image = RgbaImage::from_fn(40 * scale, self.viewport as u32 * scale, |_, y| {
+      let value = (((position + i64::from(y / scale)) * 37).rem_euclid(251)) as u8;
       Rgba([value, value.wrapping_mul(3), value.wrapping_add(90), 255])
     });
     Ok(Capture {
@@ -73,7 +85,7 @@ impl ScrollUntilSurface for FakeList {
       image,
       // A window at (100, 200) on screen, so text matches must be offset.
       bounds: Rect::new(100.0, 200.0, 40.0, self.viewport as f64),
-      scale_factor: 1.0,
+      scale_factor: f64::from(scale),
       backend: "fake".to_string(),
       fallback_reason: None,
     })
@@ -82,14 +94,16 @@ impl ScrollUntilSurface for FakeList {
   fn recognize_text(&mut self, _: &Capture) -> DriverResult<TextRecognition> {
     self.recognitions += 1;
     let visible = self.text_row.filter(|row| (self.position..self.position + self.viewport).contains(row));
+    // Like the drivers, bounds are in the capture's screen space: the window
+    // sits at (100, 200) on screen.
     let mut regions = vec![RecognizedText {
       text: format!("row at {}", self.position),
-      bounds: Rect::new(0.0, 0.0, 40.0, 1.0),
+      bounds: Rect::new(100.0, 200.0, 40.0, 1.0),
       confidence: None,
     }];
     regions.extend(visible.map(|row| RecognizedText {
       text: "TARGET ROW".to_string(),
-      bounds: Rect::new(0.0, (row - self.position) as f64, 40.0, 1.0),
+      bounds: Rect::new(100.0, 200.0 + (row - self.position) as f64, 40.0, 1.0),
       confidence: None,
     }));
     Ok(TextRecognition {
@@ -121,7 +135,7 @@ fn request(condition: ScrollUntilCondition) -> ScrollUntilRequest {
     settle: Duration::ZERO,
     no_motion_confirmations: 2,
     motion_region: None,
-    observe: ScrollUntilObserve::default(),
+    output: ScrollUntilOutputOptions::default(),
   }
 }
 
@@ -133,8 +147,8 @@ fn run(list: &mut FakeList, request: &ScrollUntilRequest) -> DriverResult<Scroll
 fn end_stops_after_consecutive_no_motion_at_the_bottom() {
   let mut list = FakeList::new(260);
   let mut streaks = Vec::new();
-  let result = scroll_until(&mut list, &request(ScrollUntilCondition::End), &mut |observation| {
-    streaks.push(observation.no_motion_streak);
+  let result = scroll_until(&mut list, &request(ScrollUntilCondition::End), &mut |update| {
+    streaks.push(update.no_motion_streak);
     Ok(ScrollUntilDecision::Continue)
   })
   .unwrap();
@@ -173,7 +187,14 @@ fn text_condition_stops_as_soon_as_the_query_is_visible() {
   assert!(list.position <= 420 && 420 < list.position + 60, "{}", list.position);
   let matched = result.text_match.unwrap();
   assert_eq!(matched.text, "TARGET ROW");
-  // Screen bounds: the capture's screen origin plus the line's offset.
+  // ROOT CAUSE:
+  //
+  // If the window was not at the screen origin, the match was offset by the
+  // window origin twice: the drivers already return OCR bounds in screen
+  // space, and `text_match` added `capture.bounds.origin` again. The fake
+  // returned offsets instead of screen bounds, which hid it.
+  //
+  // The fix uses the driver's screen bounds as they are.
   assert_eq!(matched.bounds, Rect::new(100.0, 200.0 + (420 - list.position) as f64, 40.0, 1.0));
 }
 
@@ -252,16 +273,16 @@ fn invalid_requests_are_rejected_before_any_input() {
 }
 
 #[test]
-fn observer_sees_every_observation_with_text_by_default() {
+fn observer_sees_every_update_with_text_by_default() {
   let mut list = FakeList::new(260);
   let mut seen = Vec::new();
-  scroll_until(&mut list, &request(ScrollUntilCondition::End), &mut |observation| {
-    assert!(observation.text.is_some(), "{observation:?}");
-    seen.push((observation.steps, observation.motion.is_some(), observation.stop));
+  scroll_until(&mut list, &request(ScrollUntilCondition::End), &mut |update| {
+    assert!(update.text.is_some(), "{update:?}");
+    seen.push((update.steps, update.motion.is_some(), update.stop));
     Ok(ScrollUntilDecision::Continue)
   })
   .unwrap();
-  assert_eq!(seen.first(), Some(&(0, false, None)), "initial observation has no motion yet");
+  assert_eq!(seen.first(), Some(&(0, false, None)), "initial update has no motion yet");
   assert_eq!(seen.len(), 7);
   assert_eq!(seen.last(), Some(&(6, true, Some(ScrollUntilStopReason::EndByNoVisualProgress))));
 }
@@ -269,8 +290,8 @@ fn observer_sees_every_observation_with_text_by_default() {
 #[test]
 fn observer_stop_ends_the_loop_as_predicate_satisfied() {
   let mut list = FakeList::new(2_000);
-  let result = scroll_until(&mut list, &request(ScrollUntilCondition::End), &mut |observation| {
-    let text = observation.text.expect("text is observed by default");
+  let result = scroll_until(&mut list, &request(ScrollUntilCondition::End), &mut |update| {
+    let text = update.text.expect("text is observed by default");
     Ok(if text.regions[0].text == "row at 150" {
       ScrollUntilDecision::Stop
     } else {
@@ -298,8 +319,8 @@ fn built_in_stop_wins_over_the_observer_decision() {
     &request(ScrollUntilCondition::TextVisible {
       query: "target".to_string(),
     }),
-    &mut |observation| {
-      assert_eq!(observation.stop, Some(ScrollUntilStopReason::TextVisible));
+    &mut |update| {
+      assert_eq!(update.stop, Some(ScrollUntilStopReason::TextVisible));
       Ok(ScrollUntilDecision::Stop)
     },
   )
@@ -310,8 +331,8 @@ fn built_in_stop_wins_over_the_observer_decision() {
 #[test]
 fn observer_errors_abort_the_loop() {
   let mut list = FakeList::new(2_000);
-  let error = scroll_until(&mut list, &request(ScrollUntilCondition::End), &mut |observation| {
-    if observation.steps == 2 {
+  let error = scroll_until(&mut list, &request(ScrollUntilCondition::End), &mut |update| {
+    if update.steps == 2 {
       Err(DriverError::InvalidInput {
         message: "client went away".to_string(),
       })
@@ -325,12 +346,12 @@ fn observer_errors_abort_the_loop() {
 }
 
 #[test]
-fn opted_out_observations_skip_recognition() {
+fn opted_out_updates_skip_recognition() {
   let mut list = FakeList::new(260);
   let mut end = request(ScrollUntilCondition::End);
-  end.observe = ScrollUntilObserve { text: false };
-  scroll_until(&mut list, &end, &mut |observation| {
-    assert!(observation.text.is_none());
+  end.output = ScrollUntilOutputOptions { text: false };
+  scroll_until(&mut list, &end, &mut |update| {
+    assert!(update.text.is_none());
     Ok(ScrollUntilDecision::Continue)
   })
   .unwrap();
@@ -344,12 +365,48 @@ fn text_condition_still_recognizes_when_text_is_opted_out() {
   let mut find = request(ScrollUntilCondition::TextVisible {
     query: "target".to_string(),
   });
-  find.observe.text = false;
-  let result = scroll_until(&mut list, &find, &mut |observation| {
-    assert!(observation.text.is_none());
+  find.output.text = false;
+  let result = scroll_until(&mut list, &find, &mut |update| {
+    assert!(update.text.is_none());
     Ok(ScrollUntilDecision::Continue)
   })
   .unwrap();
   assert_eq!(result.reason, ScrollUntilStopReason::TextVisible);
   assert!(list.recognitions > 0);
+}
+
+#[test]
+fn motion_only_loops_capture_at_logical_resolution() {
+  let mut list = FakeList::new(260);
+  let mut end = request(ScrollUntilCondition::End);
+  end.output = ScrollUntilOutputOptions { text: false };
+  scroll_until(&mut list, &end, &mut |_| Ok(ScrollUntilDecision::Continue)).unwrap();
+  assert!(list.resolutions.iter().all(|resolution| *resolution == CaptureResolution::Logical), "{:?}", list.resolutions);
+
+  let mut list = FakeList::new(260);
+  scroll_until(&mut list, &request(ScrollUntilCondition::End), &mut |_| Ok(ScrollUntilDecision::Continue)).unwrap();
+  assert!(list.resolutions.iter().all(|resolution| *resolution == CaptureResolution::Native), "text needs native pixels");
+}
+
+#[test]
+fn retina_captures_detect_the_same_motion_as_one_x_captures() {
+  // ROOT CAUSE:
+  //
+  // If a window capture came back at 2x, motion was compared in backing
+  // pixels, so the ±24 px search policy validated on 1x captures covered only
+  // 12 points and a step's shift read as twice as large.
+  //
+  // The fix compares motion per logical point whatever the capture resolution.
+  let run = |scale: u32| {
+    let mut list = FakeList::new(260);
+    list.scale = scale;
+    let mut seen = Vec::new();
+    scroll_until(&mut list, &request(ScrollUntilCondition::End), &mut |observation| {
+      seen.push((observation.steps, observation.motion.map(|motion| (motion.estimated_shift, motion.no_motion))));
+      Ok(ScrollUntilDecision::Continue)
+    })
+    .unwrap();
+    seen
+  };
+  assert_eq!(run(2), run(1));
 }

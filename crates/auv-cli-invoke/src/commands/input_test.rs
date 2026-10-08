@@ -1189,7 +1189,7 @@ fn scroll_until_records_the_exact_final_observation_without_recapturing() {
         step.delta(),
       ))
     }
-    fn capture(&mut self) -> auv_driver::DriverResult<auv_driver::Capture> {
+    fn capture(&mut self, _: auv_driver::CaptureResolution) -> auv_driver::DriverResult<auv_driver::Capture> {
       self.captures += 1;
       Ok(auv_driver::Capture {
         origin: None,

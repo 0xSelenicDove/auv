@@ -1,5 +1,10 @@
 # Capture references and positions
 
+> Naming migration (2026-10-08): `ScrollUntilObservation` → `ScrollUntilUpdate`; `ScrollUntilObserve` → `ScrollUntilOutputOptions`.
+> This dated note may retain the former names. Prefer concrete domain results;
+> reserve `observation` for information used to decide the next action.
+> See the [migration and current mapping](../runtime/2026-10-08-domain-result-naming-migration.md) before implementing examples.
+
 Status: Part A implemented (2026-10-07, branch `feat/capture-refs`); Part B
 proposed. Names marked *provisional* are open for review.
 
@@ -39,7 +44,11 @@ against a local daemon, with read-only measurements on macOS.
   - Input is split by space: `ClickScreenPoint` versus `ClickWindowPoint`,
     `ScrollWindowPoint*` (window-local only), and `MoveMouse`/`DragMouse`
     (screen).
-  - OCR bounds are typed `ScreenRect`, but they are offsets from `origin`.
+  - OCR bounds are screen rectangles (`capture.bounds.origin` plus pixels /
+    scale on every driver); `origin` maps them into the capture's owning
+    space. This note first described them as offsets, which was wrong: one
+    consumer, scroll-until's `text_match`, made the same mistake and offset
+    matches twice (fixed with Part B.2).
   - Regions are 0–1 fractions (`NormalizedRect`).
   - The playground converts screen areas to fractions and to window-local
     points.
@@ -211,6 +220,74 @@ Decisions:
   captures inside the store (capture-store preprocessing, not designed
   yet), not for evidence.
 
+## Capture resolution (measured 2026-10-07)
+
+macOS window captures used to come back at 1x on Retina displays. The
+ScreenCaptureKit path passed the window's frame in points as
+`SCStreamConfiguration.width/height`, which are output pixels. Display
+captures (xcap) were 2x. The two capture paths disagreed, and every OCR on a
+window read half the detail.
+
+Decision (owner, 2026-10-07): captures default to native resolution, and
+`CaptureResolution::Logical` is opt-in. Logical captures serve display-only
+frames (playground live mode) and motion-only scroll-until loops.
+
+Release-build window captures on a 6K display, three samples each:
+
+| Capture | Before | After |
+| --- | --- | --- |
+| Native (2x, ~81 MB RGBA) | 3.7–4.7 s | 0.28–0.36 s |
+| Logical (1x) | 1.2–1.5 s | 0.27–0.29 s |
+| Display native (xcap) | ~50 ms | ~50 ms |
+| Display logical (xcap + area-average downscale) | — | ~78 ms |
+
+Most of the old window-capture time was swift-bridge copying pixels into a
+`RustVec` one byte per FFI call. A bulk Rust constructor
+(`native_byte_vec_from_raw`, `NOTICE(swift-bridge-bulk-bytes)`) removed it.
+After that, native and logical window captures cost about the same.
+
+Consumers validated on 1x keep 1x:
+
+- NetEase flows were the exception until 2026-10-07. They now request
+  `Native` (`NOTICE(netease-native-captures)`): a live sidebar comparison
+  read about 24 of 103 rows wrong at 1x and none at 2x, at about twice the
+  OCR time. Their pixel analyses (motion crops, the play-button classifier,
+  icon templates) stay at 1x, and text read off cover thumbnails is dropped
+  (`NOTICE(netease-cover-art-text)`).
+- Scroll-until compares motion per logical point
+  (`NOTICE(scroll-until-logical-motion)`): `ViewportPixelPolicy` was tuned on
+  1x captures.
+
+## Capture store preprocessing (2026-10-07)
+
+Captures held by reference let the Runner reuse work on them
+(`crates/auv-cli/src/runner/capture_store.rs`):
+
+- **Dedupe.** Identical captures (blake3 of pixels and metadata) share one
+  blob. This covers polling an unchanged window: `waitForText`, and the steps
+  at the end of a scroll-until loop.
+- **Derived caches** on the blob:
+  - OCR results, keyed by region, custom words and languages;
+  - `GetCaptureImage` results, keyed by region, max size and encoding. Raw
+    unresized RGBA is not cached, because it would duplicate the pixels.
+- **Cold packing.** Blobs idle for 30 s are packed losslessly as QOI (3-14 ms
+  for a Retina window) and unpacked on the next read.
+- **Budget order.** Drop derived caches, then pack the least recently used hot
+  blobs, then evict the least recently used captures.
+
+Release build on a 6K display, read-only:
+
+| Call | First | Repeated |
+| --- | --- | --- |
+| OCR on half the display | 3231 ms | 1 ms |
+| JPEG thumbnail (1440×900) | 59 ms | 1 ms |
+
+Deferred, with markers in code:
+
+- `TODO(capture-store-find-text-seed)`: find-text does not seed the OCR cache.
+- `TODO(capture-store-prepared-images)`: images are encoded on first fetch,
+  not prepared at capture time.
+
 ## Part B — Positions
 
 The domain already has the right model:
@@ -233,16 +310,20 @@ The wire and the SDK still split everything by space. Proposal:
      window or screen space. The Runner converts screen positions using the
      window's current frame, so callers stop converting by hand.
    - `MoveMouse`/`DragMouse` keep screen points.
-2. **Everything AUV returns is in screen space.** For AUV-produced captures,
-   `RecognizedText.bounds` and `TextMatch.bounds` are screen rectangles, as
-   their type already claims. The Runner applies `origin` before responding.
-   Offsets relative to `origin` remain only for caller-owned images, which have
-   no screen placement.
-3. **Regions accept a screen rectangle.** Every `region` field becomes a
-   `oneof { NormalizedRect normalized; ScreenRect screen; }`. A screen
-   rectangle is mapped into the image by the Runner and clipped to it. A
-   rectangle that misses the image entirely is `INVALID_ARGUMENT`. Clients pass
-   their areas directly.
+2. **Everything AUV returns is in screen space.** Already true:
+   `RecognizedText.bounds` and `TextMatch.bounds` are screen rectangles on
+   every driver, in the space of the capture's `bounds` (for a caller-owned
+   image, the `bounds` the caller supplied). Done (2026-10-07): scroll-until's
+   `text_match` no longer adds the capture origin a second time, and the
+   docs that called these offsets are corrected.
+3. **Regions accept a screen rectangle.** Done (2026-10-07):
+   `RecognizeTextRequest`, `FindWindowTextRequest`, `FindDisplayTextRequest`
+   and `GetCaptureImageRequest` gain `ScreenRect screen_region`, exclusive with
+   `region`. A sibling field was chosen over a `oneof`, because a `oneof` would
+   make JS callers write `{ area: { case, value } }`. The Runner maps the
+   rectangle into the image and clips it; a rectangle that misses the image is
+   `INVALID_ARGUMENT`. The Rust client takes `ImageRegion::{Normalized,
+   Screen}`; the playground passes its areas directly.
 4. **One normalized rectangle.**
    - Delete `auv-core`'s `NormalizedRegion` in favor of `auv-driver-common`'s
      type.

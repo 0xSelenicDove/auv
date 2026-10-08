@@ -5,9 +5,9 @@
 
 use std::time::{Duration, Instant};
 
-use auv_driver::{Capture, DriverResult, InputActionResult, InputPolicy, Scroll, ScrollOptions, WindowPoint};
+use auv_driver::{Capture, CaptureResolution, DriverResult, InputActionResult, InputPolicy, Scroll, ScrollOptions, WindowPoint};
 use auv_scan::{
-  ScrollUntilCondition, ScrollUntilDecision, ScrollUntilObserve, ScrollUntilRequest, ScrollUntilStep, ScrollUntilStopReason,
+  ScrollUntilCondition, ScrollUntilDecision, ScrollUntilOutputOptions, ScrollUntilRequest, ScrollUntilStep, ScrollUntilStopReason,
   ScrollUntilSurface, WindowScrollUntilSurface, scroll_until,
 };
 
@@ -28,9 +28,9 @@ impl ScrollUntilSurface for TimedSurface<'_> {
     result
   }
 
-  fn capture(&mut self) -> DriverResult<Capture> {
+  fn capture(&mut self, resolution: CaptureResolution) -> DriverResult<Capture> {
     let start = Instant::now();
-    let result = self.inner.capture();
+    let result = self.inner.capture(resolution);
     self.capture_ms.push(start.elapsed().as_secs_f64() * 1000.0);
     result
   }
@@ -92,7 +92,7 @@ fn profile_canvas_deep_scroll_stages() {
     settle: Duration::from_millis(300),
     no_motion_confirmations: 2,
     motion_region: None,
-    observe: ScrollUntilObserve { text: false },
+    output: ScrollUntilOutputOptions { text: false },
   };
   let mut final_capture = None;
   let start = Instant::now();

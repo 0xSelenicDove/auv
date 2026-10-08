@@ -77,6 +77,26 @@ pub struct NormalizedRegion {
   pub height: f64,
 }
 
+/// Part of an image: fractions of its size, or a logical screen rectangle
+/// that the Runner clips to the image.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ImageRegion {
+  Normalized(NormalizedRegion),
+  Screen(auv_driver::Rect),
+}
+
+impl From<NormalizedRegion> for ImageRegion {
+  fn from(region: NormalizedRegion) -> Self {
+    Self::Normalized(region)
+  }
+}
+
+impl From<auv_driver::Rect> for ImageRegion {
+  fn from(area: auv_driver::Rect) -> Self {
+    Self::Screen(area)
+  }
+}
+
 /// Selects a display by its canonical driver ID or exact name.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DisplaySelector {
@@ -260,10 +280,10 @@ impl ScrollStreamSession {
 /// One event from a scroll-until operation.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ScrollUntilEvent {
-  /// One observation, in order. When `awaiting_decision` is set, the Runner
+  /// One update, in order. When `awaiting_decision` is set, the Runner
   /// waits for [`ScrollUntilSession::decide`] before continuing.
-  Observation {
-    observation: auv_scan::ScrollUntilObservation<RunnerCapture>,
+  Update {
+    update: auv_scan::ScrollUntilUpdate<RunnerCapture>,
     awaiting_decision: bool,
   },
   Completed(auv_scan::ScrollUntilResult),
@@ -281,7 +301,7 @@ impl ScrollUntilSession {
     self.responses.message().await.map_err(capability_status)?.map(scroll_until_event_from_proto).transpose()
   }
 
-  /// Answers the latest observation that is awaiting a decision.
+  /// Answers the latest update that is awaiting a decision.
   pub async fn decide(&self, decision: auv_scan::ScrollUntilDecision) -> Result<(), CapabilityError> {
     self
       .requests
@@ -389,14 +409,14 @@ impl RunnerClient {
     self.extension_transport()
   }
 
-  /// Returns display observation and capture capabilities.
+  /// Returns display inspection and capture capabilities.
   pub fn displays(&self) -> DisplaysClient {
     DisplaysClient {
       runner: self.clone(),
     }
   }
 
-  /// Returns window observation and input capabilities.
+  /// Returns window inspection and input capabilities.
   pub fn windows(&self) -> WindowsClient {
     WindowsClient {
       runner: self.clone(),
@@ -436,7 +456,7 @@ impl RunnerClient {
   pub async fn recognize_text(
     &self,
     source: impl Into<RecognitionSource>,
-    region: Option<NormalizedRegion>,
+    region: Option<ImageRegion>,
     custom_words: Vec<String>,
     recognition_languages: Vec<String>,
   ) -> Result<auv_driver::TextRecognition, CapabilityError> {
@@ -451,7 +471,8 @@ impl RunnerClient {
       .max_encoding_message_size(IMAGE_RPC_MESSAGE_SIZE_LIMIT)
       .recognize_text(proto::RecognizeTextRequest {
         source: Some(source),
-        region: region.map(normalized_region_to_proto),
+        region: normalized_region(region),
+        screen_region: screen_region(region),
         custom_words,
         recognition_languages,
       })
@@ -629,7 +650,7 @@ fn overlay_options_to_proto(value: auv_driver_overlay_common::ShowOptions) -> Re
   })
 }
 
-/// Display observation and capture operations.
+/// Display inspection and capture operations.
 #[derive(Clone, Debug)]
 pub struct DisplaysClient {
   runner: RunnerClient,
@@ -649,11 +670,21 @@ impl DisplaysClient {
     })
   }
 
-  /// Captures one selected or primary display.
+  /// Captures one selected or primary display at native resolution.
   pub async fn capture(&self, selector: Option<DisplaySelector>) -> Result<auv_driver::DisplayCapture<RunnerCapture>, CapabilityError> {
+    self.capture_with(selector, auv_driver::CaptureResolution::Native).await
+  }
+
+  /// Captures one selected or primary display at `resolution`.
+  pub async fn capture_with(
+    &self,
+    selector: Option<DisplaySelector>,
+    resolution: auv_driver::CaptureResolution,
+  ) -> Result<auv_driver::DisplayCapture<RunnerCapture>, CapabilityError> {
     let response = proto::capture_service_client::CaptureServiceClient::new(self.runner.transport()?)
       .capture_display(proto::CaptureDisplayRequest {
         selector: selector.map(display_selector_to_proto),
+        resolution: capture_resolution_to_proto(resolution) as i32,
       })
       .await
       .map_err(capability_status)?
@@ -664,16 +695,27 @@ impl DisplaysClient {
     })
   }
 
-  /// Captures a screen-coordinate region on one display.
+  /// Captures a screen-coordinate region on one display at native resolution.
   pub async fn capture_region(
     &self,
     region: auv_driver::Rect,
     selector: Option<DisplaySelector>,
   ) -> Result<auv_driver::RegionCapture<RunnerCapture>, CapabilityError> {
+    self.capture_region_with(region, selector, auv_driver::CaptureResolution::Native).await
+  }
+
+  /// Captures a screen-coordinate region on one display at `resolution`.
+  pub async fn capture_region_with(
+    &self,
+    region: auv_driver::Rect,
+    selector: Option<DisplaySelector>,
+    resolution: auv_driver::CaptureResolution,
+  ) -> Result<auv_driver::RegionCapture<RunnerCapture>, CapabilityError> {
     let response = proto::capture_service_client::CaptureServiceClient::new(self.runner.transport()?)
       .capture_region(proto::CaptureRegionRequest {
         region: Some(rect_to_proto(region)),
         selector: selector.map(display_selector_to_proto),
+        resolution: capture_resolution_to_proto(resolution) as i32,
       })
       .await
       .map_err(capability_status)?
@@ -704,7 +746,8 @@ impl DisplaysClient {
       .find_display_text(proto::FindDisplayTextRequest {
         selector: selector.map(display_selector_to_proto),
         query: query.into(),
-        region: options.region.map(normalized_region_to_proto),
+        region: normalized_region(options.region),
+        screen_region: screen_region(options.region),
         custom_words: options.custom_words,
         recognition_languages: options.recognition_languages,
       })
@@ -792,9 +835,9 @@ impl WindowsClient {
 #[derive(Clone, Debug)]
 pub struct WindowClient {
   runner: RunnerClient,
-  // TODO(window-client-observation): This is the resolve-time observation,
+  // TODO(window-client-snapshot): This is the resolve-time snapshot,
   // not current grounding. Stop retaining and exposing it once callers obtain
-  // window observations from the capability result that produced them.
+  // window snapshots from the capability result that produced them.
   window: auv_driver::Window,
   window_ref: proto::WindowRef,
 }
@@ -810,11 +853,17 @@ impl WindowClient {
     &self.window.reference
   }
 
-  /// Captures the resolved window.
+  /// Captures the resolved window at native resolution.
   pub async fn capture(&self) -> Result<WindowCapture, CapabilityError> {
+    self.capture_with(auv_driver::CaptureResolution::Native).await
+  }
+
+  /// Captures the resolved window at `resolution`.
+  pub async fn capture_with(&self, resolution: auv_driver::CaptureResolution) -> Result<WindowCapture, CapabilityError> {
     let response = proto::capture_service_client::CaptureServiceClient::new(self.runner.transport()?)
       .capture_window(proto::CaptureWindowRequest {
         window: Some(self.window_ref.clone()),
+        resolution: capture_resolution_to_proto(resolution) as i32,
       })
       .await
       .map_err(capability_status)?
@@ -836,7 +885,8 @@ impl WindowClient {
       .find_window_text(proto::FindWindowTextRequest {
         window: Some(self.window_ref.clone()),
         query: query.into(),
-        region: options.region.map(normalized_region_to_proto),
+        region: normalized_region(options.region),
+        screen_region: screen_region(options.region),
         custom_words: options.custom_words,
         recognition_languages: options.recognition_languages,
       })
@@ -935,7 +985,7 @@ impl WindowClient {
 
   /// Scrolls in steps at a window-local point, observing after each step on
   /// the Runner, until the end, visible text, the caller's decision, or the
-  /// step budget. With `await_decisions`, answer each observation that awaits
+  /// step budget. With `await_decisions`, answer each update that awaits
   /// a decision through [`ScrollUntilSession::decide`].
   pub async fn scroll_until(
     &self,
@@ -969,30 +1019,30 @@ impl WindowClient {
   }
 
   /// Runs [`Self::scroll_until`] with a client-side predicate: returning
-  /// `true` for an observation stops the loop as `predicate_satisfied`.
-  /// Observations the Runner already ends are not passed to `predicate`.
+  /// `true` for an update stops the loop as `predicate_satisfied`.
+  /// Updates the Runner already ends are not passed to `predicate`.
   pub async fn scroll_until_with(
     &self,
     point: auv_driver::WindowPoint,
     request: auv_scan::ScrollUntilRequest,
     options: auv_driver::ScrollOptions,
-    mut predicate: impl FnMut(&auv_scan::ScrollUntilObservation<RunnerCapture>) -> bool,
+    mut predicate: impl FnMut(&auv_scan::ScrollUntilUpdate<RunnerCapture>) -> bool,
   ) -> Result<auv_scan::ScrollUntilResult, CapabilityError> {
     let mut session = self.scroll_until(point, request, options, true).await?;
     while let Some(event) = session.next().await? {
       match event {
-        ScrollUntilEvent::Observation {
-          observation,
+        ScrollUntilEvent::Update {
+          update,
           awaiting_decision: true,
         } => {
-          let decision = if predicate(&observation) {
+          let decision = if predicate(&update) {
             auv_scan::ScrollUntilDecision::Stop
           } else {
             auv_scan::ScrollUntilDecision::Continue
           };
           session.decide(decision).await?;
         }
-        ScrollUntilEvent::Observation { .. } => {}
+        ScrollUntilEvent::Update { .. } => {}
         ScrollUntilEvent::Completed(result) => return Ok(result),
       }
     }
@@ -1695,8 +1745,8 @@ impl InputClient {
 /// Optional OCR configuration shared by display and window searches.
 #[derive(Clone, Debug, Default)]
 pub struct FindTextOptions {
-  /// Optional normalized search region.
-  pub region: Option<NormalizedRegion>,
+  /// Search only this part of the capture.
+  pub region: Option<ImageRegion>,
   /// Extra recognition vocabulary.
   pub custom_words: Vec<String>,
   /// Ordered recognition language identifiers.
@@ -2096,8 +2146,8 @@ fn scroll_until_begin_to_proto(
       height: region.height,
     }),
     options: Some(scroll_options_to_proto(options)?),
-    observe: Some(proto::ScrollUntilObserve {
-      omit_text: !request.observe.text,
+    output: Some(proto::ScrollUntilOutputOptions {
+      omit_text: !request.output.text,
     }),
     await_decisions,
   })
@@ -2125,13 +2175,13 @@ fn scroll_until_event_from_proto(value: proto::ScrollUntilResponse) -> Result<Sc
     no_motion: value.no_motion,
   };
   match required(value.event, "ScrollUntil response omitted event")? {
-    Event::Observation(value) => Ok(ScrollUntilEvent::Observation {
-      observation: auv_scan::ScrollUntilObservation {
+    Event::Update(value) => Ok(ScrollUntilEvent::Update {
+      update: auv_scan::ScrollUntilUpdate {
         steps: value.steps,
-        delivered: scroll(value.delivered, "scroll-until observation omitted delivered")?,
+        delivered: scroll(value.delivered, "scroll-until update omitted delivered")?,
         motion: value.motion.map(motion),
         no_motion_streak: value.no_motion_streak,
-        capture: runner_capture_from_proto(required(value.capture, "scroll-until observation omitted its capture")?)?,
+        capture: runner_capture_from_proto(required(value.capture, "scroll-until update omitted its capture")?)?,
         text: value.text.map(text_recognition_from_proto).transpose()?,
         stop: scroll_until_stop_reason_from_proto(value.stop)?,
       },
@@ -2207,12 +2257,24 @@ fn rect_to_proto(value: auv_driver::Rect) -> proto::ScreenRect {
   }
 }
 
-fn normalized_region_to_proto(value: NormalizedRegion) -> auv_api_proto::auv::api::image::v1::NormalizedRect {
-  auv_api_proto::auv::api::image::v1::NormalizedRect {
-    x: value.x,
-    y: value.y,
-    width: value.width,
-    height: value.height,
+/// The `region` field for an image region given as fractions.
+fn normalized_region(region: Option<ImageRegion>) -> Option<auv_api_proto::auv::api::image::v1::NormalizedRect> {
+  match region? {
+    ImageRegion::Normalized(value) => Some(auv_api_proto::auv::api::image::v1::NormalizedRect {
+      x: value.x,
+      y: value.y,
+      width: value.width,
+      height: value.height,
+    }),
+    ImageRegion::Screen(_) => None,
+  }
+}
+
+/// The `screen_region` field for an image region given in screen coordinates.
+fn screen_region(region: Option<ImageRegion>) -> Option<proto::ScreenRect> {
+  match region? {
+    ImageRegion::Screen(area) => Some(rect_to_proto(area)),
+    ImageRegion::Normalized(_) => None,
   }
 }
 
@@ -2335,6 +2397,13 @@ fn text_recognition_from_proto(response: proto::RecognizeTextResponse) -> Result
       })
       .collect::<Result<_, CapabilityError>>()?,
   })
+}
+
+fn capture_resolution_to_proto(resolution: auv_driver::CaptureResolution) -> proto::CaptureResolution {
+  match resolution {
+    auv_driver::CaptureResolution::Native => proto::CaptureResolution::Native,
+    auv_driver::CaptureResolution::Logical => proto::CaptureResolution::Logical,
+  }
 }
 
 fn position_from_proto(position: proto::Position) -> Result<auv_driver::Position, CapabilityError> {

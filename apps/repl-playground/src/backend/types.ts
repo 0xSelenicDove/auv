@@ -1,4 +1,4 @@
-import type { ClickOptions, Point, Rect, ScrollDelta, ScrollObservation, ScrollUntilResult, TextMatch, WindowSelector } from '../script-api/api'
+import type { ClickOptions, Point, Rect, ScrollDelta, ScrollUntilResult, ScrollUntilUpdate, TextMatch, WindowSelector } from '../script-api/api'
 
 /**
  * One accessibility element. `path` is a stable-within-a-snapshot address
@@ -29,7 +29,12 @@ export interface Backend {
   activateApp: (bundleId: string) => Promise<InputReceipt>
   /** Opens a correlation scope for one script execution, when supported. */
   beginRun: () => Promise<string | undefined>
-  captureDisplay: (displayId?: string) => Promise<CapturedFrame>
+  /**
+   * `logical` captures one pixel per point: for display-only frames such as
+   * live mode, a quarter of a Retina capture. Script captures stay native so
+   * OCR reads full detail.
+   */
+  captureDisplay: (displayId?: string, options?: { logical?: boolean }) => Promise<CapturedFrame>
   /**
    * Encoded pixels of a capture, fit inside `maxSize` (never enlarged). The
    * only call that moves pixels; everything else passes `CapturedFrame.ref`.
@@ -40,14 +45,15 @@ export interface Backend {
   clickWindow: (windowId: string, point: Point, options?: ClickOptions) => Promise<InputReceipt>
   dispose: () => Promise<void>
   endRun: (outcome: RunOutcomeKind) => Promise<void>
-  findDisplayText: (query: string, displayId?: string, region?: NormalizedRect) => Promise<TextSearchResult>
-  findWindowText: (windowId: string, query: string, region?: NormalizedRect) => Promise<TextSearchResult>
+  /** `area` limits the search to a logical screen rectangle. */
+  findDisplayText: (query: string, displayId?: string, area?: Rect) => Promise<TextSearchResult>
+  findWindowText: (windowId: string, query: string, area?: Rect) => Promise<TextSearchResult>
   readonly kind: 'auv' | 'mock' | 'replay'
   readonly label: string
   listDisplays: () => Promise<DisplayInfo[]>
   listWindows: () => Promise<WindowInfo[]>
   pressKey: (key: string) => Promise<InputReceipt>
-  recognizeText: (frame: CapturedFrame, region?: NormalizedRect) => Promise<TextSearchResult>
+  recognizeText: (frame: CapturedFrame, area?: Rect) => Promise<TextSearchResult>
   resolveWindow: (selector: WindowSelector) => Promise<WindowInfo>
   /** Wheel-scrolls once at a window-local point. */
   scrollWindow: (windowId: string, point: Point, delta: ScrollDelta) => Promise<InputReceipt>
@@ -55,7 +61,7 @@ export interface Backend {
    * Scrolls at a window-local point in steps, observing after each, until the
    * request's condition, `decide`, the end, or the budget stops it.
    */
-  scrollWindowUntil: (windowId: string, point: Point, request: ScrollUntilRequest, decide?: (observation: ScrollObservation) => Promise<boolean>) => Promise<ScrollUntilOutcome>
+  scrollWindowUntil: (windowId: string, point: Point, request: ScrollUntilRequest, decide?: (update: ScrollUntilUpdate) => Promise<boolean>) => Promise<ScrollUntilOutcome>
   typeText: (text: string) => Promise<InputReceipt>
 }
 
@@ -86,16 +92,10 @@ export interface InputReceipt {
   point?: Point
 }
 
-/**
- * Part of a source image as fractions of its size, inside `[0, 1]` (mirrors
- * `auv.api.image.v1.NormalizedRect`). Same shape as `Rect`, different space.
- */
-export type NormalizedRect = Rect
-
 export type RunOutcomeKind = 'canceled' | 'failed' | 'succeeded'
 
 export interface ScrollUntilOutcome {
-  /** The last observation's capture and OCR, when the loop observed anything. */
+  /** The last update's capture and OCR, when the loop observed anything. */
   capture?: CapturedFrame
   match?: TextMatch
   reason: ScrollUntilResult['reason']

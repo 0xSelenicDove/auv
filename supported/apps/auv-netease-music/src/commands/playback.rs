@@ -340,7 +340,10 @@ pub fn run_playback_status_probe(inputs: &PlaybackStatusInputs) -> Result<Playba
   };
   let window_size = Size::new(window.frame.size.width, window.frame.size.height);
 
-  let before_capture = session.window().capture(&window).map_err(|error| format!("initial playback capture failed: {error}"))?;
+  let before_capture = session
+    .window()
+    .capture_with(&window, crate::window_capture_options())
+    .map_err(|error| format!("initial playback capture failed: {error}"))?;
   crate::telemetry::capture_artifact("auv.netease.playback.before_capture", &before_capture);
   let before_recognition = session
     .vision()
@@ -348,7 +351,7 @@ pub fn run_playback_status_probe(inputs: &PlaybackStatusInputs) -> Result<Playba
     .map_err(|error| format!("initial playback OCR failed: {error}"))?;
   let before_recognition = before_recognition.relative_to(&before_capture).map_err(|error| error.to_string())?;
   let before_screen = screen::classify_screen(&before_recognition, window_size);
-  let control_state = classify_bottom_playback_control_state(&before_capture.image);
+  let control_state = classify_bottom_playback_control_state(&before_capture.image, before_capture.scale_factor);
   let mut player = PlayerView::from_control_state(control_state);
   if let Some(text) = bottom_bar_text(&before_recognition, window_size) {
     player = player.with_observed_text(text);
@@ -412,7 +415,10 @@ pub fn run_playback_status_probe(inputs: &PlaybackStatusInputs) -> Result<Playba
     std::thread::sleep(std::time::Duration::from_millis(inputs.settle_ms));
   }
 
-  let mut after_capture = session.window().capture(&window).map_err(|error| format!("post-click detail capture failed: {error}"))?;
+  let mut after_capture = session
+    .window()
+    .capture_with(&window, crate::window_capture_options())
+    .map_err(|error| format!("post-click detail capture failed: {error}"))?;
   crate::telemetry::capture_artifact("auv.netease.playback.after_click_capture", &after_capture);
   let mut recognition = session
     .vision()
@@ -452,7 +458,10 @@ pub fn run_playback_status_probe(inputs: &PlaybackStatusInputs) -> Result<Playba
       std::thread::sleep(std::time::Duration::from_millis(inputs.settle_ms));
     }
 
-    after_capture = session.window().capture(&window).map_err(|error| format!("post-foreground-click detail capture failed: {error}"))?;
+    after_capture = session
+      .window()
+      .capture_with(&window, crate::window_capture_options())
+      .map_err(|error| format!("post-foreground-click detail capture failed: {error}"))?;
     crate::telemetry::capture_artifact("auv.netease.playback.after_foreground_click_capture", &after_capture);
     recognition = session
       .vision()
