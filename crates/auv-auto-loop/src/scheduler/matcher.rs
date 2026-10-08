@@ -7,7 +7,7 @@
 //!    All preconditions must pass, otherwise execution is intercepted.
 
 use crate::decision_log::DecisionLogger;
-use crate::models::{DecisionAction, DecisionCategory, OperationDef, PreconditionDef, ReasonCode};
+use crate::models::{DecisionAction, DecisionCategory, ExecutionMode, OperationDef, PreconditionDef, ReasonCode};
 use crate::scheduler::catalog::OperationCatalog;
 use std::collections::HashMap;
 
@@ -17,6 +17,7 @@ pub struct TaskRequest {
   pub app_name: String,
   pub task_name: String,
   pub instruction: String,
+  pub requested_mode: Option<ExecutionMode>,
   pub current_context: HashMap<String, serde_json::Value>,
   pub embedding_vector: Option<Vec<f32>>,
 }
@@ -66,6 +67,38 @@ impl<'a> FastLoopScheduler<'a> {
 
     // Step 1: Exact Operation Key / Target Fingerprint Match
     if let Some(op) = catalog.get_active(&canonical_key) {
+      // Check execution mode compatibility (bidirectional)
+      if let Some(req_mode) = request.requested_mode
+        && req_mode != op.execution_mode
+      {
+        self.logger.log(
+          DecisionCategory::Scheduling,
+          DecisionAction::Escalated,
+          ReasonCode::ModeMismatchEscalateVlm,
+          task_id,
+          Some(op.name.clone()),
+          format!(
+            "Mode mismatch for '{}': requested {:?} mode, but operation requires {:?} mode. Rejecting incompatible execution and escalating to VLM (zero side-effects).",
+            canonical_key, req_mode, op.execution_mode
+          ),
+          serde_json::json!({
+            "op_mode": op.execution_mode.as_str(),
+            "requested_mode": req_mode.as_str(),
+            "zero_side_effects": true
+          }),
+        );
+
+        return SchedulingOutcome {
+          selected_operation: None,
+          embedding_called: false,
+          reason_code: ReasonCode::ModeMismatchEscalateVlm,
+          message: format!(
+            "Mode mismatch: operation '{}' requires {:?} mode, cannot satisfy requested {:?} mode (zero side effects)",
+            canonical_key, op.execution_mode, req_mode
+          ),
+        };
+      }
+
       // Evaluate strict preconditions
       let pre_check = evaluate_preconditions(&op.preconditions, &request.current_context);
       if pre_check.passed {
@@ -133,7 +166,32 @@ impl<'a> FastLoopScheduler<'a> {
     );
 
     // Step 3: Candidate -> Strict Preconditions Check
+    let mut had_mode_mismatch = false;
+    let mut had_mode_compatible_candidate = false;
     for candidate in candidates {
+      if let Some(req_mode) = request.requested_mode
+        && req_mode != candidate.execution_mode
+      {
+        self.logger.log(
+          DecisionCategory::Scheduling,
+          DecisionAction::Intercepted,
+          ReasonCode::ModeMismatchEscalateVlm,
+          task_id,
+          Some(candidate.name.clone()),
+          format!(
+            "Candidate '{}' mode ({:?}) incompatible with requested mode ({:?}); intercepted.",
+            candidate.name, candidate.execution_mode, req_mode
+          ),
+          serde_json::json!({
+            "op": candidate.name,
+            "op_mode": candidate.execution_mode.as_str(),
+            "requested_mode": req_mode.as_str(),
+          }),
+        );
+        had_mode_mismatch = true;
+        continue;
+      }
+      had_mode_compatible_candidate = true;
       let pre_check = evaluate_preconditions(&candidate.preconditions, &request.current_context);
       if pre_check.passed {
         self.logger.log(
@@ -163,6 +221,25 @@ impl<'a> FastLoopScheduler<'a> {
           serde_json::json!({ "failure": pre_check.failure_reason }),
         );
       }
+    }
+
+    if had_mode_mismatch && !had_mode_compatible_candidate {
+      self.logger.log(
+        DecisionCategory::Scheduling,
+        DecisionAction::Escalated,
+        ReasonCode::ModeMismatchEscalateVlm,
+        task_id,
+        None,
+        "All candidates intercepted due to execution mode mismatch; escalating to VLM.",
+        serde_json::json!({ "embedding_called": true }),
+      );
+
+      return SchedulingOutcome {
+        selected_operation: None,
+        embedding_called,
+        reason_code: ReasonCode::ModeMismatchEscalateVlm,
+        message: "All candidates intercepted due to execution mode mismatch; escalating to VLM.".to_string(),
+      };
     }
 
     // All candidates failed preconditions

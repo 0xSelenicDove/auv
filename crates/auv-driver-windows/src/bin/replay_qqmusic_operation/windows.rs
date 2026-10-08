@@ -31,7 +31,10 @@ use auv_driver_windows::playback_guard::{
   DEFAULT_PLAY_POLL_TIMEOUT, DEFAULT_TARGET_VOLUME, DEFAULT_VOLUME_TOLERANCE, Step2Options, execute_step2_real_with_prestate,
 };
 use auv_driver_windows::track_identity::{TrackChangeVerdict, TrackIdentity, evaluate_track_change};
-use auv_driver_windows::wgc::{capture_window_health, capture_window_wgc, prewarm_wgc, prewarm_wgc_window, reset_d3d_context};
+use auv_driver_windows::wgc::{
+  FastWindowVerification, capture_window_health_cached, capture_window_health_strict, capture_window_wgc, check_window_liveness,
+  prewarm_wgc, prewarm_wgc_window, reset_d3d_context,
+};
 use auv_driver_windows::window::list_windows;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -42,11 +45,19 @@ use std::time::{Duration, Instant};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{IsIconic, SW_RESTORE, ShowWindow};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ExecutionMode {
+  Fast,
+  Verified,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct CompiledOperation {
   schema_version: String,
   name: String,
   description: String,
+  execution_mode: ExecutionMode,
   compilation_metadata: CompilationMetadata,
   target: TargetMetadata,
   steps: Vec<OperationStepDef>,
@@ -577,6 +588,7 @@ fn execute_replay_optimized(
   fault_injection: Option<&str>,
   allow_restore: bool,
   is_fast_mode: bool,
+  fast_window_verification: FastWindowVerification,
   pacing_ms: f64,
   cache_state: &str,
   cached_endpoint_id: Option<&str>,
@@ -845,10 +857,33 @@ fn execute_replay_optimized(
         "status": "skipped_minimized",
         "reason": "window_minimized (zero-window-mutation redline preserves user state)",
         "alive": true,
+        "verification_kind": if is_fast_mode && fast_window_verification == FastWindowVerification::LightweightLiveness {
+          "lightweight_liveness"
+        } else {
+          "wgc_fresh"
+        },
       }),
     )
-  } else {
-    match capture_window_health(&ctx.window) {
+  } else if is_fast_mode && fast_window_verification == FastWindowVerification::LightweightLiveness {
+    let alive = check_window_liveness(&ctx.window).unwrap_or(false);
+    let dur = s4_start.elapsed().as_secs_f64() * 1000.0;
+    (
+      dur,
+      alive,
+      if alive {
+        "alive".to_string()
+      } else {
+        "dead".to_string()
+      },
+      "active".to_string(),
+      serde_json::json!({
+        "status": if alive { "liveness_verified" } else { "liveness_failed" },
+        "alive": alive,
+        "verification_kind": "lightweight_liveness",
+      }),
+    )
+  } else if is_fast_mode {
+    match capture_window_health_cached(&ctx.window) {
       Ok(health) => {
         let dur = s4_start.elapsed().as_secs_f64() * 1000.0;
         let fh = if health.is_fresh {
@@ -858,7 +893,7 @@ fn execute_replay_optimized(
         };
         (
           dur,
-          health.alive,
+          health.alive && health.is_fresh,
           fh,
           "active".to_string(),
           serde_json::json!({
@@ -868,6 +903,7 @@ fn execute_replay_optimized(
             "non_black_ratio": health.non_black_ratio,
             "is_fresh": health.is_fresh,
             "alive": health.alive,
+            "verification_kind": "wgc_fresh",
           }),
         )
       }
@@ -882,6 +918,48 @@ fn execute_replay_optimized(
             "status": "error",
             "error": format!("{e:?}"),
             "alive": false,
+            "verification_kind": "wgc_fresh",
+          }),
+        )
+      }
+    }
+  } else {
+    match capture_window_health_strict(&ctx.window) {
+      Ok(health) => {
+        let dur = s4_start.elapsed().as_secs_f64() * 1000.0;
+        let fh = if health.is_fresh {
+          "fresh".to_string()
+        } else {
+          "stale".to_string()
+        };
+        (
+          dur,
+          health.alive && health.is_fresh,
+          fh,
+          "active".to_string(),
+          serde_json::json!({
+            "status": "captured_health",
+            "width": health.width,
+            "height": health.height,
+            "non_black_ratio": health.non_black_ratio,
+            "is_fresh": health.is_fresh,
+            "alive": health.alive,
+            "verification_kind": "wgc_fresh",
+          }),
+        )
+      }
+      Err(e) => {
+        let dur = s4_start.elapsed().as_secs_f64() * 1000.0;
+        (
+          dur,
+          false,
+          "error".to_string(),
+          "active".to_string(),
+          serde_json::json!({
+            "status": "error",
+            "error": format!("{e:?}"),
+            "alive": false,
+            "verification_kind": "wgc_fresh",
           }),
         )
       }
@@ -996,17 +1074,24 @@ fn compute_stats(mut vals: Vec<f64>) -> (f64, f64, f64) {
   (p50, p95, mean)
 }
 
-pub(super) fn main() {
-  ensure_input_desktop();
+fn validate_cli_mode(mode: &str) -> Result<(), String> {
+  match mode {
+    "baseline" | "verified" | "fast" => Ok(()),
+    other => Err(format!("Unsupported --mode '{other}'; expected baseline, verified, or fast")),
+  }
+}
 
+pub(super) fn main() {
   let args: Vec<String> = env::args().collect();
   let mut replays_count = 20usize;
   let mut mode = "verified".to_string(); // "baseline", "verified", "fast"
   let mut output_file: Option<String> = None;
+  let mut user_op_file: Option<String> = None;
   let mut fault_inject: Option<String> = None;
   let mut allow_restore = false;
   let mut pacing_delay_ms = 50.0;
   let mut is_single_cold_mode = false;
+  let mut fast_window_verification = FastWindowVerification::WgcFresh;
 
   let mut i = 1;
   while i < args.len() {
@@ -1014,6 +1099,14 @@ pub(super) fn main() {
       "--mode" => {
         if i + 1 < args.len() {
           mode = args[i + 1].to_lowercase();
+          i += 1;
+        } else {
+          panic!("Missing value for --mode; expected baseline, verified, or fast");
+        }
+      }
+      "--op" | "--operation" => {
+        if i + 1 < args.len() {
+          user_op_file = Some(args[i + 1].clone());
           i += 1;
         }
       }
@@ -1048,13 +1141,25 @@ pub(super) fn main() {
         is_single_cold_mode = true;
         replays_count = 1;
       }
+      "--fast-window-verification" => {
+        if i + 1 < args.len() {
+          fast_window_verification = match args[i + 1].to_lowercase().as_str() {
+            "liveness" | "lightweight" | "lightweight_liveness" => FastWindowVerification::LightweightLiveness,
+            _ => FastWindowVerification::WgcFresh,
+          };
+          i += 1;
+        }
+      }
       _ => {}
     }
     i += 1;
   }
 
-  // Prewarm only for prewarmed experimental groups (e.g. warm "verified" and "fast" modes).
-  // "baseline" mode and "--cold" single-run must measure the cold path without caching D3D context or WGC session.
+  validate_cli_mode(&mode).unwrap_or_else(|message| panic!("{message}"));
+  ensure_input_desktop();
+
+  // Prewarm only warm experimental groups. Baseline and --cold runs must
+  // measure the uninitialized path without D3D/session/worker state.
   let mut wgc_init_dur = Duration::ZERO;
   if mode == "baseline" || is_single_cold_mode {
     reset_d3d_context();
@@ -1074,17 +1179,50 @@ pub(super) fn main() {
   let wgc_init_ms = wgc_init_dur.as_secs_f64() * 1000.0;
 
   let final_output = output_file.unwrap_or_else(|| match mode.as_str() {
-    "baseline" => "docs/ai/references/driver/2026-10-04-windows-hotpath-baseline-20x.jsonl".to_string(),
-    "fast" => "docs/ai/references/driver/2026-10-04-windows-hotpath-optimized-fast-20x.jsonl".to_string(),
-    _ => "docs/ai/references/driver/2026-10-04-windows-hotpath-optimized-verified-20x.jsonl".to_string(),
+    "baseline" => "docs/ai/references/driver/2026-10-08-wgc-health-baseline-20x.jsonl".to_string(),
+    "fast" => "docs/ai/references/driver/2026-10-08-wgc-health-warm-fast-20x.jsonl".to_string(),
+    _ => "docs/ai/references/driver/2026-10-08-wgc-health-warm-verified-20x.jsonl".to_string(),
   });
 
-  let op_file_path = "docs/ai/references/driver/qqmusic-prepared-playback.json";
+  let default_op_path = match mode.as_str() {
+    "fast" => "docs/ai/references/driver/qqmusic-prepared-playback-fast.json",
+    "baseline" | "verified" => "docs/ai/references/driver/qqmusic-prepared-playback.json",
+    _ => unreachable!("CLI mode was validated above"),
+  };
+  let op_file_path = user_op_file.as_deref().unwrap_or(default_op_path);
   let op_json = fs::read_to_string(op_file_path)
     .or_else(|_| fs::read_to_string(Path::new("..").join("..").join(op_file_path)))
     .unwrap_or_else(|e| panic!("Failed to read compiled operation JSON at {op_file_path}: {e}"));
   let compiled_op: CompiledOperation =
-    serde_json::from_str(&op_json).unwrap_or_else(|e| panic!("Failed to parse compiled operation JSON: {e}"));
+    serde_json::from_str(&op_json).unwrap_or_else(|e| panic!("Failed to parse compiled operation JSON at {op_file_path}: {e}"));
+
+  if compiled_op.schema_version != "auv.operation.v2" {
+    panic!(
+      "Compiled operation schema mismatch at {}: expected 'auv.operation.v2', got '{}' (fail-closed)",
+      op_file_path, compiled_op.schema_version
+    );
+  }
+
+  // Validate execution mode compatibility between CLI and operation declaration
+  match (mode.as_str(), compiled_op.execution_mode) {
+    ("fast", ExecutionMode::Verified) => {
+      panic!(
+        "Mode conflict: CLI requested 'fast' mode, but compiled operation '{}' requires 'verified' mode (fail-closed)",
+        compiled_op.name
+      );
+    }
+    ("verified", ExecutionMode::Fast) => {
+      panic!(
+        "Mode conflict: CLI requested 'verified' mode, but compiled operation '{}' declares 'fast' mode (fail-closed)",
+        compiled_op.name
+      );
+    }
+    ("baseline", _) => {
+      // Baseline is a harness path, not an operation execution mode. It uses
+      // the verified fixture to measure the unoptimized implementation.
+    }
+    _ => unreachable!("CLI mode was validated above"),
+  }
 
   println!("================================================================================");
   println!("QQ Music Hotpath Profiling & Replay Harness (Zero VLM / Zero Token)");
@@ -1098,6 +1236,7 @@ pub(super) fn main() {
   println!("WGC Prewarm      : {:.2}ms", wgc_init_ms);
   println!("Output JSONL     : {}", final_output);
   println!("Fault Injection  : {:?}", fault_inject);
+  println!("Fast Window Verif: {:?}", fast_window_verification);
   println!("Allow Restore    : {} (default false, zero-window-mutation redline)", allow_restore);
   println!("VLM Invocations  : 0 (hard constraint)");
   println!("Token Budget     : 0 (hard constraint)");
@@ -1105,12 +1244,16 @@ pub(super) fn main() {
 
   if let Some(ref fi) = fault_inject {
     println!("[FAULT INJECTION MODE] Injecting fault: {}", fi);
-    let record = match mode.as_str() {
-      "baseline" => execute_replay_baseline(1, Some(fi), allow_restore, 0.0, "cold", wgc_init_ms),
-      "fast" => execute_replay_optimized(1, Some(fi), allow_restore, true, 0.0, "cold", None, wgc_init_ms).map(|(r, _)| r),
-      _ => execute_replay_optimized(1, Some(fi), allow_restore, false, 0.0, "cold", None, wgc_init_ms).map(|(r, _)| r),
-    }
-    .expect("Failed to execute fault injection replay");
+    let record =
+      match mode.as_str() {
+        "baseline" => execute_replay_baseline(1, Some(fi), allow_restore, 0.0, "cold", wgc_init_ms),
+        "fast" => execute_replay_optimized(1, Some(fi), allow_restore, true, fast_window_verification, 0.0, "cold", None, wgc_init_ms)
+          .map(|(r, _)| r),
+        "verified" => execute_replay_optimized(1, Some(fi), allow_restore, false, fast_window_verification, 0.0, "cold", None, wgc_init_ms)
+          .map(|(r, _)| r),
+        _ => unreachable!("CLI mode was validated above"),
+      }
+      .expect("Failed to execute fault injection replay");
 
     println!("Iteration 1: success={}, escalated_to_vlm={}", record.success, record.escalated_to_vlm);
     for step in &record.steps {
@@ -1143,8 +1286,29 @@ pub(super) fn main() {
 
     let res = match mode.as_str() {
       "baseline" => execute_replay_baseline(iter, None, allow_restore, current_pacing, cache_state, wgc_init_ms).map(|r| (r, None)),
-      "fast" => execute_replay_optimized(iter, None, allow_restore, true, current_pacing, cache_state, cached_ep_id.as_deref(), wgc_init_ms),
-      _ => execute_replay_optimized(iter, None, allow_restore, false, current_pacing, cache_state, cached_ep_id.as_deref(), wgc_init_ms),
+      "fast" => execute_replay_optimized(
+        iter,
+        None,
+        allow_restore,
+        true,
+        fast_window_verification,
+        current_pacing,
+        cache_state,
+        cached_ep_id.as_deref(),
+        wgc_init_ms,
+      ),
+      "verified" => execute_replay_optimized(
+        iter,
+        None,
+        allow_restore,
+        false,
+        fast_window_verification,
+        current_pacing,
+        cache_state,
+        cached_ep_id.as_deref(),
+        wgc_init_ms,
+      ),
+      _ => unreachable!("CLI mode was validated above"),
     };
 
     let (mut record, next_ep) = match res {
@@ -1270,4 +1434,22 @@ pub(super) fn main() {
     records.len()
   );
   println!("================================================================================");
+}
+
+#[cfg(test)]
+mod tests {
+  use super::validate_cli_mode;
+
+  #[test]
+  fn cli_mode_validation_accepts_supported_modes() {
+    for mode in ["baseline", "verified", "fast"] {
+      assert_eq!(validate_cli_mode(mode), Ok(()));
+    }
+  }
+
+  #[test]
+  fn cli_mode_validation_rejects_unknown_modes() {
+    let error = validate_cli_mode("fastt").unwrap_err();
+    assert!(error.contains("Unsupported --mode 'fastt'"));
+  }
 }
