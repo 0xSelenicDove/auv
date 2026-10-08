@@ -1,0 +1,77 @@
+{
+  "trial": 3,
+  "arm": "after",
+  "case": "B",
+  "seconds_including_startup": 65.02153800008819,
+  "exit_code": 0,
+  "timed_out": false,
+  "usage": {
+    "input_tokens": 139866,
+    "cached_input_tokens": 117120,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 2545,
+    "reasoning_output_tokens": 397
+  },
+  "answer": {
+    "records": [
+      {
+        "name": "Amber transfer",
+        "code": "QV-9244",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-skill-token-fix-benchmark-20261008/trial-03/store/artifacts/01a11a9b-7a0f-7122-bd85-7b4eec1d1bb6/01a11a9b-7ff2-72d5-a0ac-d40d47a7e341.webp"
+      },
+      {
+        "name": "Cedar dispatch",
+        "code": "EL-5818",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-skill-token-fix-benchmark-20261008/trial-03/store/artifacts/01a11a9b-9e13-7031-a1f5-d51012be0761/01a11a9b-a935-7249-a300-9169254734c4.webp"
+      },
+      {
+        "name": "Fern review",
+        "code": "QV-5886",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-skill-token-fix-benchmark-20261008/trial-03/store/artifacts/01a11a9b-a941-752c-8d77-e019ee3181ca/01a11a9b-b412-7793-8753-4a679f75b279.webp"
+      },
+      {
+        "name": "Indigo receipt",
+        "code": "QV-5713",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-skill-token-fix-benchmark-20261008/trial-03/store/artifacts/01a11a9b-b41c-74a0-af94-0fb4f2c7cb5b/01a11a9b-bf8c-7479-923c-3d33dbe5b776.webp"
+      },
+      {
+        "name": "Laurel request",
+        "code": "BK-9322",
+        "status": "Pending audit",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-skill-token-fix-benchmark-20261008/trial-03/store/artifacts/01a11a9b-bf9c-73e1-8e95-a5a4e8eaab47/01a11a9b-ca9a-7144-9266-b866603521be.webp"
+      },
+      {
+        "name": "Maple handoff",
+        "code": "HN-3847",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-skill-token-fix-benchmark-20261008/trial-03/store/artifacts/01a11a9b-caa6-72ca-8218-8f9e5b994f67/01a11a9b-d316-7483-85a9-875db6ebbc93.webp"
+      },
+      {
+        "name": "Rowan audit",
+        "code": "JP-9286",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-skill-token-fix-benchmark-20261008/trial-03/store/artifacts/01a11a9b-d321-775d-8815-136bec91c3f6/01a11a9b-de19-7212-a91d-5ba593db49d7.webp"
+      },
+      {
+        "name": "Zinnia release",
+        "code": "CT-8040",
+        "status": "Pending audit",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-skill-token-fix-benchmark-20261008/trial-03/store/artifacts/01a11a9b-de23-71ba-9e19-a805db3b1191/01a11a9b-e957-70d8-a896-8fe44528fedb.webp"
+      }
+    ],
+    "complete": true
+  },
+  "prompt_sha256": "09e7eac0a208603e7cbcbd2c43c9b9e76cdb35c23ba7dcfbc935e7965bf2f755"
+}

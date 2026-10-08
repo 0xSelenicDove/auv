@@ -72,10 +72,7 @@ back from an unavailable remote Device to the local desktop.
 
 ## Reuse for repeated work
 
-Reuse an already connected MCP for related operations; keep that server alive.
-A short sequential CLI batch without an existing daemon can stay direct. Start
-a Runner for required capture-reference workflows or measured reuse benefits,
-rather than assuming daemon setup saves model tokens.
+Prefer an already connected MCP for related operations; keep that server alive.
 For an existing SDK workflow, retain its connection, client and routed Runner.
 Call `startAuv()` once per owning host; `connect()` attaches to someone else's
 existing daemon. Close your connection at completion and stop only a daemon you

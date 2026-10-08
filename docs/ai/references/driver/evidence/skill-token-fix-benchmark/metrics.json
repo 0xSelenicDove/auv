@@ -1,0 +1,435 @@
+{
+  "trials": [
+    {
+      "trial": 1,
+      "arm": "before",
+      "case": "A",
+      "seconds_including_startup": 133.80823670898098,
+      "exit_code": 0,
+      "timed_out": false,
+      "usage": {
+        "input_tokens": 531233,
+        "cached_input_tokens": 491136,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 5689,
+        "reasoning_output_tokens": 905
+      },
+      "total_tokens": 536922,
+      "uncached_input_plus_output": 45786,
+      "verified_records": 8,
+      "complete": true,
+      "completed_shell_calls": 15,
+      "operation_result_count": 15,
+      "operation_counts": {
+        "app.activate": 2,
+        "window.capture": 3,
+        "input.scrollUntil": 9,
+        "input.scroll": 1
+      },
+      "task_owned_daemon_started": true,
+      "failed_operations": 1,
+      "evidence": [
+        {
+          "name": "Birch transfer",
+          "file": "trial-01-record-01.webp",
+          "sha256": "f83b9da011ec04e913f4971ac21269f92dc38df0149a52938363a57e9dcef31c",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Cobalt dispatch",
+          "file": "trial-01-record-02.webp",
+          "sha256": "d847e7655cf36071627f4c93d08c0eefe1bd438628074014efd7af5701e4477c",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Ember review",
+          "file": "trial-01-record-03.webp",
+          "sha256": "2eda4df528a99e7a91c54ed6951829922d565dc8a63949a9a638927a7f91d481",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Harbor receipt",
+          "file": "trial-01-record-04.webp",
+          "sha256": "c27c42ee9244c186713834e94e8ab86fb0d8791db54642a7fb06cd53af206fd1",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Juniper request",
+          "file": "trial-01-record-05.webp",
+          "sha256": "c7fd5667a8479270336430363e4c6d9349a82f29930628377f563dc981c54457",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Linden handoff",
+          "file": "trial-01-record-06.webp",
+          "sha256": "7403d58f9cd74b943a2c7faa8c9d59d1ac64a18b89e474a3a668f9bef9bd2712",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Quartz audit",
+          "file": "trial-01-record-07.webp",
+          "sha256": "b77a08f029608a5bdf3877b0ba70d34d151b1cb0c904db53bdf5be9a8b085bb3",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Willow release",
+          "file": "trial-01-record-08.webp",
+          "sha256": "fb26e9ff635c925edc54e4ea3fc2f7f93a2d9b9603aafae76ac3efe303b4c506",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        }
+      ],
+      "final_image": "trial-01.verify.jpg"
+    },
+    {
+      "trial": 2,
+      "arm": "after",
+      "case": "A",
+      "seconds_including_startup": 66.24200208391994,
+      "exit_code": 0,
+      "timed_out": false,
+      "usage": {
+        "input_tokens": 115880,
+        "cached_input_tokens": 85504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2518,
+        "reasoning_output_tokens": 422
+      },
+      "total_tokens": 118398,
+      "uncached_input_plus_output": 32894,
+      "verified_records": 8,
+      "complete": true,
+      "completed_shell_calls": 4,
+      "operation_result_count": 8,
+      "operation_counts": {
+        "input.scrollUntil": 8
+      },
+      "task_owned_daemon_started": false,
+      "failed_operations": 0,
+      "evidence": [
+        {
+          "name": "Birch transfer",
+          "file": "trial-02-record-01.webp",
+          "sha256": "57876e595c55afa1443ad4ae7f198cf885ff7ca9797594fed0a63dc8099b3d82",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Cobalt dispatch",
+          "file": "trial-02-record-02.webp",
+          "sha256": "e0e327bf76dd5b6dbfdc34bf8e1f17ca122f4d5ea8fa6d63ec11dbda7e3cd63d",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Ember review",
+          "file": "trial-02-record-03.webp",
+          "sha256": "27e21f4dc4dcf94e036d881f7d135486a2c0c852f19ffd48459d843348587b04",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Harbor receipt",
+          "file": "trial-02-record-04.webp",
+          "sha256": "d8d1f89215b4662bf7160fafc3f1ef510f745df17065f82e37c4203c055301dc",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Juniper request",
+          "file": "trial-02-record-05.webp",
+          "sha256": "5655fe5e2a2303d55f9adade5ac7e35eb2754dd1d9f4a4faffd2fa5756f17f06",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Linden handoff",
+          "file": "trial-02-record-06.webp",
+          "sha256": "5d6ee8d228e95cab74eff9a7f2ff2a4130f81a0e2411034eb84b8e3eb7e43f37",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Quartz audit",
+          "file": "trial-02-record-07.webp",
+          "sha256": "ce4fa096c5745e42ed3531f5142d11469cf0502a8f2fe63b52b7cf8f5d73618d",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Willow release",
+          "file": "trial-02-record-08.webp",
+          "sha256": "4d71f0ac04d2e77f38c5ecbe82db14e6ebce2031c51435fde10173111dc91620",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        }
+      ],
+      "final_image": "trial-02.verify.jpg"
+    },
+    {
+      "trial": 3,
+      "arm": "after",
+      "case": "B",
+      "seconds_including_startup": 65.02153800008819,
+      "exit_code": 0,
+      "timed_out": false,
+      "usage": {
+        "input_tokens": 139866,
+        "cached_input_tokens": 117120,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2545,
+        "reasoning_output_tokens": 397
+      },
+      "total_tokens": 142411,
+      "uncached_input_plus_output": 25291,
+      "verified_records": 8,
+      "complete": true,
+      "completed_shell_calls": 4,
+      "operation_result_count": 8,
+      "operation_counts": {
+        "input.scrollUntil": 8
+      },
+      "task_owned_daemon_started": false,
+      "failed_operations": 0,
+      "evidence": [
+        {
+          "name": "Amber transfer",
+          "file": "trial-03-record-01.webp",
+          "sha256": "57876e595c55afa1443ad4ae7f198cf885ff7ca9797594fed0a63dc8099b3d82",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Cedar dispatch",
+          "file": "trial-03-record-02.webp",
+          "sha256": "900f7a3f187eaf376e7eb4c432793d59161eaf70294d687fa737b1db61f0e52b",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Fern review",
+          "file": "trial-03-record-03.webp",
+          "sha256": "861ffd554d43ce1242d32c9c00ad2bc496ce70c474dafdd95fbd5b5bb8484ede",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Indigo receipt",
+          "file": "trial-03-record-04.webp",
+          "sha256": "2ade9c6f0819de95a1b9cc3104dc3d657eda4af33bc2ca429c60817774a31330",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Laurel request",
+          "file": "trial-03-record-05.webp",
+          "sha256": "30ab974073fee89aa322474b02b23f936f450aae4f5e4b898aa0c11df39662f0",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Maple handoff",
+          "file": "trial-03-record-06.webp",
+          "sha256": "eec83cc0353195654934a8a2ebe834c4f9eae826bb99bc80bbec6e6ba12085bc",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Rowan audit",
+          "file": "trial-03-record-07.webp",
+          "sha256": "6891a1f45d4321b2ffd1b5423046e19f925a1b88d67d6d46099566810d7d8edf",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Zinnia release",
+          "file": "trial-03-record-08.webp",
+          "sha256": "38b60247891774459b4c02eb804aef6c9ccb52c956626cd92bff1e5ac7701432",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        }
+      ],
+      "final_image": "trial-03.verify.jpg"
+    },
+    {
+      "trial": 4,
+      "arm": "before",
+      "case": "B",
+      "seconds_including_startup": 142.7228905420052,
+      "exit_code": 0,
+      "timed_out": false,
+      "usage": {
+        "input_tokens": 695431,
+        "cached_input_tokens": 623616,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 5812,
+        "reasoning_output_tokens": 496
+      },
+      "total_tokens": 701243,
+      "uncached_input_plus_output": 77627,
+      "verified_records": 8,
+      "complete": true,
+      "completed_shell_calls": 15,
+      "operation_result_count": 12,
+      "operation_counts": {
+        "app.activate": 1,
+        "window.capture": 2,
+        "input.scrollUntil": 8,
+        "input.scroll": 1
+      },
+      "task_owned_daemon_started": true,
+      "failed_operations": 0,
+      "evidence": [
+        {
+          "name": "Amber transfer",
+          "file": "trial-04-record-01.webp",
+          "sha256": "147e4b8b95d927d7ed3906fd615320f367365c19b8961c17a70ced90f879f676",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Cedar dispatch",
+          "file": "trial-04-record-02.webp",
+          "sha256": "d48f74a6b02684fdd195aa125b051b6f0acb932f6a0cc402ccd8b5a84eae6022",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Fern review",
+          "file": "trial-04-record-03.webp",
+          "sha256": "3d298a11f9d99b702333ee74b114096812978b2d55cd240538e6b7cfe9c4bb89",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Indigo receipt",
+          "file": "trial-04-record-04.webp",
+          "sha256": "14e06c3c64bec92b9ab40041b082918c112bbe34ea1a0eacaf9583bd73c27bda",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Laurel request",
+          "file": "trial-04-record-05.webp",
+          "sha256": "e37af94332953bd796d84148ce92ed1a80084c22ab41bc91f268b709b41b4235",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Maple handoff",
+          "file": "trial-04-record-06.webp",
+          "sha256": "192e8a126f2e573234b307aeeb31032ae56fefa59e7045ee9155eff548a1db23",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Rowan audit",
+          "file": "trial-04-record-07.webp",
+          "sha256": "de2254a0a6aef5bde94332008bfaa977c20eb7d8e2f5c883762d4f8e43da1815",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        },
+        {
+          "name": "Zinnia release",
+          "file": "trial-04-record-08.webp",
+          "sha256": "eb74d5c391ecbaf86bb5be4fcc173e526e1a68bc7c8e2b63f841ff55f7988677",
+          "width": 900,
+          "height": 682,
+          "complete_row_on_one_ocr_line": true,
+          "original_receipt_hash_matches": true
+        }
+      ],
+      "final_image": "trial-04.verify.jpg"
+    }
+  ],
+  "aggregate": {
+    "before": {
+      "seconds": 276.5311272509862,
+      "total_tokens": 1238165,
+      "uncached_input_plus_output": 123413,
+      "verified_records": 16,
+      "complete_tasks": 2
+    },
+    "after": {
+      "seconds": 131.26354008400813,
+      "total_tokens": 260809,
+      "uncached_input_plus_output": 58185,
+      "verified_records": 16,
+      "complete_tasks": 2
+    }
+  },
+  "change_percent": {
+    "seconds": -52.532092358315154,
+    "total_tokens": -78.93584457644982,
+    "uncached_input_plus_output": -52.85342711059613
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "registered": "2026-10-08",
+  "classification": "docs-only skill correction and test-only benchmark",
+  "order": [
+    "before/A",
+    "after/A",
+    "after/B",
+    "before/B"
+  ],
+  "runtime_commit": "f9abd0e5",
+  "baseline_skill_commit": "dfa4abee",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "low",
+  "timeout_seconds": 900,
+  "versions": {
+    "before": {
+      "binary_sha256": "79f55ecee5b167cc89719f08cb9e36d0e069852bcc54c105e34badec636a4344",
+      "skill_sha256": "52d7c17bad7de9d6b8b47381b4657c10ca15164a6ed0ba090f44515986d5ec78",
+      "operations_sha256": "8b68b7d95a4bbeea69bf9adc8ca272c4e9117d554cbf51dab7a2ce3e59fd654b"
+    },
+    "after": {
+      "binary_sha256": "79f55ecee5b167cc89719f08cb9e36d0e069852bcc54c105e34badec636a4344",
+      "skill_sha256": "369d65670deeebd5fd4381ac54c169aed2b6b94e36dc0eee2889277dc29fafe8",
+      "operations_sha256": "45a5a0a36a113650b217170724528922772fe02ea0001d70acf6a3ccbe7c2d63"
+    }
+  },
+  "codex_version": "codex-cli 0.150.1"
+}

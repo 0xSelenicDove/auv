@@ -1,0 +1,16 @@
+[
+  {
+    "trial": 1,
+    "response": {
+      "run_id": "73d8608f-2336-0cb8-1bfa-ab87308e2d0b",
+      "status": "failed",
+      "command_id": "input.scrollUntil",
+      "result": null,
+      "failure": "Runner capability RPC failed: code: 'The service is currently unavailable', message: \"40:101: execution error: System Events got an error: Application isn\u2019t running. (-600)\"",
+      "failure_details": {
+        "code": "backend",
+        "message": "Runner capability RPC failed: code: 'The service is currently unavailable', message: \"40:101: execution error: System Events got an error: Application isn\u2019t running. (-600)\""
+      }
+    }
+  }
+]
