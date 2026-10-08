@@ -1795,7 +1795,7 @@ fn scroll_until_request_from_proto(request: proto::ScrollUntilBegin) -> Result<a
     Some(proto::scroll_until_begin::Condition::TextVisible(text)) => auv_scan::ScrollUntilCondition::TextVisible { query: text.query },
     None => return Err(Status::invalid_argument("condition is required")),
   };
-  let motion_region = request.motion_region.map(|region| ratio_rect_from_proto(Some(region))).transpose()?;
+  let motion_region = request.motion_region.map(|region| relative_rect_from_proto(Some(region))).transpose()?;
   Ok(auv_scan::ScrollUntilRequest {
     step,
     condition,
@@ -2176,7 +2176,7 @@ fn stored_capture(captures: &CaptureStore, reference: proto::CaptureRef) -> Resu
 /// Crops, bounds and encodes a stored capture's pixels for `GetCaptureImage`.
 fn capture_image_to_proto(
   capture: &auv_driver::Capture,
-  region: auv_driver::RatioRect,
+  region: auv_driver::RelativeRect,
   max_size: Option<auv_api_proto::auv::api::image::v1::PixelSize>,
   encoding: auv_api_proto::auv::api::image::v1::ImageEncoding,
 ) -> Result<proto::GetCaptureImageResponse, Status> {
@@ -2275,12 +2275,12 @@ fn image_frame_from_proto(frame: proto::ImageFrame) -> Result<auv_driver::Captur
 /// or `screen_region` in logical screen coordinates, clipped to the image's
 /// screen `bounds`. Neither means the whole image.
 fn image_region_from_proto(
-  region: Option<auv_api_proto::auv::api::image::v1::NormalizedRect>,
+  region: Option<auv_api_proto::auv::api::image::v1::RelativeRect>,
   screen_region: Option<proto::ScreenRect>,
   bounds: auv_driver::Rect,
-) -> Result<auv_driver::RatioRect, Status> {
+) -> Result<auv_driver::RelativeRect, Status> {
   let Some(screen_region) = screen_region else {
-    return ratio_rect_from_proto(region);
+    return relative_rect_from_proto(region);
   };
   if region.is_some() {
     return Err(Status::invalid_argument("region and screen_region are exclusive"));
@@ -2296,7 +2296,7 @@ fn image_region_from_proto(
   if right <= left || bottom <= top {
     return Err(Status::invalid_argument("screen_region does not overlap the image"));
   }
-  Ok(auv_driver::RatioRect::new(
+  Ok(auv_driver::RelativeRect::new(
     (left - bounds.origin.x) / bounds.size.width,
     (top - bounds.origin.y) / bounds.size.height,
     (right - left) / bounds.size.width,
@@ -2304,11 +2304,11 @@ fn image_region_from_proto(
   ))
 }
 
-fn ratio_rect_from_proto(region: Option<auv_api_proto::auv::api::image::v1::NormalizedRect>) -> Result<auv_driver::RatioRect, Status> {
+fn relative_rect_from_proto(region: Option<auv_api_proto::auv::api::image::v1::RelativeRect>) -> Result<auv_driver::RelativeRect, Status> {
   let Some(region) = region else {
-    return Ok(auv_driver::RatioRect::new(0.0, 0.0, 1.0, 1.0));
+    return Ok(auv_driver::RelativeRect::new(0.0, 0.0, 1.0, 1.0));
   };
-  let region = auv_driver::RatioRect::new(region.x, region.y, region.width, region.height);
+  let region = auv_driver::RelativeRect::new(region.x, region.y, region.width, region.height);
   if !region.is_normalized() {
     return Err(Status::invalid_argument("region must be a finite, positive rectangle inside normalized image bounds"));
   }
@@ -2692,7 +2692,7 @@ impl DisplayService for LocalDisplayService {
 ///
 #[cfg(any(unix, windows))]
 pub(super) async fn serve_inherited() -> Result<(), String> {
-  let (incoming, parent_disconnected) = auv_api_server::runner_transport::inherited_transport()?.into_parts();
+  let (incoming, shutdown) = auv_api_server::runner_transport::inherited_transport()?.into_parts();
 
   let portal_state_root = std::env::var_os(super::STATE_ROOT_ENV).map(|root| std::path::PathBuf::from(root).join("portal"));
   let driver = auv::local::driver(portal_state_root).map_err(|error| error.to_string())?;
@@ -2757,6 +2757,9 @@ pub(super) async fn serve_inherited() -> Result<(), String> {
     .max_encoding_message_size(auv_api_proto::GRPC_MESSAGE_SIZE_UNLIMITED);
   let (health_reporter, health) = tonic_health::server::health_reporter();
   health_reporter.set_serving::<DisplayServiceServer<LocalDisplayService>>().await;
+  health_reporter
+    .set_serving::<auv_api_proto::auv::api::annotations::v1::method_docs_service_server::MethodDocsServiceServer<auv_api_server::method_docs::Service>>()
+    .await;
   health_reporter.set_serving::<WindowServiceServer<LocalWindowService>>().await;
   health_reporter.set_serving::<CaptureServiceServer<LocalCaptureService>>().await;
   health_reporter.set_serving::<RecentFramesServiceServer<super::recent_frames::Service>>().await;
@@ -2790,6 +2793,14 @@ pub(super) async fn serve_inherited() -> Result<(), String> {
   served_services.push("auv.api.driver.macos.v1.MediaControlService");
   #[cfg(target_os = "macos")]
   served_services.push("auv.api.driver.v1.OverlayService");
+  // Long-form docs for the methods above; the docs service itself is served
+  // and reflected too, so clients can discover it.
+  let method_docs = auv_api_server::method_docs::service(
+    &auv_api_proto::descriptor_set_for_services(&served_services)?,
+    &served_services,
+    auv_api_proto::METHOD_DOCS,
+  )?;
+  served_services.push("auv.api.annotations.v1.MethodDocsService");
   let descriptor_set = auv_api_proto::descriptor_set_for_services(&served_services)?;
   let reflection =
     auv_api_server::reflection::service(&descriptor_set).map_err(|error| format!("failed to build local Runner reflection: {error}"))?;
@@ -2797,6 +2808,7 @@ pub(super) async fn serve_inherited() -> Result<(), String> {
   let serve_result = tonic::transport::Server::builder()
     .add_service(health)
     .add_service(reflection)
+    .add_service(method_docs)
     .add_service(display)
     .add_service(window)
     .add_service(capture)
@@ -2808,7 +2820,7 @@ pub(super) async fn serve_inherited() -> Result<(), String> {
     .add_service(accessibility)
     .add_service(media_control)
     .add_service(overlay)
-    .serve_with_incoming_shutdown(incoming, parent_disconnected)
+    .serve_with_incoming_shutdown(incoming, shutdown)
     .await
     .map_err(|error| format!("Runner transport failed: {error}"));
   let shutdown_result = recent_frames_service.shutdown().await.map_err(|error| format!("recent-frame shutdown failed: {error}"));
