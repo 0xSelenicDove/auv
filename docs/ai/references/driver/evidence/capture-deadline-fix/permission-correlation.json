@@ -1,0 +1,18 @@
+{
+  "local_timestamp": "2026-10-07 22:43:35",
+  "requesting_process_id": 41412,
+  "binary": "pre-fix AUV benchmark binary",
+  "service": "kTCCServiceScreenCapture",
+  "message_ids": [
+    "41412.2",
+    "41412.3",
+    "36474.2186"
+  ],
+  "auth_values": [
+    2,
+    2,
+    2
+  ],
+  "source": "local unified-log correlation of AUTHREQ_CTX/ATTRIBUTION and AUTHREQ_RESULT",
+  "interpretation_limit": "Successful permission checks do not prove that ScreenCaptureKit delivered a frame or explain later -3801 errors."
+}

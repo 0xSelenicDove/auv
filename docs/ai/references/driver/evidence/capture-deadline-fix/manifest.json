@@ -1,0 +1,17 @@
+{
+  "base_revision": "94c35827",
+  "classification": "capture timeout lifecycle bug fix and narrow skill correction",
+  "binary_sha256": "b66663f84902f15ac760f51ee8a53b4e9e1cced416289b682dddcb4d84296c85",
+  "workspace_passed": 1163,
+  "workspace_failed": 0,
+  "workspace_ignored": 20,
+  "workspace_targets": 140,
+  "native_sequential_before": 32,
+  "native_concurrent_before": 64,
+  "native_concurrent_after": 64,
+  "background_runner_searches_completed": 8,
+  "complete_rows_verified": 8,
+  "model_token_benchmark_rerun": false,
+  "scope_limit": "Intermittent macOS capture stall not reproduced independently; fixed late callback lifecycle does not establish its underlying cause.",
+  "live_probe_confound": "Concurrent native capture stress overlapped the background Runner probe. Timings are not comparative benchmarks."
+}

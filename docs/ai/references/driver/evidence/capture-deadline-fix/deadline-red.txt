@@ -1,0 +1,5 @@
+thread 'native_capture_deadline_rejects_late_callbacks' (13062758) panicked at crates/auv-driver-macos/tests/capture_operation.rs:32:3:
+stderr: main/capture_operation.swift:26: Assertion failed
+test native_capture_deadline_rejects_late_callbacks ... FAILED
+    native_capture_deadline_rejects_late_callbacks
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s

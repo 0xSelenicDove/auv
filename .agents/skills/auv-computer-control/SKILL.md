@@ -31,4 +31,6 @@ Use `--compact-json` when help offers it, otherwise `--json`. Keep complete stdo
 
 Choose the input policy deliberately. Foreground input may raise the app; background posting may not be consumed and must honor its stated fallback policy. After ineffective input, inspect partial progress, correct focus/target, and allow one recovery for simple navigation. If unresolved, use a permitted supported alternative or report failure. Never blindly retry insertion, submission, or effects that could duplicate work, grant permissions, bypass denied access, or change a remote task to local.
 
+If a shell tool yields a running session, wait for it before issuing more input or recovery to the same window.
+
 Reuse verified operations and session help; batch only actions safe without intermediate checks. Finish with the observed outcome, evidence, and any remaining failure. Measure total tokens and successful completion before claiming savings.

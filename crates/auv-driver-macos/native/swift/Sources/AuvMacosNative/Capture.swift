@@ -23,30 +23,16 @@ private func emptyWindowCaptureResponse(
 }
 
 func capture_window_image(request: NativeWindowCaptureRequest) -> NativeWindowCaptureResponse {
-  var capturedImage: CGImage?
-  var capturedFrame = CGRect.zero
-  var captureError: Error?
-  let status = nativeCaptureWindowForAuv(windowID: UInt32(max(request.window_id, 0)), logical: request.logical) { image, frame, error in
-    capturedImage = image
-    capturedFrame = frame
-    captureError = error
-  }
-  if status == .timedOut {
+  let image: CGImage
+  let capturedFrame: CGRect
+  switch nativeCaptureWindowForAuv(windowID: UInt32(max(request.window_id, 0)), logical: request.logical) {
+  case .success(let captured):
+    image = captured.image
+    capturedFrame = captured.frame
+  case .failure(let error):
     return emptyWindowCaptureResponse(
-      message: "ScreenCaptureKit window capture timed out after 10s",
-      recovery: "verify Screen Recording permission and retry"
-    )
-  }
-  if let captureError {
-    return emptyWindowCaptureResponse(
-      message: "ScreenCaptureKit window capture failed: \(captureError)",
-      recovery: "verify the target window is capturable and retry"
-    )
-  }
-  guard let image = capturedImage else {
-    return emptyWindowCaptureResponse(
-      message: "ScreenCaptureKit returned no window image",
-      recovery: "retry capture or use a fallback capture method"
+      message: "ScreenCaptureKit window capture failed: \(error)",
+      recovery: "check the reported capture stage and target window; permission denial requires user authorization"
     )
   }
   guard let rgba = nativeRgbaBytes(from: image) else {
@@ -70,34 +56,31 @@ func capture_window_image(request: NativeWindowCaptureRequest) -> NativeWindowCa
 
 private func nativeCaptureWindowForAuv(
   windowID: UInt32,
-  logical: Bool,
-  completion: @escaping (CGImage?, CGRect, Error?) -> Void
-) -> DispatchTimeoutResult {
-  let semaphore = DispatchSemaphore(value: 0)
-
+  logical: Bool
+) -> Result<(image: CGImage, frame: CGRect), Error> {
   guard #available(macOS 14.0, *) else {
-    completion(nil, .zero, NSError(
+    return .failure(NSError(
       domain: "AuvMacosNative.Capture",
       code: 3,
       userInfo: [NSLocalizedDescriptionKey: "ScreenCaptureKit screenshot capture requires macOS 14.0 or newer"]
     ))
-    semaphore.signal()
-    return semaphore.wait(timeout: .now() + .seconds(10))
   }
 
+  let operation = WindowCaptureOperation()
   SCShareableContent.getWithCompletionHandler { content, error in
+    // NOTICE: lookup callbacks can arrive after the synchronous FFI deadline.
+    // Previously they still created a new screenshot request after fallback.
+    guard operation.beginScreenshot() else { return }
     if let error {
-      completion(nil, .zero, error)
-      semaphore.signal()
+      operation.finish(.failure(error))
       return
     }
     guard let window = content?.windows.first(where: { $0.windowID == windowID }) else {
-      completion(nil, .zero, NSError(
+      operation.finish(.failure(NSError(
         domain: "AuvMacosNative.Capture",
         code: 1,
         userInfo: [NSLocalizedDescriptionKey: "window \(windowID) not found"]
-      ))
-      semaphore.signal()
+      )))
       return
     }
 
@@ -121,28 +104,24 @@ private func nativeCaptureWindowForAuv(
       configuration: config
     ) { sampleBuffer, captureError in
       if let captureError {
-        completion(nil, .zero, captureError)
-        semaphore.signal()
+        operation.finish(.failure(captureError))
         return
       }
       guard
         let sampleBuffer,
         let image = nativeImageFromSampleBuffer(sampleBuffer)
       else {
-        completion(nil, .zero, NSError(
+        operation.finish(.failure(NSError(
           domain: "AuvMacosNative.Capture",
           code: 2,
           userInfo: [NSLocalizedDescriptionKey: "window capture returned no image sample"]
-        ))
-        semaphore.signal()
+        )))
         return
       }
-      completion(image, window.frame, nil)
-      semaphore.signal()
+      operation.finish(.success((image, window.frame)))
     }
   }
-
-  return semaphore.wait(timeout: .now() + .seconds(10))
+  return operation.wait()
 }
 
 func nativeImageFromSampleBuffer(_ sampleBuffer: CMSampleBuffer) -> CGImage? {

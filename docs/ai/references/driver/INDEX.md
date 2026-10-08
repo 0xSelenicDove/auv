@@ -140,3 +140,5 @@ Count: **84**
 - [Runner scroll search final-observation evidence](2026-10-07-runner-scroll-evidence.md): Runner-side capture recording with metadata-only receipts, matched-frame regressions, different-store live verification and recording-error separation; no new token-saving claim.
 
 - [Runner evidence matched benchmark](2026-10-07-runner-evidence-benchmark.md): four full model sessions; capture failures prevent a performance conclusion.
+
+- [Capture deadline fix](2026-10-07-capture-deadline-fix.md): late callback lifecycle regression, background search evidence, and unresolved OS stall limits.

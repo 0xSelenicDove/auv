@@ -67,3 +67,29 @@ pub fn window_ax_size_for(pid: u32, window_number: i64) -> Option<WindowAxSize> 
     minimized: response.minimized,
   })
 }
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+  // Live capture regression for the canvas benchmark failures. Exercise the
+  // native boundary without input, OCR, tracing or overlapping recovery.
+  #[test]
+  #[ignore = "requires a capturable synthetic window; set AUV_CAPTURE_TEST_WINDOW_ID"]
+  fn repeated_window_capture_completes_without_backend_failure() {
+    let id = std::env::var("AUV_CAPTURE_TEST_WINDOW_ID").unwrap().parse().unwrap();
+    // Match first-party callers: initialize WindowServer via window resolution.
+    super::super::window::list_windows(super::super::window::ListWindowsOptions::app(256, "local.auv.RepeatedSearchFixture")).unwrap();
+    std::thread::scope(|scope| {
+      for _ in 0..2 {
+        scope.spawn(|| {
+          for iteration in 0..32 {
+            let started = std::time::Instant::now();
+            let capture = super::capture_window_rgba(id, false).unwrap_or_else(|error| panic!("capture {iteration}: {error}"));
+            assert!(capture.image_width > 0 && capture.image_height > 0);
+            assert_eq!(capture.rgba_bytes.len() as i64, capture.image_width * capture.image_height * 4);
+            eprintln!("capture {iteration}: {:.3}s", started.elapsed().as_secs_f64());
+          }
+        });
+      }
+    });
+  }
+}
