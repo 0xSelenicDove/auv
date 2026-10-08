@@ -1,0 +1,72 @@
+{
+  "trial": 2,
+  "record_checks": [
+    {
+      "name": "Birch transfer",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Cobalt dispatch",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Ember review",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Harbor receipt",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Juniper request",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Linden handoff",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Quartz audit",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    },
+    {
+      "name": "Willow release",
+      "oracle_matches": true,
+      "evidence_contains_exact_row": true,
+      "subject_claims_inspected": true,
+      "evidence_width": 900,
+      "evidence_height": 682
+    }
+  ],
+  "final_target_visible": true,
+  "verified_records": 8,
+  "complete": true
+}

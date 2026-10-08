@@ -1,0 +1,77 @@
+{
+  "trial": 1,
+  "arm": "before",
+  "case": "A",
+  "seconds_including_startup": 127.31779433402698,
+  "exit_code": 0,
+  "timed_out": false,
+  "usage": {
+    "input_tokens": 336199,
+    "cached_input_tokens": 299136,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 4114,
+    "reasoning_output_tokens": 811
+  },
+  "answer": {
+    "records": [
+      {
+        "name": "Birch transfer",
+        "code": "BK-1600",
+        "status": "Stored",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-01/store/daemon/artifacts/66a7620a-14f0-089a-68fe-8f58dedcf5c0/01a11a83-61f2-74da-8e58-16f4f4a0a270.webp"
+      },
+      {
+        "name": "Cobalt dispatch",
+        "code": "BK-5738",
+        "status": "Pending audit",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-01/store/daemon/artifacts/acc59994-9c66-38c9-6818-dca2bc509d7e/01a11a83-9000-77d3-b1ea-3ebc500584a9.webp"
+      },
+      {
+        "name": "Ember review",
+        "code": "BK-5856",
+        "status": "Stored",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-01/store/daemon/artifacts/abe301ba-47e4-c942-6c80-f0c8a0f23f30/01a11a83-99a7-7196-b01e-13d5260d4f25.webp"
+      },
+      {
+        "name": "Harbor receipt",
+        "code": "WS-9195",
+        "status": "Pending audit",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-01/store/daemon/artifacts/ae5dc18d-f6ad-ff77-6d95-f9e875fff380/01a11a83-a32b-73fa-b882-d85569745253.webp"
+      },
+      {
+        "name": "Juniper request",
+        "code": "WS-1191",
+        "status": "Ready for review",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-01/store/daemon/artifacts/4ea34e50-49fb-8227-b1cc-4a37fade11e0/01a11a83-accb-7737-a333-bcccb0e7af73.webp"
+      },
+      {
+        "name": "Linden handoff",
+        "code": "JP-6711",
+        "status": "Ready for review",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-01/store/daemon/artifacts/51028d7d-f1f2-1ba1-bb00-60ebb6e42fcd/01a11a83-ef7a-75cb-b74b-e27aab598d60.webp"
+      },
+      {
+        "name": "Quartz audit",
+        "code": "HN-3250",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-01/store/daemon/artifacts/77256f5e-0bb2-2ebc-d617-fced1a022f0c/01a11a83-fb71-7795-8a25-dd4967c920b4.webp"
+      },
+      {
+        "name": "Willow release",
+        "code": "WS-1353",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-01/store/daemon/artifacts/0344b06f-ecaa-8499-1905-fab34239efc4/01a11a84-0507-7581-976a-ee1b89b4807d.webp"
+      }
+    ],
+    "complete": true
+  },
+  "prompt_sha256": "13653a13e6870f6ef0b2dd349506b402fc8fadca5190c66302f5b571aeee888a"
+}

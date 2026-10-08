@@ -1,0 +1,77 @@
+{
+  "trial": 4,
+  "arm": "before",
+  "case": "B",
+  "seconds_including_startup": 75.59740804100875,
+  "exit_code": 0,
+  "timed_out": false,
+  "usage": {
+    "input_tokens": 185751,
+    "cached_input_tokens": 151936,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 2819,
+    "reasoning_output_tokens": 349
+  },
+  "answer": {
+    "records": [
+      {
+        "name": "Amber transfer",
+        "code": "QV-9244",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-04/store/artifacts/01a11a8b-b223-71fd-b9a3-429aeed2a1be/01a11a8b-b7bb-70e8-80ad-2c4fe59bf138.webp"
+      },
+      {
+        "name": "Cedar dispatch",
+        "code": "EL-5818",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-04/store/artifacts/01a11a8b-d4e0-740a-a2ed-22c56aa7bc6a/01a11a8b-dfec-77bd-ba60-41144ff3c605.webp"
+      },
+      {
+        "name": "Fern review",
+        "code": "QV-5886",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-04/store/artifacts/01a11a8b-dffd-7317-8233-17f3973a4a2d/01a11a8b-eaad-77ab-9dcd-56367753c9ff.webp"
+      },
+      {
+        "name": "Indigo receipt",
+        "code": "QV-5713",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-04/store/artifacts/01a11a8b-eab8-72bb-8cef-20ffb275f70d/01a11a8b-f593-75f5-8e0b-5eb42def73f2.webp"
+      },
+      {
+        "name": "Laurel request",
+        "code": "BK-9322",
+        "status": "Pending audit",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-04/store/artifacts/01a11a8b-f59d-7745-918c-d1ffdb50611f/01a11a8c-0063-721b-a133-084a2fa97705.webp"
+      },
+      {
+        "name": "Maple handoff",
+        "code": "HN-3847",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-04/store/artifacts/01a11a8c-006d-70f9-8d12-915d89af44d6/01a11a8c-089f-74a6-a548-014b3fa48dde.webp"
+      },
+      {
+        "name": "Rowan audit",
+        "code": "JP-9286",
+        "status": "Approved",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-04/store/artifacts/01a11a8c-08a9-750d-a099-85ad5aaa1e8e/01a11a8c-133d-7758-bad8-678a97186cdc.webp"
+      },
+      {
+        "name": "Zinnia release",
+        "code": "CT-8040",
+        "status": "Pending audit",
+        "screenshot_verified": true,
+        "evidence_path": "/tmp/auv-stall-speed-token-benchmark-20261008/trial-04/store/artifacts/01a11a8c-1348-76f2-9a67-0166d3d30830/01a11a8c-1e3f-72a2-b788-c576630fcd63.webp"
+      }
+    ],
+    "complete": true
+  },
+  "prompt_sha256": "2f2b044683391ced02b4f73bee862ba263f6c85ce318eb8e6e98e9261acf08a7"
+}

@@ -1,0 +1,28 @@
+{
+  "registered": "2026-10-08",
+  "classification": "test-only",
+  "order": [
+    "before/A",
+    "after/A",
+    "after/B",
+    "before/B"
+  ],
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "low",
+  "timeout_seconds": 900,
+  "versions": {
+    "before": {
+      "commit": "9eefd507d0acbf0454f50db279bdf8ee6e4aa381",
+      "binary_sha256": "b66663f84902f15ac760f51ee8a53b4e9e1cced416289b682dddcb4d84296c85",
+      "skill_sha256": "8adf3ad781f947e37d1edeae14fec79cec14b259f36d09a43ba08320567079d7",
+      "operations_sha256": "936a6ca0936dd01ecef0782cc76eb96874080cb01c76ea955e5658ffb487c576"
+    },
+    "after": {
+      "commit": "f9abd0e5768f73837397f97473375235d60370e5",
+      "binary_sha256": "79f55ecee5b167cc89719f08cb9e36d0e069852bcc54c105e34badec636a4344",
+      "skill_sha256": "52d7c17bad7de9d6b8b47381b4657c10ca15164a6ed0ba090f44515986d5ec78",
+      "operations_sha256": "8b68b7d95a4bbeea69bf9adc8ca272c4e9117d554cbf51dab7a2ce3e59fd654b"
+    }
+  },
+  "codex_version": "codex-cli 0.150.1"
+}

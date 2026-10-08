@@ -1,0 +1,22 @@
+Controlled read-only desktop benchmark. Observe/control only app local.auv.RepeatedSearchFixture,
+window AUV Repeated Search - Synthetic Benchmark. Starting viewport is top, with this app foreground.
+Find these eight record names: ["Birch transfer", "Cobalt dispatch", "Ember review", "Harbor receipt", "Juniper request", "Linden handoff", "Quartz audit", "Willow release"].
+For every record, read its code and status from fresh observed pixels and retain a screenshot containing
+its complete row. Return all eight results; leave the last requested record visible. Records are drawn
+on a long canvas and absent from accessibility text. Do not infer codes/statuses or positions from naming.
+You may batch deterministic actions, use available scrollbar controls, and reuse connections/processes.
+Choose the fastest accurate workflow supported by your tools. Screenshots must be inspected to verify
+the reported content; successful input/OCR matches alone do not prove the goal. If input is ineffective,
+inspect state and allow one corrective recovery; stop on unresolved failures. No permissions changes,
+other apps, external network searches, browser automation, source/fixture/answer-file reads, process
+memory inspection, installations, agents or host configuration changes. Read only installed tool help
+and your own operation outputs/screenshots. Do not access other trials. Time limit 900 seconds.
+Return only JSON: {"records":[{"name":"...","code":"...","status":"...","screenshot_verified":true,
+"evidence_path":"..."}],"complete":true}. Preserve partial results on failure; do not guess.
+Use only AUV at /Users/hutao/github/auv/docs/notes/stall-speed-token-benchmark/bin/after for app observation and input; shell scripts/loops may batch
+these AUV commands. Discover needed syntax from installed help. Retain and expose full result JSON and
+failures; no diagnostic truncation. You may use this binary's existing CLI, private daemon or built-in MCP
+interfaces. A task-owned daemon must use a private Unix socket under /tmp/auv-stall-speed-token-benchmark-20261008/trial-02, --no-register, and a private
+--store-root; count its startup, stop only processes you own, and clean up at completion. No existing daemon
+is supplied. Store all operation records/artifacts under /tmp/auv-stall-speed-token-benchmark-20261008/trial-02/store. No native UI scripts or external OCR.
+Read the complete skill at /tmp/auv-stall-speed-token-benchmark-20261008/trial-02/codex-home/skills/auv-computer-control/SKILL.md before AUV. Its referenced operation guidance is also permitted.
