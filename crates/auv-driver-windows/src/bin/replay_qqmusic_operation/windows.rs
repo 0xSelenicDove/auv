@@ -45,13 +45,19 @@ use std::time::{Duration, Instant};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{IsIconic, SW_RESTORE, ShowWindow};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ExecutionMode {
+  Fast,
+  Verified,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct CompiledOperation {
   schema_version: String,
   name: String,
   description: String,
-  #[serde(default)]
-  execution_mode: Option<String>,
+  execution_mode: ExecutionMode,
   compilation_metadata: CompilationMetadata,
   target: TargetMetadata,
   steps: Vec<OperationStepDef>,
@@ -1068,13 +1074,19 @@ fn compute_stats(mut vals: Vec<f64>) -> (f64, f64, f64) {
   (p50, p95, mean)
 }
 
-pub(super) fn main() {
-  ensure_input_desktop();
+fn validate_cli_mode(mode: &str) -> Result<(), String> {
+  match mode {
+    "baseline" | "verified" | "fast" => Ok(()),
+    other => Err(format!("Unsupported --mode '{other}'; expected baseline, verified, or fast")),
+  }
+}
 
+pub(super) fn main() {
   let args: Vec<String> = env::args().collect();
   let mut replays_count = 20usize;
   let mut mode = "verified".to_string(); // "baseline", "verified", "fast"
   let mut output_file: Option<String> = None;
+  let mut user_op_file: Option<String> = None;
   let mut fault_inject: Option<String> = None;
   let mut allow_restore = false;
   let mut pacing_delay_ms = 50.0;
@@ -1087,6 +1099,14 @@ pub(super) fn main() {
       "--mode" => {
         if i + 1 < args.len() {
           mode = args[i + 1].to_lowercase();
+          i += 1;
+        } else {
+          panic!("Missing value for --mode; expected baseline, verified, or fast");
+        }
+      }
+      "--op" | "--operation" => {
+        if i + 1 < args.len() {
+          user_op_file = Some(args[i + 1].clone());
           i += 1;
         }
       }
@@ -1135,6 +1155,9 @@ pub(super) fn main() {
     i += 1;
   }
 
+  validate_cli_mode(&mode).unwrap_or_else(|message| panic!("{message}"));
+  ensure_input_desktop();
+
   // Prewarm only warm experimental groups. Baseline and --cold runs must
   // measure the uninitialized path without D3D/session/worker state.
   let mut wgc_init_dur = Duration::ZERO;
@@ -1161,12 +1184,45 @@ pub(super) fn main() {
     _ => "docs/ai/references/driver/2026-10-08-wgc-health-warm-verified-20x.jsonl".to_string(),
   });
 
-  let op_file_path = "docs/ai/references/driver/qqmusic-prepared-playback.json";
+  let default_op_path = match mode.as_str() {
+    "fast" => "docs/ai/references/driver/qqmusic-prepared-playback-fast.json",
+    "baseline" | "verified" => "docs/ai/references/driver/qqmusic-prepared-playback.json",
+    _ => unreachable!("CLI mode was validated above"),
+  };
+  let op_file_path = user_op_file.as_deref().unwrap_or(default_op_path);
   let op_json = fs::read_to_string(op_file_path)
     .or_else(|_| fs::read_to_string(Path::new("..").join("..").join(op_file_path)))
     .unwrap_or_else(|e| panic!("Failed to read compiled operation JSON at {op_file_path}: {e}"));
   let compiled_op: CompiledOperation =
-    serde_json::from_str(&op_json).unwrap_or_else(|e| panic!("Failed to parse compiled operation JSON: {e}"));
+    serde_json::from_str(&op_json).unwrap_or_else(|e| panic!("Failed to parse compiled operation JSON at {op_file_path}: {e}"));
+
+  if compiled_op.schema_version != "auv.operation.v2" {
+    panic!(
+      "Compiled operation schema mismatch at {}: expected 'auv.operation.v2', got '{}' (fail-closed)",
+      op_file_path, compiled_op.schema_version
+    );
+  }
+
+  // Validate execution mode compatibility between CLI and operation declaration
+  match (mode.as_str(), compiled_op.execution_mode) {
+    ("fast", ExecutionMode::Verified) => {
+      panic!(
+        "Mode conflict: CLI requested 'fast' mode, but compiled operation '{}' requires 'verified' mode (fail-closed)",
+        compiled_op.name
+      );
+    }
+    ("verified", ExecutionMode::Fast) => {
+      panic!(
+        "Mode conflict: CLI requested 'verified' mode, but compiled operation '{}' declares 'fast' mode (fail-closed)",
+        compiled_op.name
+      );
+    }
+    ("baseline", _) => {
+      // Baseline is a harness path, not an operation execution mode. It uses
+      // the verified fixture to measure the unoptimized implementation.
+    }
+    _ => unreachable!("CLI mode was validated above"),
+  }
 
   println!("================================================================================");
   println!("QQ Music Hotpath Profiling & Replay Harness (Zero VLM / Zero Token)");
@@ -1193,8 +1249,9 @@ pub(super) fn main() {
         "baseline" => execute_replay_baseline(1, Some(fi), allow_restore, 0.0, "cold", wgc_init_ms),
         "fast" => execute_replay_optimized(1, Some(fi), allow_restore, true, fast_window_verification, 0.0, "cold", None, wgc_init_ms)
           .map(|(r, _)| r),
-        _ => execute_replay_optimized(1, Some(fi), allow_restore, false, fast_window_verification, 0.0, "cold", None, wgc_init_ms)
+        "verified" => execute_replay_optimized(1, Some(fi), allow_restore, false, fast_window_verification, 0.0, "cold", None, wgc_init_ms)
           .map(|(r, _)| r),
+        _ => unreachable!("CLI mode was validated above"),
       }
       .expect("Failed to execute fault injection replay");
 
@@ -1240,7 +1297,7 @@ pub(super) fn main() {
         cached_ep_id.as_deref(),
         wgc_init_ms,
       ),
-      _ => execute_replay_optimized(
+      "verified" => execute_replay_optimized(
         iter,
         None,
         allow_restore,
@@ -1251,6 +1308,7 @@ pub(super) fn main() {
         cached_ep_id.as_deref(),
         wgc_init_ms,
       ),
+      _ => unreachable!("CLI mode was validated above"),
     };
 
     let (mut record, next_ep) = match res {
@@ -1376,4 +1434,22 @@ pub(super) fn main() {
     records.len()
   );
   println!("================================================================================");
+}
+
+#[cfg(test)]
+mod tests {
+  use super::validate_cli_mode;
+
+  #[test]
+  fn cli_mode_validation_accepts_supported_modes() {
+    for mode in ["baseline", "verified", "fast"] {
+      assert_eq!(validate_cli_mode(mode), Ok(()));
+    }
+  }
+
+  #[test]
+  fn cli_mode_validation_rejects_unknown_modes() {
+    let error = validate_cli_mode("fastt").unwrap_err();
+    assert!(error.contains("Unsupported --mode 'fastt'"));
+  }
 }
