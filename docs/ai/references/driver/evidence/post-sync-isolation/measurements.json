@@ -1,0 +1,1148 @@
+[
+  {
+    "label": "capture-1",
+    "version": "old",
+    "mode": "direct",
+    "arguments": [
+      "window.capture"
+    ],
+    "seconds": 40.094432250014506,
+    "exit_code": 1,
+    "output": {
+      "run_id": "01a11905-b61f-73fc-8282-e8de1c29d6f2",
+      "status": "failed",
+      "command_id": "window.capture",
+      "result": null,
+      "failure": "native Swift window capture failed before xcap fallback: macos native capture_window_image failed: ScreenCaptureKit window capture timed out after 10s; recovery=verify Screen Recording permission and retry; xcap fallback also failed: failed to capture window 26787: Failed to copy data",
+      "failure_details": {
+        "code": "command_failed",
+        "message": "native Swift window capture failed before xcap fallback: macos native capture_window_image failed: ScreenCaptureKit window capture timed out after 10s; recovery=verify Screen Recording permission and retry; xcap fallback also failed: failed to capture window 26787: Failed to copy data"
+      }
+    }
+  },
+  {
+    "label": "capture-2",
+    "version": "merged",
+    "mode": "direct",
+    "arguments": [
+      "window.capture"
+    ],
+    "seconds": 0.61344091698993,
+    "exit_code": 0,
+    "output": {
+      "run_id": "01a11906-52ea-71b0-af4f-c8ed9a4330c8",
+      "status": "completed",
+      "command_id": "window.capture",
+      "result": {
+        "capture": {
+          "backend": "macos.screencapturekit.ffi",
+          "bounds": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "fallback_reason": null,
+          "pixel_dimensions": {
+            "height": 1364,
+            "width": 1800
+          },
+          "scale_factor": 2.0
+        },
+        "window": {
+          "app_bundle_id": "local.auv.RepeatedSearchFixture",
+          "app_name": "AUVRepeatedSearchFixture",
+          "coordinate_space": "screen",
+          "frame": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "is_main": false,
+          "is_visible": true,
+          "process_id": 95386,
+          "reference": {
+            "id": "26787"
+          },
+          "title": "AUV Repeated Search - Synthetic Benchmark"
+        }
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a11906-52ea-71b0-af4f-c8ed9a4330c8/artifacts/01a11906-53c2-72c0-8ee2-4ffd854565db",
+          "purpose": "auv.driver.window_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 51308,
+          "sha256": "d8bdcab7eef21f46a3baf29ba489f4950de821af801d645419906ca0ff409cd2",
+          "attributes": {
+            "image.scale_factor": 2.0,
+            "image.source_height": 1364,
+            "image.source_width": 1800
+          },
+          "file_path": "/Users/hutao/github/auv/docs/notes/post-sync-isolation/capture-2/store/artifacts/01a11906-52ea-71b0-af4f-c8ed9a4330c8/01a11906-53c2-72c0-8ee2-4ffd854565db.webp"
+        }
+      ]
+    }
+  },
+  {
+    "label": "capture-3",
+    "version": "merged",
+    "mode": "direct",
+    "arguments": [
+      "window.capture"
+    ],
+    "seconds": 0.5579658749047667,
+    "exit_code": 0,
+    "output": {
+      "run_id": "01a11906-556c-75f8-9899-b91c0ff99ead",
+      "status": "completed",
+      "command_id": "window.capture",
+      "result": {
+        "capture": {
+          "backend": "macos.screencapturekit.ffi",
+          "bounds": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "fallback_reason": null,
+          "pixel_dimensions": {
+            "height": 1364,
+            "width": 1800
+          },
+          "scale_factor": 2.0
+        },
+        "window": {
+          "app_bundle_id": "local.auv.RepeatedSearchFixture",
+          "app_name": "AUVRepeatedSearchFixture",
+          "coordinate_space": "screen",
+          "frame": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "is_main": false,
+          "is_visible": true,
+          "process_id": 95386,
+          "reference": {
+            "id": "26787"
+          },
+          "title": "AUV Repeated Search - Synthetic Benchmark"
+        }
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a11906-556c-75f8-9899-b91c0ff99ead/artifacts/01a11906-563d-764f-952a-4f7af3bac016",
+          "purpose": "auv.driver.window_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 51308,
+          "sha256": "d8bdcab7eef21f46a3baf29ba489f4950de821af801d645419906ca0ff409cd2",
+          "attributes": {
+            "image.scale_factor": 2.0,
+            "image.source_height": 1364,
+            "image.source_width": 1800
+          },
+          "file_path": "/Users/hutao/github/auv/docs/notes/post-sync-isolation/capture-3/store/artifacts/01a11906-556c-75f8-9899-b91c0ff99ead/01a11906-563d-764f-952a-4f7af3bac016.webp"
+        }
+      ]
+    }
+  },
+  {
+    "label": "capture-4",
+    "version": "old",
+    "mode": "direct",
+    "arguments": [
+      "window.capture"
+    ],
+    "seconds": 10.491595959058031,
+    "exit_code": 0,
+    "output": {
+      "run_id": "01a11906-57c9-753e-84c7-67bc835d3824",
+      "status": "completed",
+      "command_id": "window.capture",
+      "result": {
+        "capture": {
+          "backend": "xcap.macos",
+          "bounds": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "fallback_reason": "macos native capture_window_image failed: ScreenCaptureKit window capture timed out after 10s; recovery=verify Screen Recording permission and retry",
+          "pixel_dimensions": {
+            "height": 1364,
+            "width": 1800
+          },
+          "scale_factor": 2.0
+        },
+        "window": {
+          "app_bundle_id": "local.auv.RepeatedSearchFixture",
+          "app_name": "AUVRepeatedSearchFixture",
+          "coordinate_space": "screen",
+          "frame": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "is_main": false,
+          "is_visible": true,
+          "process_id": 95386,
+          "reference": {
+            "id": "26787"
+          },
+          "title": "AUV Repeated Search - Synthetic Benchmark"
+        }
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a11906-57c9-753e-84c7-67bc835d3824/artifacts/01a11906-7f57-7671-98d8-1e5495a26ca0",
+          "purpose": "auv.driver.window_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 51478,
+          "sha256": "a2c2b78e8df1908f46b45f844ac64a9932b0b7c7d3f3e5cd5069bde0c096fd0b",
+          "attributes": {
+            "image.scale_factor": 2.0,
+            "image.source_height": 1364,
+            "image.source_width": 1800
+          },
+          "file_path": "/Users/hutao/github/auv/docs/notes/post-sync-isolation/capture-4/store/artifacts/01a11906-57c9-753e-84c7-67bc835d3824/01a11906-7f57-7671-98d8-1e5495a26ca0.webp"
+        }
+      ]
+    }
+  },
+  {
+    "label": "capture-5",
+    "version": "old",
+    "mode": "direct",
+    "arguments": [
+      "window.capture"
+    ],
+    "seconds": 0.7356932089896873,
+    "exit_code": 0,
+    "output": {
+      "run_id": "01a11906-c94c-71a4-bda3-fa101dd266cc",
+      "status": "completed",
+      "command_id": "window.capture",
+      "result": {
+        "capture": {
+          "backend": "macos.screencapturekit.ffi",
+          "bounds": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "fallback_reason": null,
+          "pixel_dimensions": {
+            "height": 682,
+            "width": 900
+          },
+          "scale_factor": 1.0
+        },
+        "window": {
+          "app_bundle_id": "local.auv.RepeatedSearchFixture",
+          "app_name": "AUVRepeatedSearchFixture",
+          "coordinate_space": "screen",
+          "frame": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "is_main": false,
+          "is_visible": true,
+          "process_id": 95386,
+          "reference": {
+            "id": "26787"
+          },
+          "title": "AUV Repeated Search - Synthetic Benchmark"
+        }
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a11906-c94c-71a4-bda3-fa101dd266cc/artifacts/01a11906-cac2-74b6-ad4e-22169d5aa594",
+          "purpose": "auv.driver.window_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 83842,
+          "sha256": "e8f9baa72f24705c22200c33179168e91d353097d9703f7ec7f2ebe19ea2df57",
+          "attributes": {},
+          "file_path": "/Users/hutao/github/auv/docs/notes/post-sync-isolation/capture-5/store/artifacts/01a11906-c94c-71a4-bda3-fa101dd266cc/01a11906-cac2-74b6-ad4e-22169d5aa594.webp"
+        }
+      ]
+    }
+  },
+  {
+    "label": "fixed-1-birch",
+    "version": "old",
+    "mode": "direct",
+    "arguments": [
+      "input.scrollUntil",
+      "450",
+      "500",
+      "--dy",
+      "400",
+      "--until",
+      "text:Birch transfer",
+      "--settle-ms",
+      "40",
+      "--max-steps",
+      "100",
+      "--confirmations",
+      "2",
+      "--input-policy",
+      "background-only",
+      "--no-overlay"
+    ],
+    "seconds": 27.02072675002273,
+    "exit_code": 0,
+    "output": {
+      "run_id": "01a11903-d5e0-768d-a8ff-548fc397dda6",
+      "status": "completed",
+      "command_id": "input.scrollUntil",
+      "result": {
+        "normalized": false,
+        "policy": "background_only",
+        "request": {
+          "condition": {
+            "kind": "text_visible",
+            "query": "Birch transfer"
+          },
+          "max_steps": 100,
+          "motion_region": null,
+          "no_motion_confirmations": 2,
+          "observe": {
+            "text": false
+          },
+          "settle": {
+            "nanos": 40000000,
+            "secs": 0
+          },
+          "step": {
+            "delta": {
+              "delta_x": 0.0,
+              "delta_y": 400.0
+            },
+            "kind": "instant"
+          }
+        },
+        "requested_point": {
+          "x": 450.0,
+          "y": 500.0
+        },
+        "result": {
+          "action": {
+            "attempts": [
+              {
+                "message": "AX scroll is not implemented in this slice",
+                "path": "ax_scroll",
+                "succeeded": false
+              },
+              {
+                "message": null,
+                "path": "window_targeted_wheel",
+                "succeeded": true
+              }
+            ],
+            "clipboard_disturbance": "none",
+            "focus_disturbance": "none",
+            "mouse_disturbance": "none",
+            "selected_path": "window_targeted_wheel",
+            "verified": false
+          },
+          "delivered": {
+            "delta_x": 0.0,
+            "delta_y": 400.0
+          },
+          "last_motion": {
+            "estimated_shift": -16,
+            "no_motion": false,
+            "normalized_diff": 0.016655943015928657
+          },
+          "reason": "text_visible",
+          "steps": 1,
+          "text_match": {
+            "bounds": {
+              "origin": {
+                "x": 428.0,
+                "y": 595.0
+              },
+              "size": {
+                "height": 22.0,
+                "width": 372.0
+              }
+            },
+            "text": "Birch transfer | BK-1600 | Stored"
+          }
+        },
+        "window": {
+          "app_bundle_id": "local.auv.RepeatedSearchFixture",
+          "app_name": "AUVRepeatedSearchFixture",
+          "coordinate_space": "screen",
+          "frame": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "is_main": false,
+          "is_visible": true,
+          "process_id": 95386,
+          "reference": {
+            "id": "26787"
+          },
+          "title": "AUV Repeated Search - Synthetic Benchmark"
+        },
+        "window_point": {
+          "x": 450.0,
+          "y": 500.0
+        }
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a11903-d5e0-768d-a8ff-548fc397dda6/artifacts/01a11904-3f51-738f-a088-7c8f1da54faa",
+          "purpose": "auv.scan.scroll_until_final_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 84244,
+          "sha256": "bafc8d0378296cfa0aade1a45464a7082dabb5d15da1b5d0e52ecd6259943fe9",
+          "attributes": {},
+          "file_path": "/Users/hutao/github/auv/docs/notes/post-sync-isolation/fixed-1-birch/store/artifacts/01a11903-d5e0-768d-a8ff-548fc397dda6/01a11904-3f51-738f-a088-7c8f1da54faa.webp"
+        }
+      ]
+    }
+  },
+  {
+    "label": "fixed-2-birch",
+    "version": "merged",
+    "mode": "direct",
+    "arguments": [
+      "input.scrollUntil",
+      "450",
+      "500",
+      "--dy",
+      "400",
+      "--until",
+      "text:Birch transfer",
+      "--settle-ms",
+      "40",
+      "--max-steps",
+      "100",
+      "--confirmations",
+      "2",
+      "--input-policy",
+      "background-only",
+      "--no-overlay"
+    ],
+    "seconds": 29.950419791974127,
+    "exit_code": 0,
+    "output": {
+      "run_id": "01a11904-7cb1-72fe-a843-b7b2bf66891c",
+      "status": "completed",
+      "command_id": "input.scrollUntil",
+      "result": {
+        "normalized": false,
+        "policy": "background_only",
+        "request": {
+          "condition": {
+            "kind": "text_visible",
+            "query": "Birch transfer"
+          },
+          "max_steps": 100,
+          "motion_region": null,
+          "no_motion_confirmations": 2,
+          "output": {
+            "text": false
+          },
+          "settle": {
+            "nanos": 40000000,
+            "secs": 0
+          },
+          "step": {
+            "delta": {
+              "delta_x": 0.0,
+              "delta_y": 400.0
+            },
+            "kind": "instant"
+          }
+        },
+        "requested_point": {
+          "x": 450.0,
+          "y": 500.0
+        },
+        "result": {
+          "action": {
+            "attempts": [
+              {
+                "message": "AX scroll is not implemented in this slice",
+                "path": "ax_scroll",
+                "succeeded": false
+              },
+              {
+                "message": null,
+                "path": "window_targeted_wheel",
+                "succeeded": true
+              }
+            ],
+            "clipboard_disturbance": "none",
+            "focus_disturbance": "none",
+            "mouse_disturbance": "none",
+            "selected_path": "window_targeted_wheel",
+            "verified": false
+          },
+          "delivered": {
+            "delta_x": 0.0,
+            "delta_y": 400.0
+          },
+          "last_motion": {
+            "estimated_shift": -16,
+            "no_motion": false,
+            "normalized_diff": 0.017476506681625606
+          },
+          "reason": "text_visible",
+          "steps": 1,
+          "text_match": {
+            "bounds": {
+              "origin": {
+                "x": 230.0,
+                "y": 500.5
+              },
+              "size": {
+                "height": 21.0,
+                "width": 369.0
+              }
+            },
+            "text": "Birch transfer | BK-1600 | Stored"
+          }
+        },
+        "window": {
+          "app_bundle_id": "local.auv.RepeatedSearchFixture",
+          "app_name": "AUVRepeatedSearchFixture",
+          "coordinate_space": "screen",
+          "frame": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "is_main": false,
+          "is_visible": true,
+          "process_id": 95386,
+          "reference": {
+            "id": "26787"
+          },
+          "title": "AUV Repeated Search - Synthetic Benchmark"
+        },
+        "window_point": {
+          "x": 450.0,
+          "y": 500.0
+        }
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a11904-7cb1-72fe-a843-b7b2bf66891c/artifacts/01a11904-f18c-7067-ad62-c6962e8ee1e9",
+          "purpose": "auv.scan.scroll_until_final_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 51400,
+          "sha256": "11d1504ed87a9f10a143d6e4e633e93d4a6569c7581a6037db91d93cadc1565a",
+          "attributes": {
+            "image.scale_factor": 2.0,
+            "image.source_height": 1364,
+            "image.source_width": 1800
+          },
+          "file_path": "/Users/hutao/github/auv/docs/notes/post-sync-isolation/fixed-2-birch/store/artifacts/01a11904-7cb1-72fe-a843-b7b2bf66891c/01a11904-f18c-7067-ad62-c6962e8ee1e9.webp"
+        }
+      ]
+    }
+  },
+  {
+    "label": "fixed-3-birch",
+    "version": "merged",
+    "mode": "direct",
+    "arguments": [
+      "input.scrollUntil",
+      "450",
+      "500",
+      "--dy",
+      "400",
+      "--until",
+      "text:Birch transfer",
+      "--settle-ms",
+      "40",
+      "--max-steps",
+      "100",
+      "--confirmations",
+      "2",
+      "--input-policy",
+      "background-only",
+      "--no-overlay"
+    ],
+    "seconds": 1.5368187919957563,
+    "exit_code": 0,
+    "output": {
+      "run_id": "01a11905-2216-7486-ba28-97a2fce6024d",
+      "status": "completed",
+      "command_id": "input.scrollUntil",
+      "result": {
+        "normalized": false,
+        "policy": "background_only",
+        "request": {
+          "condition": {
+            "kind": "text_visible",
+            "query": "Birch transfer"
+          },
+          "max_steps": 100,
+          "motion_region": null,
+          "no_motion_confirmations": 2,
+          "output": {
+            "text": false
+          },
+          "settle": {
+            "nanos": 40000000,
+            "secs": 0
+          },
+          "step": {
+            "delta": {
+              "delta_x": 0.0,
+              "delta_y": 400.0
+            },
+            "kind": "instant"
+          }
+        },
+        "requested_point": {
+          "x": 450.0,
+          "y": 500.0
+        },
+        "result": {
+          "action": {
+            "attempts": [
+              {
+                "message": "AX scroll is not implemented in this slice",
+                "path": "ax_scroll",
+                "succeeded": false
+              },
+              {
+                "message": null,
+                "path": "window_targeted_wheel",
+                "succeeded": true
+              }
+            ],
+            "clipboard_disturbance": "none",
+            "focus_disturbance": "none",
+            "mouse_disturbance": "none",
+            "selected_path": "window_targeted_wheel",
+            "verified": false
+          },
+          "delivered": {
+            "delta_x": 0.0,
+            "delta_y": 400.0
+          },
+          "last_motion": {
+            "estimated_shift": -16,
+            "no_motion": false,
+            "normalized_diff": 0.016715988502298437
+          },
+          "reason": "text_visible",
+          "steps": 1,
+          "text_match": {
+            "bounds": {
+              "origin": {
+                "x": 230.0,
+                "y": 500.5
+              },
+              "size": {
+                "height": 21.0,
+                "width": 369.0
+              }
+            },
+            "text": "Birch transfer | BK-1600 | Stored"
+          }
+        },
+        "window": {
+          "app_bundle_id": "local.auv.RepeatedSearchFixture",
+          "app_name": "AUVRepeatedSearchFixture",
+          "coordinate_space": "screen",
+          "frame": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "is_main": false,
+          "is_visible": true,
+          "process_id": 95386,
+          "reference": {
+            "id": "26787"
+          },
+          "title": "AUV Repeated Search - Synthetic Benchmark"
+        },
+        "window_point": {
+          "x": 450.0,
+          "y": 500.0
+        }
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a11905-2216-7486-ba28-97a2fce6024d/artifacts/01a11905-27fb-73ca-9c91-d36aafb8e2e5",
+          "purpose": "auv.scan.scroll_until_final_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 51400,
+          "sha256": "11d1504ed87a9f10a143d6e4e633e93d4a6569c7581a6037db91d93cadc1565a",
+          "attributes": {
+            "image.scale_factor": 2.0,
+            "image.source_height": 1364,
+            "image.source_width": 1800
+          },
+          "file_path": "/Users/hutao/github/auv/docs/notes/post-sync-isolation/fixed-3-birch/store/artifacts/01a11905-2216-7486-ba28-97a2fce6024d/01a11905-27fb-73ca-9c91-d36aafb8e2e5.webp"
+        }
+      ]
+    }
+  },
+  {
+    "label": "fixed-5-birch",
+    "version": "old",
+    "mode": "direct",
+    "arguments": [
+      "input.scrollUntil",
+      "450",
+      "500",
+      "--dy",
+      "400",
+      "--until",
+      "text:Birch transfer",
+      "--settle-ms",
+      "40",
+      "--max-steps",
+      "100",
+      "--confirmations",
+      "2",
+      "--input-policy",
+      "background-only",
+      "--no-overlay"
+    ],
+    "seconds": 1.0794439170276746,
+    "exit_code": 0,
+    "output": {
+      "run_id": "01a11906-f3c3-7658-8b2b-c54c4a7ff294",
+      "status": "completed",
+      "command_id": "input.scrollUntil",
+      "result": {
+        "normalized": false,
+        "policy": "background_only",
+        "request": {
+          "condition": {
+            "kind": "text_visible",
+            "query": "Birch transfer"
+          },
+          "max_steps": 100,
+          "motion_region": null,
+          "no_motion_confirmations": 2,
+          "observe": {
+            "text": false
+          },
+          "settle": {
+            "nanos": 40000000,
+            "secs": 0
+          },
+          "step": {
+            "delta": {
+              "delta_x": 0.0,
+              "delta_y": 400.0
+            },
+            "kind": "instant"
+          }
+        },
+        "requested_point": {
+          "x": 450.0,
+          "y": 500.0
+        },
+        "result": {
+          "action": {
+            "attempts": [
+              {
+                "message": "AX scroll is not implemented in this slice",
+                "path": "ax_scroll",
+                "succeeded": false
+              },
+              {
+                "message": null,
+                "path": "window_targeted_wheel",
+                "succeeded": true
+              }
+            ],
+            "clipboard_disturbance": "none",
+            "focus_disturbance": "none",
+            "mouse_disturbance": "none",
+            "selected_path": "window_targeted_wheel",
+            "verified": false
+          },
+          "delivered": {
+            "delta_x": 0.0,
+            "delta_y": 400.0
+          },
+          "last_motion": {
+            "estimated_shift": -16,
+            "no_motion": false,
+            "normalized_diff": 0.016328754256193217
+          },
+          "reason": "text_visible",
+          "steps": 1,
+          "text_match": {
+            "bounds": {
+              "origin": {
+                "x": 428.0,
+                "y": 595.0
+              },
+              "size": {
+                "height": 22.0,
+                "width": 372.0
+              }
+            },
+            "text": "Birch transfer | BK-1600 | Stored"
+          }
+        },
+        "window": {
+          "app_bundle_id": "local.auv.RepeatedSearchFixture",
+          "app_name": "AUVRepeatedSearchFixture",
+          "coordinate_space": "screen",
+          "frame": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "is_main": false,
+          "is_visible": true,
+          "process_id": 95386,
+          "reference": {
+            "id": "26787"
+          },
+          "title": "AUV Repeated Search - Synthetic Benchmark"
+        },
+        "window_point": {
+          "x": 450.0,
+          "y": 500.0
+        }
+      },
+      "artifacts": [
+        {
+          "uri": "auv://runs/01a11906-f3c3-7658-8b2b-c54c4a7ff294/artifacts/01a11906-f7ed-712c-a76d-1958292caee8",
+          "purpose": "auv.scan.scroll_until_final_capture",
+          "content_type": "image/webp",
+          "file_extension": "webp",
+          "byte_length": 83998,
+          "sha256": "be07cf0fc8c28c681c01c2657e3b633c1663c08a37ace4c123b867a2534ee92e",
+          "attributes": {},
+          "file_path": "/Users/hutao/github/auv/docs/notes/post-sync-isolation/fixed-5-birch/store/artifacts/01a11906-f3c3-7658-8b2b-c54c4a7ff294/01a11906-f7ed-712c-a76d-1958292caee8.webp"
+        }
+      ]
+    }
+  },
+  {
+    "label": "merged-click-after-native-focus",
+    "version": "merged",
+    "mode": "direct",
+    "arguments": [
+      "input.clickPoint",
+      "90",
+      "57",
+      "--relative-to",
+      "window",
+      "--input-policy",
+      "foreground-preferred"
+    ],
+    "seconds": 1.3130054159555584,
+    "exit_code": 1,
+    "output": {
+      "run_id": "01a11901-7bde-7453-93f4-4b2819371f68",
+      "status": "failed",
+      "command_id": "input.clickPoint",
+      "result": null,
+      "failure": "macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again",
+      "failure_details": {
+        "code": "command_failed",
+        "message": "macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again"
+      }
+    }
+  },
+  {
+    "label": "merged-click-bg",
+    "version": "merged",
+    "mode": "direct",
+    "arguments": [
+      "input.clickPoint",
+      "90",
+      "57",
+      "--relative-to",
+      "window",
+      "--input-policy",
+      "background-only"
+    ],
+    "seconds": 0.19560587499290705,
+    "exit_code": 0,
+    "output": {
+      "run_id": "01a11901-8120-746b-b527-5d905d7694e7",
+      "status": "completed",
+      "command_id": "input.clickPoint",
+      "result": {
+        "action": {
+          "attempts": [
+            {
+              "message": null,
+              "path": "window_targeted_mouse",
+              "succeeded": true
+            }
+          ],
+          "clipboard_disturbance": "none",
+          "focus_disturbance": "none",
+          "mouse_disturbance": "none",
+          "selected_path": "window_targeted_mouse",
+          "verified": false
+        },
+        "normalized": false,
+        "relative_to": "window",
+        "requested_point": {
+          "x": 90.0,
+          "y": 57.0
+        },
+        "screen_point": {
+          "x": 290.0,
+          "y": 151.0
+        },
+        "window": {
+          "app_bundle_id": "local.auv.RepeatedSearchFixture",
+          "app_name": "AUVRepeatedSearchFixture",
+          "coordinate_space": "screen",
+          "frame": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "is_main": false,
+          "is_visible": true,
+          "process_id": 95386,
+          "reference": {
+            "id": "26787"
+          },
+          "title": "AUV Repeated Search - Synthetic Benchmark"
+        }
+      }
+    }
+  },
+  {
+    "label": "merged-click-fg",
+    "version": "merged",
+    "mode": "direct",
+    "arguments": [
+      "input.clickPoint",
+      "90",
+      "57",
+      "--relative-to",
+      "window",
+      "--input-policy",
+      "foreground-preferred"
+    ],
+    "seconds": 1.2964387920219451,
+    "exit_code": 1,
+    "output": {
+      "run_id": "01a11900-3fb0-71c4-974d-df06b58b4fa7",
+      "status": "failed",
+      "command_id": "input.clickPoint",
+      "result": null,
+      "failure": "macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again",
+      "failure_details": {
+        "code": "command_failed",
+        "message": "macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again"
+      }
+    }
+  },
+  {
+    "label": "merged-window-list",
+    "version": "merged",
+    "mode": "direct",
+    "arguments": [
+      "window.list"
+    ],
+    "seconds": 0.05361041601281613,
+    "exit_code": 0,
+    "output": {
+      "run_id": "01a11900-8f7b-7189-8dc4-08acb82482a2",
+      "status": "completed",
+      "command_id": "window.list",
+      "result": [
+        {
+          "app_bundle_id": "local.auv.RepeatedSearchFixture",
+          "app_name": "AUVRepeatedSearchFixture",
+          "coordinate_space": "screen",
+          "frame": {
+            "origin": {
+              "x": 200.0,
+              "y": 94.0
+            },
+            "size": {
+              "height": 682.0,
+              "width": 900.0
+            }
+          },
+          "is_main": false,
+          "is_visible": true,
+          "process_id": 95386,
+          "reference": {
+            "id": "26787"
+          },
+          "title": "AUV Repeated Search - Synthetic Benchmark"
+        }
+      ]
+    }
+  },
+  {
+    "label": "old-activate",
+    "version": "old",
+    "mode": "direct",
+    "arguments": [
+      "app.activate"
+    ],
+    "seconds": 0.6859836250077933,
+    "exit_code": 0,
+    "output": {
+      "run_id": "01a11900-1290-770b-82b6-b9506aa0ab66",
+      "status": "completed",
+      "command_id": "app.activate",
+      "result": {
+        "requested_bundle_id": "local.auv.RepeatedSearchFixture",
+        "verification": {
+          "observed_bundle_id": "local.auv.RepeatedSearchFixture",
+          "status": "verified_foreground"
+        }
+      }
+    }
+  },
+  {
+    "label": "old-click-after-native-focus",
+    "version": "old",
+    "mode": "direct",
+    "arguments": [
+      "input.clickPoint",
+      "90",
+      "57",
+      "--relative-to",
+      "window",
+      "--input-policy",
+      "foreground-preferred"
+    ],
+    "seconds": 1.3155510420911014,
+    "exit_code": 1,
+    "output": {
+      "run_id": "01a11901-7679-772e-af78-7e9767ec2693",
+      "status": "failed",
+      "command_id": "input.clickPoint",
+      "result": null,
+      "failure": "macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again",
+      "failure_details": {
+        "code": "command_failed",
+        "message": "macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again"
+      }
+    }
+  },
+  {
+    "label": "old-click-fg",
+    "version": "old",
+    "mode": "direct",
+    "arguments": [
+      "input.clickPoint",
+      "90",
+      "57",
+      "--relative-to",
+      "window",
+      "--input-policy",
+      "foreground-preferred"
+    ],
+    "seconds": 1.468842834001407,
+    "exit_code": 1,
+    "output": {
+      "run_id": "01a11900-39af-7636-90c1-fda5fff722d0",
+      "status": "failed",
+      "command_id": "input.clickPoint",
+      "result": null,
+      "failure": "macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again",
+      "failure_details": {
+        "code": "command_failed",
+        "message": "macos native confirm_input_focus failed: target activation or window focus was not confirmed; recovery=resolve and focus the target again"
+      }
+    }
+  },
+  {
+    "label": "fixed-4-birch",
+    "version": "old",
+    "mode": "direct",
+    "seconds": 60,
+    "exit_code": null,
+    "timed_out": true,
+    "stdout": "",
+    "stderr": "",
+    "note": "60-second subprocess limit; capture-1 overlapped the last part of this attempt. No completed run record or final artifact."
+  }
+]

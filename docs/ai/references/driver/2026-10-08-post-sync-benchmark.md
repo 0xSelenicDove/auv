@@ -29,6 +29,11 @@ launch through exit, including any task-owned daemon startup. Failed attempts
 remain counted; their shorter duration is not a successful-task speed saving.
 These are token counts, not monetary-cost or quota estimates.
 
+The subsequent [fixed-operation investigation](2026-10-08-post-sync-isolation.md)
+reproduced the foreground-focus rejection in both frozen binaries and retained
+search timing variance and capture timeouts. It does not establish the cause of
+this full-session spike or a token improvement.
+
 In the completed case B, the skill used **135.1% more total tokens** and took
 **233.9% longer** than native. It also used more tokens and time than AUV without
 the skill. AUV's uncached-input-plus-output totals were lower than native in

@@ -1,0 +1,29 @@
+{
+  "classification": "test-only investigation; production unchanged",
+  "old_revision": "0ba6bac1",
+  "merged_revision": "50aa4972",
+  "current_docs_revision": "4948a8fc",
+  "old_sha256": "77ef631d4aef828cfaf4b5f86c4cd1f7344ba125de68db18a15025e85f6e33e0",
+  "merged_sha256": "daa52d04394adc56871bd887a68cd5b7594843367940e69d77582dcaf5805fc8",
+  "confounded_attempts": [
+    "fixed-4-birch",
+    "capture-1"
+  ],
+  "model_sessions": 0,
+  "provider_tokens_measured": false,
+  "search_order": [
+    "fixed-1-birch",
+    "fixed-2-birch",
+    "fixed-3-birch",
+    "fixed-4-birch",
+    "fixed-5-birch"
+  ],
+  "capture_order": [
+    "capture-1",
+    "capture-2",
+    "capture-3",
+    "capture-4",
+    "capture-5"
+  ],
+  "verification": "Four completed searches independently audited after all measurements; all contain exact label/code/status. Auditor uses Apple Vision, as does AUV; not an independent OCR engine."
+}

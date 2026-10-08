@@ -1,0 +1,1 @@
+{"run_id":"01a11900-1290-770b-82b6-b9506aa0ab66","status":"completed","command_id":"app.activate","result":{"requested_bundle_id":"local.auv.RepeatedSearchFixture","verification":{"observed_bundle_id":"local.auv.RepeatedSearchFixture","status":"verified_foreground"}}}

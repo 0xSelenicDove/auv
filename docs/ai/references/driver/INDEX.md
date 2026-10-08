@@ -128,3 +128,5 @@ Count: **84**
 - [Repeated visual search benchmark](2026-10-07-repeated-search-benchmark.md): Six-attempt three-method pilot with batching, current skill, startup accounting, retained interruptions, and a completed case showing fewer tokens but slightly longer elapsed time.
 
 - [Post-sync repeated visual search benchmark](2026-10-08-post-sync-benchmark.md): Six retained sessions on the merged fork; native wins both tasks, foreground-focus failure retained, total and uncached tokens distinguished.
+
+- [Post-sync focus and runtime isolation](2026-10-08-post-sync-isolation.md): Focus rejection reproduces in both binaries; fixed searches and capture probes retain timeouts, timing variance and one disclosed overlap.
