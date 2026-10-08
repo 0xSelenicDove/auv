@@ -134,3 +134,5 @@ Count: **84**
 - [Captured-window focus fix](2026-10-07-focus-badge-fix.md): Sharing-badge rejection reproduced and repaired; verified foreground search/reset, first-OCR stall profiled, and repeated-work routing clarified without token-saving claims.
 
 - [Post-fix repeated visual search benchmark](2026-10-07-post-fix-benchmark.md): Six verified sessions; focus failure absent, current skill still slower and more costly than successful pre-merge case B, variable native controls and audit exceptions retained.
+
+- [Rejected evidence reuse guidance candidate](2026-10-07-skill-evidence-candidate.md): One verified case B follow-up regressed tokens and time; incumbent restored and missing Runner final-artifact boundary identified.

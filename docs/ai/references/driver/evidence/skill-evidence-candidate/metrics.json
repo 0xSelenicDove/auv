@@ -1,0 +1,18 @@
+{
+  "trial": 4,
+  "arm": "auv_with_skill",
+  "case": "B",
+  "seconds_including_startup": 222.24048987496644,
+  "exit_code": 0,
+  "timed_out": false,
+  "usage": {
+    "input_tokens": 528434,
+    "cached_input_tokens": 486656,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 6397,
+    "reasoning_output_tokens": 1028
+  },
+  "prompt_sha256": "950d48ba09878a7b222ea7c137637658b9f86211e900eeb5e0aee029a17453b4",
+  "total_tokens": 534831,
+  "decision": "rejected_current_skill_restored"
+}
