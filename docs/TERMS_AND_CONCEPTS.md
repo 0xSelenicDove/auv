@@ -1372,7 +1372,7 @@ Across the Runner API, a capture frame stays in the Runner that produced it
   path for a remote client. An unknown/expired reference is `NOT_FOUND`, and an
   unconfigured store is `FAILED_PRECONDITION`; neither causes a fresh capture.
   Recorded Runner `input.scrollUntil` invocations persist the last streamed
-  observation as `auv.scan.scroll_until_final_capture`, matching local invoke.
+  update as `auv.scan.scroll_until_final_capture`, matching local invoke.
   Dry runs and calls without artifact recording emit no screenshot artifact.
   If optional recording fails, invoke retains the direct scroll result and emits
   `auv.invoke.artifact_preparation_failed`; it never repeats input to recover

@@ -16,7 +16,7 @@ fn retina_ocr_enlargement_keeps_small_mixed_text_readable() {
     backend: "offline.fixture".into(),
     fallback_reason: None,
   };
-  let crop = ratio_rect_to_observed(&capture, RatioRect::new(0.0, 0.0, 1.0, 1.0));
+  let crop = relative_rect_to_observed(&capture, RelativeRect::new(0.0, 0.0, 1.0, 1.0));
   let mut rows = Vec::new();
   let mut baseline_expected_found = true;
   let mut candidate_expected_found = true;
