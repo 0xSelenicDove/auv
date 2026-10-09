@@ -16,8 +16,16 @@ describe('areaOf', () => {
     expect(area.label).toBe('music')
   })
 
+  it('starts from an SDK window client and remembers its window ID', () => {
+    const client = { id: 'w-1', window: { $typeName: 'auv.api.driver.v1.Window', frame: { height: 300, width: 400, x: 10, y: 20 }, ref: { windowId: 'w-1' } } }
+    const area = areaOf(client as never)
+    expect(box(area)).toEqual({ height: 300, width: 400, x: 10, y: 20 })
+    expect(area.from).toBe('window:w-1')
+  })
+
   it('starts from an OCR match through its bounds', () => {
-    const area = areaOf({ bounds: { height: 20, width: 80, x: 10, y: 30 }, confidence: 1, text: 'Done' })
+    const match = { bounds: { height: 20, width: 80, x: 10, y: 30 }, confidence: 1, text: 'Done' }
+    const area = areaOf(match)
     expect(box(area)).toEqual({ height: 20, width: 80, x: 10, y: 30 })
     expect(area.from).toBeUndefined()
   })
@@ -69,6 +77,14 @@ describe('area relations', () => {
   it('checks containment for points and rectangles', () => {
     expect(search.contains({ x: 510, y: 90 })).toBe(true)
     expect(search.contains({ height: 10, width: 300, x: 510, y: 90 })).toBe(false)
+  })
+
+  // An SDK click target with `bounds` is a screen rectangle clicked at its
+  // center; without it, `{ x, y }` would be a window-local top-left corner.
+  it('offers its screen bounds to SDK clicks, as an inherited getter', () => {
+    expect('bounds' in search).toBe(true)
+    expect(search.bounds).toEqual({ height: 36, width: 256, x: 500, y: 82 })
+    expect(Object.keys(search)).not.toContain('bounds')
   })
 
   it('crosses to the host as plain data without methods', () => {
