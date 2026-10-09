@@ -2,6 +2,8 @@
 
 Platform drivers, input, window, capture, permissions
 
+- [Windows center-point scroll at 200% scaling](2026-10-08-windows-scroll-dpi-fix.md)
+
 Executable GUI evaluations live in
 [`evals/auv-base`](../../../../evals/auv-base/README.md), organized by platform with
 test objects, tasks, and cases. Rust runs evaluations; shared desktop receivers
@@ -148,3 +150,5 @@ Count: **87**
 - [Stall fix speed and token benchmark](2026-10-08-stall-speed-token-benchmark.md): Four fully verified model sessions; observed 96.6% more total tokens and 60.6% longer elapsed time, differing routes and extra verification work, with complete evidence.
 
 - [Skill token correction](2026-10-08-skill-token-correction.md): Same-binary four-session validation of leaner visual-search guidance; 78.9% fewer total tokens and 52.5% less time with all records verified, plus frozen skills and complete evidence.
+- [Windows one-pass collector and editing benchmarks](2026-10-08-windows-one-pass-collector.md) — stream collection, model token/time comparisons, save/reload recovery, and task-adapter JSON/image transport hardening and exact-whitespace reporting verification with evidence limits.
+- [Windows accessibility text read](2026-10-08-windows-accessibility-text.md): Recorded read-only UIA names/values through invoke, WindowService and SDK, with bounded traversal and exact-text editing trial evidence.

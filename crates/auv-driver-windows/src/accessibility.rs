@@ -24,8 +24,8 @@ use crate::error::invalid_input;
 // producing an unbounded snapshot (and guard the recursive walk against deep
 // stacks). They are independent limits: depth caps how far down we descend,
 // node count caps total breadth-times-depth output.
-const MAX_DEPTH: usize = 40;
-const MAX_NODES: usize = 2_000;
+pub const MAX_DEPTH: usize = 40;
+pub const MAX_NODES: usize = 2_000;
 
 /// One node in a flattened accessibility tree snapshot.
 ///
@@ -135,8 +135,10 @@ mod native {
   use auv_driver_common::window::Window;
   use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize};
   use windows::Win32::UI::Accessibility::{
-    CUIAutomation, IUIAutomation, IUIAutomationElement, IUIAutomationInvokePattern, IUIAutomationSelectionItemPattern,
-    IUIAutomationTreeWalker, IUIAutomationValuePattern, UIA_InvokePatternId, UIA_SelectionItemPatternId, UIA_ValuePatternId,
+    CUIAutomation, IUIAutomation, IUIAutomationCacheRequest, IUIAutomationElement, IUIAutomationInvokePattern,
+    IUIAutomationSelectionItemPattern, IUIAutomationTreeWalker, IUIAutomationValuePattern, TreeScope_Element, UIA_AutomationIdPropertyId,
+    UIA_BoundingRectanglePropertyId, UIA_ClassNamePropertyId, UIA_HasKeyboardFocusPropertyId, UIA_InvokePatternId,
+    UIA_LocalizedControlTypePropertyId, UIA_NamePropertyId, UIA_SelectionItemPatternId, UIA_ValuePatternId, UIA_ValueValuePropertyId,
   };
   use windows::core::{BSTR, Result as WindowsResult};
 
@@ -178,8 +180,14 @@ mod native {
     let walker =
       unsafe { automation.ControlViewWalker() }.map_err(|error| backend(format!("failed to get UI Automation control walker: {error}")))?;
 
+    // One fresh request per snapshot; Element scope avoids fetching an
+    // unbounded subtree before the existing traversal limits can stop it.
+    // The caching idea comes from Windows-MCP; see THIRD_PARTY_NOTICES.md
+    // and docs/ai/references/driver/2026-10-08-windows-accessibility-text.md.
+    let cache = snapshot_cache(&automation).ok();
+    let cached_root = cache.as_ref().and_then(|request| unsafe { root.BuildUpdatedCache(request) }.ok());
     let mut nodes = Vec::new();
-    walk(&walker, &root, 0, "0".to_string(), &mut nodes);
+    walk(&walker, cached_root.as_ref().unwrap_or(&root), cache.as_ref(), cached_root.is_some(), 0, "0".to_string(), &mut nodes);
     Ok(AxTreeSnapshot {
       window_ref: window.reference.id.clone(),
       nodes,
@@ -227,38 +235,128 @@ mod native {
   /// Depth-first traversal that appends each visited element, then descends
   /// through its control-view children. Traversal stops widening once the node
   /// budget is exhausted and stops descending past the depth limit.
-  fn walk(walker: &IUIAutomationTreeWalker, element: &IUIAutomationElement, depth: usize, path: String, nodes: &mut Vec<AxNode>) {
+  fn walk(
+    walker: &IUIAutomationTreeWalker,
+    element: &IUIAutomationElement,
+    cache: Option<&IUIAutomationCacheRequest>,
+    cached: bool,
+    depth: usize,
+    path: String,
+    nodes: &mut Vec<AxNode>,
+  ) {
     if nodes.len() >= MAX_NODES {
       return;
     }
-    nodes.push(node_from_element(element, depth, path.clone()));
+    // Cache only this visited element. Providers that reject caching retain
+    // the original live-property path; cached read failures also fall back.
+    nodes.push(node_from_element(element, cached, depth, path.clone()));
     if depth >= MAX_DEPTH {
       return;
     }
 
-    let mut next = unsafe { walker.GetFirstChildElement(element) }.ok();
+    let mut next = unsafe {
+      if let Some(request) = cache {
+        walker.GetFirstChildElementBuildCache(element, request).map(|child| (child, true)).or_else(|error| {
+          // windows-core 0.58 converts a successful null interface to
+          // Error::empty (S_OK): no child, not a cache failure.
+          if error.code().is_ok() {
+            Err(error)
+          } else {
+            walker.GetFirstChildElement(element).map(|child| (child, false))
+          }
+        })
+      } else {
+        walker.GetFirstChildElement(element).map(|child| (child, false))
+      }
+    }
+    .ok();
     let mut index = 0usize;
-    while let Some(child) = next {
+    while let Some((child, child_cached)) = next {
       if nodes.len() >= MAX_NODES {
         break;
       }
-      walk(walker, &child, depth + 1, format!("{path}/{index}"), nodes);
-      next = unsafe { walker.GetNextSiblingElement(&child) }.ok();
+      walk(walker, &child, cache, child_cached, depth + 1, format!("{path}/{index}"), nodes);
+      next = unsafe {
+        if let Some(request) = cache {
+          walker.GetNextSiblingElementBuildCache(&child, request).map(|sibling| (sibling, true)).or_else(|error| {
+            if error.code().is_ok() {
+              Err(error)
+            } else {
+              walker.GetNextSiblingElement(&child).map(|sibling| (sibling, false))
+            }
+          })
+        } else {
+          walker.GetNextSiblingElement(&child).map(|sibling| (sibling, false))
+        }
+      }
+      .ok();
       index += 1;
     }
   }
 
-  fn node_from_element(element: &IUIAutomationElement, depth: usize, path: String) -> AxNode {
+  fn snapshot_cache(automation: &IUIAutomation) -> WindowsResult<IUIAutomationCacheRequest> {
+    let request = unsafe { automation.CreateCacheRequest()? };
+    unsafe {
+      request.SetTreeScope(TreeScope_Element)?;
+      for property in [
+        UIA_LocalizedControlTypePropertyId,
+        UIA_NamePropertyId,
+        UIA_AutomationIdPropertyId,
+        UIA_ClassNamePropertyId,
+        UIA_HasKeyboardFocusPropertyId,
+        UIA_BoundingRectanglePropertyId,
+        UIA_ValueValuePropertyId,
+      ] {
+        request.AddProperty(property)?;
+      }
+      request.AddPattern(UIA_ValuePatternId)?;
+    }
+    Ok(request)
+  }
+
+  fn node_from_element(element: &IUIAutomationElement, cached: bool, depth: usize, path: String) -> AxNode {
     AxNode {
       depth,
       path,
-      control_type: bstr_or_default(unsafe { element.CurrentLocalizedControlType() }),
-      name: bstr_or_default(unsafe { element.CurrentName() }),
-      value: value_or_none(element),
-      automation_id: bstr_or_default(unsafe { element.CurrentAutomationId() }),
-      class_name: bstr_or_default(unsafe { element.CurrentClassName() }),
-      focused: unsafe { element.CurrentHasKeyboardFocus() }.map(|value| value.as_bool()).unwrap_or(false),
-      bounds: bounds_or_default(element),
+      control_type: bstr_or_default(unsafe {
+        if cached {
+          element.CachedLocalizedControlType().or_else(|_| element.CurrentLocalizedControlType())
+        } else {
+          element.CurrentLocalizedControlType()
+        }
+      }),
+      name: bstr_or_default(unsafe {
+        if cached {
+          element.CachedName().or_else(|_| element.CurrentName())
+        } else {
+          element.CurrentName()
+        }
+      }),
+      value: value_or_none(element, cached),
+      automation_id: bstr_or_default(unsafe {
+        if cached {
+          element.CachedAutomationId().or_else(|_| element.CurrentAutomationId())
+        } else {
+          element.CurrentAutomationId()
+        }
+      }),
+      class_name: bstr_or_default(unsafe {
+        if cached {
+          element.CachedClassName().or_else(|_| element.CurrentClassName())
+        } else {
+          element.CurrentClassName()
+        }
+      }),
+      focused: unsafe {
+        if cached {
+          element.CachedHasKeyboardFocus().or_else(|_| element.CurrentHasKeyboardFocus())
+        } else {
+          element.CurrentHasKeyboardFocus()
+        }
+      }
+      .map(|value| value.as_bool())
+      .unwrap_or(false),
+      bounds: bounds_or_default(element, cached),
     }
   }
 
@@ -266,16 +364,64 @@ mod native {
     result.map(|value| value.to_string()).unwrap_or_default()
   }
 
-  fn value_or_none(element: &IUIAutomationElement) -> Option<String> {
+  fn value_or_none(element: &IUIAutomationElement, cached: bool) -> Option<String> {
+    if cached {
+      if let Ok(pattern) = unsafe { element.GetCachedPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId) } {
+        if let Ok(value) = unsafe { pattern.CachedValue() } {
+          return Some(value.to_string());
+        }
+      }
+    }
     let pattern = unsafe { element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId) }.ok()?;
     let value = unsafe { pattern.CurrentValue() }.ok()?.to_string();
-    (!value.is_empty()).then_some(value)
+    // An exposed empty value differs from an unsupported ValuePattern.
+    Some(value)
   }
 
-  fn bounds_or_default(element: &IUIAutomationElement) -> Rect {
-    match unsafe { element.CurrentBoundingRectangle() } {
+  fn bounds_or_default(element: &IUIAutomationElement, cached: bool) -> Rect {
+    match unsafe {
+      if cached {
+        element.CachedBoundingRectangle().or_else(|_| element.CurrentBoundingRectangle())
+      } else {
+        element.CurrentBoundingRectangle()
+      }
+    } {
       Ok(rect) => rect_from_edges(rect.left, rect.top, rect.right, rect.bottom),
       Err(_) => Rect::default(),
+    }
+  }
+
+  #[cfg(test)]
+  mod cache_tests {
+    use super::*;
+
+    // Uses the owned synthetic fixture when running the Windows validation.
+    // ROOT CAUSE: a cache failure must not erase otherwise readable properties,
+    // and cached ValuePattern reads must retain Some("") rather than None.
+    #[test]
+    #[ignore = "requires the owned synthetic fixture in reset state; run alone with --ignored --test-threads=1"]
+    fn cached_snapshot_and_missing_cache_fallback_preserve_fixture_nodes() {
+      let windows = crate::window::list_windows().expect("list windows");
+      let window = windows
+        .iter()
+        .find(|window| window.title.as_deref() == Some("AUV Record Editor - Synthetic Benchmark"))
+        .expect("owned synthetic fixture must be running in reset state");
+      let _com = init_com();
+      let automation: IUIAutomation = unsafe { CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER) }.unwrap();
+      let root = unsafe { automation.ElementFromHandle(window_handle(window).unwrap()) }.unwrap();
+      let walker = unsafe { automation.ControlViewWalker() }.unwrap();
+      let request = snapshot_cache(&automation).unwrap();
+      let cached_root = unsafe { root.BuildUpdatedCache(&request) }.unwrap();
+      assert_eq!(unsafe { cached_root.CachedName() }.unwrap(), unsafe { root.CurrentName() }.unwrap());
+      let mut live = Vec::new();
+      walk(&walker, &root, None, false, 0, "0".into(), &mut live);
+      let mut cached = Vec::new();
+      walk(&walker, &cached_root, Some(&request), true, 0, "0".into(), &mut cached);
+      assert_eq!(cached, live);
+      // An uncached element intentionally takes every cached-property failure
+      // branch, including pattern/rectangle/focus reads, and falls back live.
+      assert_eq!(node_from_element(&root, true, 0, "0".into()), node_from_element(&root, false, 0, "0".into()));
+      assert!(cached.iter().any(|node| node.value.as_deref() == Some("")));
     }
   }
 }

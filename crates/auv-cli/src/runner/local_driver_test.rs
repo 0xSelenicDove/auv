@@ -1,5 +1,24 @@
 use super::*;
 
+#[cfg(target_os = "windows")]
+#[tokio::test]
+async fn accessibility_snapshot_rejects_missing_or_unknown_window_before_uia() {
+  let service = LocalWindowService {
+    session: auv_driver::open_local().unwrap(),
+  };
+  let missing = service.snapshot_accessibility(Request::new(proto::SnapshotWindowAccessibilityRequest { window: None })).await.unwrap_err();
+  assert_eq!(missing.code(), tonic::Code::InvalidArgument);
+  let unknown = service
+    .snapshot_accessibility(Request::new(proto::SnapshotWindowAccessibilityRequest {
+      window: Some(proto::WindowRef {
+        window_id: "not-a-live-window-reference".into(),
+      }),
+    }))
+    .await
+    .unwrap_err();
+  assert_eq!(unknown.code(), tonic::Code::NotFound);
+}
+
 fn test_capture_store() -> CaptureStore {
   CaptureStore::new(CaptureStoreOptions::default())
 }

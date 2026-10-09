@@ -114,6 +114,7 @@ mod native {
       button: Option<auv_driver_common::MouseButton>,
       phase: u8,
     ) -> DriverResult<auv_driver_common::InputActionResult> {
+      let _dpi = crate::dpi::DpiScope::physical_pixels()?;
       use windows::Win32::System::SystemServices::{MK_MBUTTON, MK_RBUTTON};
       use windows::Win32::UI::WindowsAndMessaging::{
         GetWindowThreadProcessId, IsChild, IsWindow, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_RBUTTONDOWN, WM_RBUTTONUP,
@@ -191,6 +192,7 @@ mod native {
     click: Click,
     modifiers: ClickModifiers,
   ) -> DriverResult<()> {
+    let _dpi = crate::dpi::DpiScope::physical_pixels()?;
     let target = resolve_target_hwnd(window, screen_point)?;
     let client = screen_to_client(target, screen_point)?;
     let lparam = make_lparam(client.x, client.y);
@@ -239,6 +241,7 @@ mod native {
   }
 
   pub(super) fn scroll(window: &Window, screen_point: Point, units: crate::input::WheelUnits) -> DriverResult<()> {
+    let _dpi = crate::dpi::DpiScope::physical_pixels()?;
     let target = resolve_target_hwnd(window, screen_point)?;
     // WM_MOUSEWHEEL/WM_MOUSEHWHEEL report the pointer position in *screen*
     // coordinates, unlike WM_LBUTTONDOWN/UP which use client coordinates.

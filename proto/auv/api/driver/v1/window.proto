@@ -7,6 +7,17 @@ import "auv/api/annotations/v1/annotations.proto";
 import "auv/api/driver/v1/geometry.proto";
 
 service WindowService {
+  // Windows UIA provider text, preserved verbatim. A bounded tree is not a
+  // guarantee of complete, visible or semantically accurate application text.
+  rpc SnapshotAccessibility(SnapshotWindowAccessibilityRequest) returns (SnapshotWindowAccessibilityResponse) {
+    option (auv.api.annotations.v1.discoverable) = true;
+    option (auv.api.annotations.v1.effect) = METHOD_EFFECT_READ_ONLY;
+    option (auv.api.annotations.v1.presentation) = {
+      name: "window.accessibility"
+      title: "Read window accessibility"
+      description: "Reads bounded Windows UIA nodes with raw names and values; unavailable on other backends."
+    };
+  }
   rpc ListWindows(ListWindowsRequest) returns (ListWindowsResponse) {
     option (auv.api.annotations.v1.discoverable) = true;
     option (auv.api.annotations.v1.effect) = METHOD_EFFECT_READ_ONLY;
@@ -73,4 +84,31 @@ message ResolveWindowRequest {
 
 message ResolveWindowResponse {
   Window window = 1;
+}
+
+message SnapshotWindowAccessibilityRequest {
+  WindowRef window = 1;
+}
+
+message WindowAccessibilityNode {
+  uint32 depth = 1;
+  string path = 2;
+  string control_type = 3;
+  string name = 4;
+  optional string value = 5;
+  string automation_id = 6;
+  string class_name = 7;
+  bool focused = 8;
+  // NOTICE(accessibility-bounds): node geometry is excluded until its Windows
+  // DPI coordinate contract is validated. Ground input in a fresh capture.
+}
+
+message SnapshotWindowAccessibilityResponse {
+  Window window = 1;
+  repeated WindowAccessibilityNode nodes = 2;
+  string backend = 3;
+  uint32 max_depth = 4;
+  uint32 max_nodes = 5;
+  // The existing driver does not report whether a traversal limit was hit.
+  bool completeness_known = 6;
 }

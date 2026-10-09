@@ -225,6 +225,19 @@ pub async fn invoke(input: crate::InvokeCommandInput, context: auv::AuvContext) 
         },
       }
     }
+    "window.accessibility" => {
+      if input.dry_run {
+        Ok(crate::InvokeCommandOutput::completed())
+      } else {
+        let snapshot = resolve_runner_window(&runner, &input)
+          .await?
+          .accessibility_snapshot()
+          .await
+          .map_err(|error| error.to_string())
+          .and_then(crate::commands::window::window_accessibility_output)?;
+        crate::commands::window::record_window_accessibility_output(snapshot).await
+      }
+    }
     "window.findText" => match input.inputs.get("query").cloned() {
       None => Err("window.findText omitted its typed query argument".to_string()),
       Some(query) => {

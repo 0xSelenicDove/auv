@@ -289,6 +289,7 @@ mod window_native {
 
   pub(super) fn capture_window_rgba(window: &Window) -> DriverResult<WindowPixels> {
     let hwnd = window_handle(window)?;
+    let _dpi = crate::dpi::DpiScope::window_rendering(hwnd)?;
     let (width, height) = window_pixel_size(hwnd)?;
     let bgra = print_window_bgra(hwnd, width, height)?;
     Ok(WindowPixels {

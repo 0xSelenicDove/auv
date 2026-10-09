@@ -3,6 +3,98 @@ use auv_driver::{CoordinateSpace, Rect, Window, WindowRef};
 use super::*;
 
 #[test]
+fn accessibility_recording_matches_the_direct_result_verbatim() {
+  use auv_tracing::{Context, MemoryTracingStore, RunId, configure, dispatcher};
+  let store = std::sync::Arc::new(MemoryTracingStore::new());
+  let dispatch = configure().tracing_store(store.clone()).build().unwrap();
+  let root = dispatcher::with_default(&dispatch, || Context::root(RunId::new()));
+  let value = serde_json::json!({"window_ref":"123","nodes":[{"name":"  Café  東京   ready.  ","value":"\tline\n  end  "}]});
+  let output = InvokeCommandOutput::from_result(&value).unwrap();
+  let future = root.in_scope(|| record_window_accessibility_output(output));
+  let recorded = futures_executor::block_on(root.instrument(future)).unwrap();
+  let artifacts = recorded.artifacts();
+  assert_eq!(artifacts.len(), 1);
+  assert_eq!(artifacts[0].purpose().as_str(), "auv.window.accessibility");
+  let body = store.artifact(artifacts[0].uri()).unwrap();
+  assert_eq!(serde_json::from_slice::<serde_json::Value>(&body).unwrap(), value);
+  assert_eq!(recorded.result().unwrap(), &value);
+}
+
+#[test]
+fn accessibility_result_preserves_provider_whitespace_and_optional_values() {
+  use auv_api_proto::auv::api::driver::v1 as proto;
+  let name = "Note:   Café  東京   ready.  ";
+  let value = "\tline one\nline  two  ";
+  let response = proto::SnapshotWindowAccessibilityResponse {
+    window: Some(proto::Window {
+      r#ref: Some(proto::WindowRef {
+        window_id: "123".into(),
+      }),
+      ..Default::default()
+    }),
+    nodes: vec![
+      proto::WindowAccessibilityNode {
+        name: name.into(),
+        value: Some(value.into()),
+        path: "0/6".into(),
+        ..Default::default()
+      },
+      proto::WindowAccessibilityNode {
+        value: None,
+        ..Default::default()
+      },
+    ],
+    backend: "windows-uia".into(),
+    max_depth: 40,
+    max_nodes: 2000,
+    completeness_known: false,
+  };
+  let output = window_accessibility_output(response).unwrap();
+  let result = output.result().unwrap();
+  assert_eq!(result["nodes"][0]["name"], name);
+  assert_eq!(result["nodes"][0]["value"], value);
+  assert_eq!(result["nodes"][0]["path"], "0/6");
+  assert!(result["nodes"][1]["value"].is_null());
+  assert_eq!(result["completeness_known"], false);
+  assert_eq!(result["max_nodes"], 2000);
+  assert_eq!(result["window_ref"], "123");
+}
+
+#[test]
+fn accessibility_result_rejects_missing_window_identity() {
+  use auv_api_proto::auv::api::driver::v1 as proto;
+  assert!(window_accessibility_output(proto::SnapshotWindowAccessibilityResponse::default()).is_err());
+  assert!(
+    window_accessibility_output(proto::SnapshotWindowAccessibilityResponse {
+      window: Some(proto::Window {
+        r#ref: Some(proto::WindowRef {
+          window_id: " ".into()
+        }),
+        ..Default::default()
+      }),
+      ..Default::default()
+    })
+    .is_err()
+  );
+}
+
+#[tokio::test]
+async fn accessibility_dry_run_validates_target_without_reading_a_window() {
+  let command = accessibility_window_invoke_command();
+  let mut input = InvokeCommandInput {
+    command_id: "window.accessibility".into(),
+    target: None,
+    inputs: Default::default(),
+    typed_args: None,
+    dry_run: true,
+    cancellation: Default::default(),
+  };
+  assert!(command.clone().invoke(input.clone()).await.is_err());
+  input.target = Some(crate::ExecutionTarget::Window { id: "123".into() });
+  assert!(command.invoke(input).await.unwrap().result().is_none());
+}
+
+#[test]
 fn window_list_filters_known_app_and_title_without_losing_matching_metadata() {
   let make_window = |id: &str, app: Option<&str>, title: Option<&str>| Window {
     reference: WindowRef { id: id.into() },

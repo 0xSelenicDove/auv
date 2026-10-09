@@ -1,5 +1,8 @@
 pub use auv_driver_common::*;
 
+#[cfg(target_os = "windows")]
+pub use auv_driver_windows::accessibility::{MAX_DEPTH as WINDOWS_AX_MAX_DEPTH, MAX_NODES as WINDOWS_AX_MAX_NODES};
+
 #[cfg(feature = "overlay")]
 pub use auv_driver_overlay as overlay;
 

@@ -20,6 +20,14 @@ UIA, and `Windows.Media.Ocr`.
 - App-level activation by process name (`ApplicationControl::activate_process_name`)
 - Overlay visual adapter (cursor, outline, status layers) via `auv-driver-overlay-windows`
 
+Window enumeration, posted pointer delivery, cursor reads,
+and SendInput pointer normalization use scoped per-monitor DPI awareness. Their
+screen coordinates therefore match DWM's physical bounds even in a DPI-unaware
+host. PrintWindow capture instead follows the target's rendering awareness so
+the bitmap fits its actual render extent. The caller's thread context is restored
+after each synchronous native operation. See the [200% scaling regression](../../docs/ai/references/driver/2026-10-08-windows-scroll-dpi-fix.md)
+for the tested scope; this does not establish exact PrintWindow/DWM border mapping.
+
 ## Open TODOs
 
 | Marker | Location | What is deferred |

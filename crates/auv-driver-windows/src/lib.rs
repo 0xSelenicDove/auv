@@ -13,6 +13,7 @@ mod descriptor;
 pub mod desktop;
 pub mod device_session;
 pub mod device_unlock_host;
+mod dpi;
 mod driver;
 mod error;
 pub mod input;

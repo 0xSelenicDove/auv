@@ -22,6 +22,7 @@ struct FakeList {
   /// Backing pixels per point for native captures.
   scale: u32,
   resolutions: Vec<CaptureResolution>,
+  sparse_pixels: bool,
 }
 
 impl FakeList {
@@ -38,6 +39,7 @@ impl FakeList {
       recognitions: 0,
       scale: 1,
       resolutions: Vec::new(),
+      sparse_pixels: false,
     }
   }
 
@@ -76,10 +78,25 @@ impl ScrollUntilSurface for FakeList {
       1
     };
     // Each logical row spans `scale` backing rows.
-    let image = RgbaImage::from_fn(40 * scale, self.viewport as u32 * scale, |_, y| {
-      let value = (((position + i64::from(y / scale)) * 37).rem_euclid(251)) as u8;
-      Rgba([value, value.wrapping_mul(3), value.wrapping_add(90), 255])
-    });
+    let image = if self.sparse_pixels {
+      // Repeated static row separators dominate the frame. Changing a small
+      // glyph leaves mean difference below 1%, as in the Windows row canvas.
+      RgbaImage::from_fn(400, 600, |x, y| {
+        let value = if y % 64 == 0 {
+          180
+        } else if x == 100 && y == 111 {
+          (position % 200) as u8
+        } else {
+          255
+        };
+        Rgba([value, value, value, 255])
+      })
+    } else {
+      RgbaImage::from_fn(40 * scale, self.viewport as u32 * scale, |_, y| {
+        let value = (((position + i64::from(y / scale)) * 37).rem_euclid(251)) as u8;
+        Rgba([value, value.wrapping_mul(3), value.wrapping_add(90), 255])
+      })
+    };
     Ok(Capture {
       origin: None,
       image,
@@ -158,6 +175,44 @@ fn end_stops_after_consecutive_no_motion_at_the_bottom() {
   assert_eq!(result.steps, 6);
   assert_eq!(streaks, [0, 0, 0, 0, 0, 1, 2]);
   assert_eq!(result.action.unwrap().selected_path, InputDeliveryPath::WindowTargetedWheel);
+}
+
+#[test]
+fn sparse_text_progress_does_not_stop_before_a_later_target() {
+  let mut list = FakeList::new(400);
+  list.sparse_pixels = true;
+  let before = list.capture(CaptureResolution::Native).unwrap();
+  list.position = 50;
+  let after = list.capture(CaptureResolution::Native).unwrap();
+  assert!(compare_viewport_pixels(&before.image, &after.image, ScrollAxis::Vertical, ViewportPixelPolicy::default()).no_motion);
+  list.position = 0;
+  list.text_row = Some(220);
+  let result = run(
+    &mut list,
+    &request(ScrollUntilCondition::TextVisible {
+      query: "TARGET ROW".into(),
+    }),
+  )
+  .unwrap();
+  assert_eq!(result.reason, ScrollUntilStopReason::TextVisible);
+  assert_eq!(result.steps, 4);
+  assert!(result.text_match.is_some());
+}
+
+#[test]
+fn sparse_text_search_still_stops_when_content_stays_unchanged_at_bottom() {
+  let mut list = FakeList::new(260);
+  list.sparse_pixels = true;
+  let result = run(
+    &mut list,
+    &request(ScrollUntilCondition::TextVisible {
+      query: "missing target".into(),
+    }),
+  )
+  .unwrap();
+  assert_eq!(result.reason, ScrollUntilStopReason::EndByNoVisualProgress);
+  assert_eq!(list.position, 200);
+  assert_eq!(result.steps, 6);
 }
 
 #[test]

@@ -863,6 +863,27 @@ pub struct WindowClient {
 }
 
 impl WindowClient {
+  /// Reads raw Windows UIA names/values through this Runner. Provider strings
+  /// are not OCR; bounded traversal does not prove complete or visible text.
+  pub async fn accessibility_snapshot(&self) -> Result<proto::SnapshotWindowAccessibilityResponse, CapabilityError> {
+    let response = proto::window_service_client::WindowServiceClient::new(self.runner.transport()?)
+      .snapshot_accessibility(proto::SnapshotWindowAccessibilityRequest {
+        window: Some(self.window_ref.clone()),
+      })
+      .await
+      .map_err(capability_status)?
+      .into_inner();
+    let window = response
+      .window
+      .as_ref()
+      .and_then(|window| window.r#ref.as_ref())
+      .ok_or_else(|| CapabilityError::InvalidResponse("accessibility snapshot omitted WindowRef".into()))?;
+    if window.window_id != self.window_ref.window_id {
+      return Err(CapabilityError::InvalidResponse("accessibility snapshot returned a different WindowRef".into()));
+    }
+    Ok(response)
+  }
+
   /// Returns the resolved typed Window.
   pub fn resource(&self) -> &auv_driver::Window {
     &self.window

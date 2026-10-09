@@ -591,6 +591,7 @@ mod native {
   }
 
   pub(super) fn current_position() -> DriverResult<Point> {
+    let _dpi = crate::dpi::DpiScope::physical_pixels()?;
     let mut point = windows::Win32::Foundation::POINT::default();
     unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut point) }
       .map_err(|error| crate::error::backend(format!("GetCursorPos failed: {error}")))?;
@@ -603,6 +604,7 @@ mod native {
   }
 
   pub(super) fn move_to(point: Point) -> DriverResult<()> {
+    let _dpi = crate::dpi::DpiScope::physical_pixels()?;
     let origin_x = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
     let origin_y = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };
     let width = unsafe { GetSystemMetrics(SM_CXVIRTUALSCREEN) };

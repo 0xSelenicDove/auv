@@ -159,6 +159,8 @@ pub struct ScrollUntilUpdate<C = Capture> {
   pub delivered: Scroll,
   /// Motion since the previous update; `None` before the first step.
   pub motion: Option<ViewportPixelMotion>,
+  /// Consecutive pixel-still steps without changed recognized content, when
+  /// recognition is already enabled. A sparse text change resets this streak.
   pub no_motion_streak: u32,
   /// The window capture this update was made from.
   pub capture: C,
@@ -241,12 +243,24 @@ pub fn scroll_until(
   let mut capture = surface.capture(resolution)?;
   let mut previous = motion_frame(&capture, request.motion_region);
   let mut no_motion_streak = 0;
+  let mut previous_text = None;
   loop {
     let text = if query.is_some() || request.output.text {
       Some(surface.recognize_text(&capture)?)
     } else {
       None
     };
+    if let Some(text) = &text {
+      // Sparse, repetitive rows can change below the mean pixel threshold.
+      // OCR is already required here; changed content disproves a still view
+      // without adding another capture or recognition pass. Pixel-only end
+      // searches keep their existing policy; the step budget bounds OCR jitter.
+      let content: Vec<_> = text.regions.iter().map(|region| region.text.split_whitespace().collect::<Vec<_>>().join(" ")).collect();
+      if previous_text.as_ref().is_some_and(|previous| previous != &content) {
+        no_motion_streak = 0;
+      }
+      previous_text = Some(content);
+    }
     result.text_match = query.zip(text.as_ref()).and_then(|(query, text)| text_match(text, query));
     // Every condition, not only `End`, stops once the viewport stays still:
     // further steps cannot reveal anything new.

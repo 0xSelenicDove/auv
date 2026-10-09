@@ -13,6 +13,7 @@ use crate::error::{invalid_input, not_found};
 
 #[cfg(target_os = "windows")]
 pub fn list_windows() -> DriverResult<Vec<Window>> {
+  let _dpi = crate::dpi::DpiScope::physical_pixels()?;
   native::list_windows()
 }
 

@@ -2511,6 +2511,45 @@ pub(super) fn display_selector_from_proto(selector: Option<proto::DisplaySelecto
 
 #[tonic::async_trait]
 impl WindowService for LocalWindowService {
+  async fn snapshot_accessibility(
+    &self,
+    request: Request<proto::SnapshotWindowAccessibilityRequest>,
+  ) -> Result<Response<proto::SnapshotWindowAccessibilityResponse>, Status> {
+    let reference = request.into_inner().window.ok_or_else(|| Status::invalid_argument("window is required"))?;
+    let window = resolve_window_ref(&self.session, reference)?;
+    #[cfg(target_os = "windows")]
+    {
+      let snapshot = self.session.accessibility().snapshot_window(&window).map_err(driver_status)?;
+      let nodes = snapshot
+        .nodes
+        .into_iter()
+        .map(|node| proto::WindowAccessibilityNode {
+          depth: node.depth as u32,
+          path: node.path,
+          control_type: node.control_type,
+          name: node.name,
+          value: node.value,
+          automation_id: node.automation_id,
+          class_name: node.class_name,
+          focused: node.focused,
+        })
+        .collect();
+      Ok(Response::new(proto::SnapshotWindowAccessibilityResponse {
+        window: Some(window_to_proto(window)),
+        nodes,
+        backend: "windows-uia".into(),
+        max_depth: auv_driver::WINDOWS_AX_MAX_DEPTH as u32,
+        max_nodes: auv_driver::WINDOWS_AX_MAX_NODES as u32,
+        completeness_known: false,
+      }))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+      let _ = window;
+      Err(Status::unimplemented("window.accessibility currently supports Windows UIA only"))
+    }
+  }
+
   async fn list_windows(&self, _request: Request<proto::ListWindowsRequest>) -> Result<Response<proto::ListWindowsResponse>, Status> {
     let windows = self.session.window().list().map_err(driver_status)?.into_iter().map(window_to_proto).collect();
     Ok(Response::new(proto::ListWindowsResponse { windows }))

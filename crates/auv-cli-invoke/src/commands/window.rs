@@ -24,9 +24,101 @@ pub fn group() -> CommandGroup {
   CommandGroup::new("window", "WINDOW")
     .command(list_windows_invoke_command())
     .command(capture_window_invoke_command())
+    .command(accessibility_window_invoke_command())
     .command(find_window_text_invoke_command())
     .command(wait_for_window_text_invoke_command())
     .command(click_window_text_invoke_command())
+}
+
+#[derive(Clone, Debug, Args, serde::Serialize, serde::Deserialize)]
+#[command(
+  after_long_help = "Example: auv invoke window.accessibility --target window:123 --json\nNames and values are raw Windows UIA provider text. Bounded traversal does not establish complete or visible text. Refresh after application changes; paths are snapshot-local identities, not durable selectors."
+)]
+struct AccessibilityWindowArgs {}
+
+#[invoke_command(
+  id = "window.accessibility",
+  target = RequiredWindow,
+  group = "window",
+  description = "Read bounded Windows UIA nodes with verbatim names and values, without activating the window.",
+  input = AccessibilityWindowArgs,
+)]
+async fn accessibility_window(input: InvokeCommandInput, _args: AccessibilityWindowArgs) -> InvokeCommandResult {
+  if input.dry_run {
+    return Ok(InvokeCommandOutput::completed());
+  }
+  #[cfg(target_os = "windows")]
+  {
+    let session = auv::local::open().map_err(|error| error.to_string())?;
+    let window = match input.target.as_ref().expect("validated window target") {
+      crate::ExecutionTarget::Window { id } => {
+        auv_driver::find_window(session.window().list().map_err(|error| error.to_string())?, id).map_err(|error| error.to_string())?
+      }
+      crate::ExecutionTarget::Application { id } => session
+        .window()
+        .resolve(auv_driver::WindowSelector {
+          app: Some(auv_driver::App::bundle_id(id.clone())),
+          main_visible: true,
+          ..Default::default()
+        })
+        .map_err(|error| error.to_string())?,
+      crate::ExecutionTarget::Display { .. } => unreachable!("validated window target"),
+    };
+    let snapshot = session.accessibility().snapshot_window(&window).map_err(|error| error.to_string())?;
+    let nodes: Vec<_> = snapshot
+      .nodes
+      .into_iter()
+      .map(|node| {
+        serde_json::json!({
+          "depth":node.depth,"path":node.path,"control_type":node.control_type,"name":node.name,"value":node.value,
+          "automation_id":node.automation_id,"class_name":node.class_name,"focused":node.focused
+        })
+      })
+      .collect();
+    let output = InvokeCommandOutput::from_result(&serde_json::json!({
+      "window_ref":snapshot.window_ref,"nodes":nodes,"backend":"windows-uia",
+      "max_depth":auv_driver::WINDOWS_AX_MAX_DEPTH,"max_nodes":auv_driver::WINDOWS_AX_MAX_NODES,
+      "completeness_known":false
+    }))?;
+    record_window_accessibility_output(output).await
+  }
+  #[cfg(not(target_os = "windows"))]
+  {
+    Err("window.accessibility currently supports Windows UIA only".into())
+  }
+}
+
+/// Projects the typed Runner snapshot without trimming provider text or
+/// interpreting it as OCR. Same direct result shape as the local command.
+pub(crate) fn window_accessibility_output(
+  snapshot: auv_api_proto::auv::api::driver::v1::SnapshotWindowAccessibilityResponse,
+) -> InvokeCommandResult {
+  let window_ref = snapshot.window.and_then(|window| window.r#ref).ok_or("accessibility snapshot omitted WindowRef")?.window_id;
+  if window_ref.trim().is_empty() {
+    return Err("accessibility snapshot omitted WindowRef id".into());
+  }
+  let nodes: Vec<_> = snapshot
+    .nodes
+    .into_iter()
+    .map(|node| {
+      serde_json::json!({"depth":node.depth,"path":node.path,"control_type":node.control_type,"name":node.name,"value":node.value,
+      "automation_id":node.automation_id,"class_name":node.class_name,"focused":node.focused})
+    })
+    .collect();
+  InvokeCommandOutput::from_result(&serde_json::json!({"window_ref":window_ref,"nodes":nodes,"backend":snapshot.backend,
+    "max_depth":snapshot.max_depth,"max_nodes":snapshot.max_nodes,"completeness_known":snapshot.completeness_known}))
+}
+
+/// Persist the exact direct result as JSON evidence through normal invoke
+/// tracing, shared by local and Runner-backed execution.
+pub(crate) async fn record_window_accessibility_output(output: InvokeCommandOutput) -> InvokeCommandResult {
+  let body = serde_json::to_vec(output.result().ok_or("accessibility output omitted result")?).map_err(|error| error.to_string())?;
+  let options = auv_tracing::EmitBytesOptions::new()
+    .with_purpose("auv.window.accessibility")
+    .with_content_type("application/json")
+    .with_file_extension("json");
+  let artifact = crate::artifact::emit_bytes_with_receipt(options, body).await;
+  Ok(output.with_artifacts(artifact))
 }
 
 #[derive(Clone, Debug, Args, serde::Serialize, serde::Deserialize)]
